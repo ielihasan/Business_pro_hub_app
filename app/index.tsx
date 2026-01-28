@@ -1,22 +1,30 @@
 import { useEffect } from 'react';
-import { View, StyleSheet, Image, Text } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { Typography, Spacing } from '@/constants/theme';
+import { useStore } from '@/store/useStore';
 
 export default function SplashIndex() {
   const { colors } = useTheme();
+  const { isAuthenticated, isLoading } = useStore();
 
   useEffect(() => {
-    // Simulate checking auth state and redirect
-    const timer = setTimeout(() => {
-      // For now, always redirect to auth
-      // In production, check if user is authenticated
-      router.replace('/(auth)/welcome');
-    }, 1500);
+    // Wait for auth to be initialized, then redirect
+    if (!isLoading) {
+      const timer = setTimeout(() => {
+        if (isAuthenticated) {
+          // User is logged in, go to main tabs
+          router.replace('/(tabs)');
+        } else {
+          // User is not logged in, go to welcome screen
+          router.replace('/(auth)/welcome');
+        }
+      }, 1000); // Short delay for splash screen effect
 
-    return () => clearTimeout(timer);
-  }, []);
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, isLoading]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

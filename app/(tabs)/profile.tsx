@@ -14,17 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Card, CardContent, Avatar, Badge, Separator, Button } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
-
-// Mock user data
-const user = {
-  name: 'Ali Hassan',
-  email: 'ali.hassan@uog.edu.pk',
-  phone: '+92 300 1234567',
-  avatar: null,
-  loyaltyPoints: 1250,
-  totalVisits: 47,
-  memberSince: 'January 2024',
-};
+import { useStore } from '@/store/useStore';
 
 const menuSections = [
   {
@@ -58,11 +48,22 @@ const menuSections = [
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
+  const { user, logout, isLoading } = useStore();
   const [toggleStates, setToggleStates] = useState<Record<string, boolean>>({
     notifications: true,
     location: true,
     theme: false,
   });
+
+  // Default user data if not logged in (shouldn't happen, but fallback)
+  const displayUser = user || {
+    name: 'Guest User',
+    email: 'guest@example.com',
+    phone: '',
+    loyaltyPoints: 0,
+    totalVisits: 0,
+    memberSince: 'Today',
+  };
 
   const handleToggle = (id: string, value: boolean) => {
     setToggleStates((prev) => ({ ...prev, [id]: value }));
@@ -96,7 +97,8 @@ export default function ProfileScreen() {
         {
           text: 'Sign Out',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
+            await logout();
             router.replace('/(auth)/welcome');
           },
         },
@@ -110,16 +112,16 @@ export default function ProfileScreen() {
         {/* Profile Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.avatarContainer}>
-            <Avatar name={user.name} size="xl" />
+            <Avatar name={displayUser.name} size="xl" />
             <View style={[styles.editBadge, { backgroundColor: colors.primary }]}>
               <Ionicons name="camera" size={14} color={colors.primaryForeground} />
             </View>
           </TouchableOpacity>
           <Text style={[styles.userName, { color: colors.foreground }]}>
-            {user.name}
+            {displayUser.name}
           </Text>
           <Text style={[styles.userEmail, { color: colors.mutedForeground }]}>
-            {user.email}
+            {displayUser.email}
           </Text>
         </View>
 
@@ -132,7 +134,7 @@ export default function ProfileScreen() {
                   <Ionicons name="star" size={20} color={colors.warning} />
                 </View>
                 <Text style={[styles.statValue, { color: colors.foreground }]}>
-                  {user.loyaltyPoints.toLocaleString()}
+                  {displayUser.loyaltyPoints.toLocaleString()}
                 </Text>
                 <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
                   Points
@@ -144,7 +146,7 @@ export default function ProfileScreen() {
                   <Ionicons name="location" size={20} color={colors.info} />
                 </View>
                 <Text style={[styles.statValue, { color: colors.foreground }]}>
-                  {user.totalVisits}
+                  {displayUser.totalVisits}
                 </Text>
                 <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
                   Visits
@@ -156,7 +158,7 @@ export default function ProfileScreen() {
                   <Ionicons name="calendar" size={20} color={colors.success} />
                 </View>
                 <Text style={[styles.statValue, { color: colors.foreground }]}>
-                  {user.memberSince.split(' ')[0]}
+                  {displayUser.memberSince.split(' ')[0]}
                 </Text>
                 <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
                   Since
@@ -231,6 +233,8 @@ export default function ProfileScreen() {
           <Button
             variant="outline"
             onPress={handleLogout}
+            loading={isLoading}
+            disabled={isLoading}
             style={[styles.logoutButton, { borderColor: colors.destructive }]}
             textStyle={{ color: colors.destructive }}
             icon={<Ionicons name="log-out-outline" size={20} color={colors.destructive} />}

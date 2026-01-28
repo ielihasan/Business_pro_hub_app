@@ -7,22 +7,28 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { Button, Input, Separator } from '@/components/ui';
+import { Button, Input } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { useStore } from '@/store/useStore';
 
 export default function LoginScreen() {
   const { colors } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
+  const { login, isLoading, authError, clearAuthError } = useStore();
+
   const handleLogin = async () => {
+    // Clear previous errors
+    clearAuthError();
+
     // Validate
     const newErrors: { email?: string; password?: string } = {};
     if (!email) {
@@ -41,19 +47,30 @@ export default function LoginScreen() {
       return;
     }
 
-    setLoading(true);
     setErrors({});
 
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
+    // Call Supabase login
+    const result = await login({ email, password });
+
+    if (result.success) {
       router.replace('/(tabs)');
-    }, 1500);
+    } else {
+      // Show error alert
+      Alert.alert(
+        'Login Failed',
+        result.error || 'Invalid email or password. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleSocialLogin = (provider: string) => {
-    // Social login logic
-    console.log(`Login with ${provider}`);
+    // Social login will be implemented later
+    Alert.alert(
+      'Coming Soon',
+      `${provider} login will be available soon!`,
+      [{ text: 'OK' }]
+    );
   };
 
   return (
@@ -85,41 +102,65 @@ export default function LoginScreen() {
             </Text>
           </View>
 
+          {/* Error Message */}
+          {authError && (
+            <View style={[styles.errorContainer, { backgroundColor: colors.destructive + '20' }]}>
+              <Ionicons name="alert-circle" size={20} color={colors.destructive} />
+              <Text style={[styles.errorMessage, { color: colors.destructive }]}>
+                {authError}
+              </Text>
+            </View>
+          )}
+
           {/* Form */}
           <View style={styles.form}>
             <Input
               label="Email"
               placeholder="Enter your email"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (errors.email) setErrors((prev) => ({ ...prev, email: '' }));
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
               leftIcon="mail-outline"
               error={errors.email}
+              editable={!isLoading}
             />
             <Input
               label="Password"
               placeholder="Enter your password"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (errors.password) setErrors((prev) => ({ ...prev, password: '' }));
+              }}
               secureTextEntry
               autoCapitalize="none"
               autoComplete="password"
               leftIcon="lock-closed-outline"
               error={errors.password}
+              editable={!isLoading}
             />
 
             <TouchableOpacity
               style={styles.forgotPassword}
               onPress={() => router.push('/(auth)/forgot-password')}
+              disabled={isLoading}
             >
               <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
                 Forgot password?
               </Text>
             </TouchableOpacity>
 
-            <Button onPress={handleLogin} loading={loading} style={styles.loginButton}>
+            <Button
+              onPress={handleLogin}
+              loading={isLoading}
+              style={styles.loginButton}
+              disabled={isLoading}
+            >
               Sign In
             </Button>
           </View>
@@ -140,7 +181,8 @@ export default function LoginScreen() {
                 styles.socialButton,
                 { backgroundColor: colors.secondary, borderColor: colors.border },
               ]}
-              onPress={() => handleSocialLogin('google')}
+              onPress={() => handleSocialLogin('Google')}
+              disabled={isLoading}
             >
               <Ionicons name="logo-google" size={20} color={colors.foreground} />
               <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
@@ -152,7 +194,8 @@ export default function LoginScreen() {
                 styles.socialButton,
                 { backgroundColor: colors.secondary, borderColor: colors.border },
               ]}
-              onPress={() => handleSocialLogin('apple')}
+              onPress={() => handleSocialLogin('Apple')}
+              disabled={isLoading}
             >
               <Ionicons name="logo-apple" size={20} color={colors.foreground} />
               <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
@@ -166,7 +209,10 @@ export default function LoginScreen() {
             <Text style={[styles.registerText, { color: colors.mutedForeground }]}>
               Don't have an account?{' '}
             </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/register')}
+              disabled={isLoading}
+            >
               <Text style={[styles.registerLink, { color: colors.primary }]}>
                 Sign up
               </Text>
@@ -207,6 +253,18 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: Typography.fontSize.base,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing[3],
+    borderRadius: BorderRadius.DEFAULT,
+    marginBottom: Spacing[4],
+    gap: Spacing[2],
+  },
+  errorMessage: {
+    flex: 1,
+    fontSize: Typography.fontSize.sm,
   },
   form: {
     gap: Spacing[4],

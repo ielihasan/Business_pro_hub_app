@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button, Input } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { useStore } from '@/store/useStore';
 
 export default function RegisterScreen() {
   const { colors } = useTheme();
@@ -24,9 +26,10 @@ export default function RegisterScreen() {
     password: '',
     confirmPassword: '',
   });
-  const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+
+  const { register, isLoading, authError, clearAuthError } = useStore();
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -76,15 +79,63 @@ export default function RegisterScreen() {
   };
 
   const handleRegister = async () => {
+    // Clear previous errors
+    clearAuthError();
+
     if (!validateForm()) return;
 
-    setLoading(true);
+    // Call Supabase register
+    const result = await register({
+      email: formData.email,
+      password: formData.password,
+      fullName: formData.fullName,
+      phone: formData.phone,
+    });
 
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-      router.replace('/(tabs)');
-    }, 1500);
+    if (result.success) {
+      // Check if session exists (email confirmation disabled) or not (email confirmation enabled)
+      const { session } = useStore.getState();
+
+      if (session) {
+        // Email confirmation disabled - user can proceed directly
+        Alert.alert(
+          'Registration Successful',
+          'Your account has been created successfully!',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.replace('/(tabs)'),
+            },
+          ]
+        );
+      } else {
+        // Email confirmation enabled - user needs to verify email
+        Alert.alert(
+          'Verify Your Email',
+          'Your account has been created. Please check your email and click the verification link before logging in.',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.replace('/(auth)/login'),
+            },
+          ]
+        );
+      }
+    } else {
+      Alert.alert(
+        'Registration Failed',
+        result.error || 'Something went wrong. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const handleSocialSignup = (provider: string) => {
+    Alert.alert(
+      'Coming Soon',
+      `${provider} signup will be available soon!`,
+      [{ text: 'OK' }]
+    );
   };
 
   return (
@@ -116,6 +167,16 @@ export default function RegisterScreen() {
             </Text>
           </View>
 
+          {/* Error Message */}
+          {authError && (
+            <View style={[styles.errorContainer, { backgroundColor: colors.destructive + '20' }]}>
+              <Ionicons name="alert-circle" size={20} color={colors.destructive} />
+              <Text style={[styles.errorMessage, { color: colors.destructive }]}>
+                {authError}
+              </Text>
+            </View>
+          )}
+
           {/* Form */}
           <View style={styles.form}>
             <Input
@@ -127,6 +188,7 @@ export default function RegisterScreen() {
               autoComplete="name"
               leftIcon="person-outline"
               error={errors.fullName}
+              editable={!isLoading}
             />
 
             <Input
@@ -139,6 +201,7 @@ export default function RegisterScreen() {
               autoComplete="email"
               leftIcon="mail-outline"
               error={errors.email}
+              editable={!isLoading}
             />
 
             <Input
@@ -150,6 +213,7 @@ export default function RegisterScreen() {
               autoComplete="tel"
               leftIcon="call-outline"
               error={errors.phone}
+              editable={!isLoading}
             />
 
             <Input
@@ -163,6 +227,7 @@ export default function RegisterScreen() {
               leftIcon="lock-closed-outline"
               error={errors.password}
               hint="Must be at least 8 characters"
+              editable={!isLoading}
             />
 
             <Input
@@ -174,12 +239,14 @@ export default function RegisterScreen() {
               autoCapitalize="none"
               leftIcon="lock-closed-outline"
               error={errors.confirmPassword}
+              editable={!isLoading}
             />
 
             {/* Terms Checkbox */}
             <TouchableOpacity
               style={styles.termsContainer}
               onPress={() => setAgreedToTerms(!agreedToTerms)}
+              disabled={isLoading}
             >
               <View
                 style={[
@@ -209,8 +276,9 @@ export default function RegisterScreen() {
 
             <Button
               onPress={handleRegister}
-              loading={loading}
+              loading={isLoading}
               style={styles.registerButton}
+              disabled={isLoading}
             >
               Create Account
             </Button>
@@ -232,6 +300,8 @@ export default function RegisterScreen() {
                 styles.socialButton,
                 { backgroundColor: colors.secondary, borderColor: colors.border },
               ]}
+              onPress={() => handleSocialSignup('Google')}
+              disabled={isLoading}
             >
               <Ionicons name="logo-google" size={20} color={colors.foreground} />
               <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
@@ -243,6 +313,8 @@ export default function RegisterScreen() {
                 styles.socialButton,
                 { backgroundColor: colors.secondary, borderColor: colors.border },
               ]}
+              onPress={() => handleSocialSignup('Apple')}
+              disabled={isLoading}
             >
               <Ionicons name="logo-apple" size={20} color={colors.foreground} />
               <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
@@ -256,7 +328,10 @@ export default function RegisterScreen() {
             <Text style={[styles.loginText, { color: colors.mutedForeground }]}>
               Already have an account?{' '}
             </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/login')}
+              disabled={isLoading}
+            >
               <Text style={[styles.loginLink, { color: colors.primary }]}>
                 Sign in
               </Text>
@@ -298,6 +373,18 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: Typography.fontSize.base,
     lineHeight: Typography.fontSize.base * Typography.lineHeight.relaxed,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing[3],
+    borderRadius: BorderRadius.DEFAULT,
+    marginBottom: Spacing[4],
+    gap: Spacing[2],
+  },
+  errorMessage: {
+    flex: 1,
+    fontSize: Typography.fontSize.sm,
   },
   form: {
     gap: Spacing[4],

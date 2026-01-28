@@ -1,4 +1,15 @@
 import { create } from 'zustand';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import {
+  loginUser,
+  registerUser,
+  logoutUser,
+  getCurrentSession,
+  getUserProfile,
+  onAuthStateChange,
+  RegisterData,
+  LoginData,
+} from '@/lib/auth';
 
 // Types
 export interface User {
@@ -70,7 +81,10 @@ export interface Notification {
 interface AppState {
   // Auth
   isAuthenticated: boolean;
+  isLoading: boolean;
   user: User | null;
+  session: Session | null;
+  authError: string | null;
 
   // Queue
   activeQueues: QueueEntry[];
@@ -91,9 +105,17 @@ interface AppState {
   locationEnabled: boolean;
   darkMode: boolean;
 
-  // Actions
+  // Auth Actions
+  login: (data: LoginData) => Promise<{ success: boolean; error?: string }>;
+  register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
+  initializeAuth: () => Promise<void>;
+  setAuthError: (error: string | null) => void;
+  clearAuthError: () => void;
+
+  // User Actions
   setUser: (user: User | null) => void;
-  setAuthenticated: (value: boolean) => void;
+  updateUserProfile: (updates: Partial<User>) => void;
 
   // Queue actions
   joinQueue: (queue: QueueEntry) => void;
@@ -117,60 +139,37 @@ interface AppState {
   toggleNotifications: () => void;
   toggleLocation: () => void;
   toggleDarkMode: () => void;
-
-  // Auth actions
-  logout: () => void;
 }
 
-// Initial mock data
-const mockUser: User = {
-  id: 'u1',
-  name: 'Ali Hassan',
-  email: 'ali.hassan@uog.edu.pk',
-  phone: '+92 300 1234567',
-  loyaltyPoints: 1250,
-  totalVisits: 47,
-  memberSince: 'January 2024',
+// Helper function to convert Supabase user to app User
+const mapSupabaseUserToUser = (
+  supabaseUser: SupabaseUser,
+  profile?: any
+): User => {
+  const metadata = supabaseUser.user_metadata || {};
+
+  return {
+    id: supabaseUser.id,
+    name: profile?.full_name || metadata.full_name || 'User',
+    email: supabaseUser.email || '',
+    phone: profile?.phone_number || metadata.phone_number || '',
+    avatar: profile?.avatar_url || metadata.avatar_url,
+    loyaltyPoints: 0, // Will be fetched from database later
+    totalVisits: 0,
+    memberSince: new Date(supabaseUser.created_at).toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+    }),
+  };
 };
-
-const mockActiveQueues: QueueEntry[] = [
-  {
-    id: 'q1',
-    businessId: '1',
-    businessName: 'Campus Coffee Shop',
-    businessCategory: 'Food & Beverage',
-    ticketNumber: 'CC-042',
-    position: 3,
-    totalInQueue: 8,
-    estimatedWait: '8 min',
-    status: 'waiting',
-    joinedAt: '10:30 AM',
-  },
-];
-
-const mockNotifications: Notification[] = [
-  {
-    id: 'n1',
-    type: 'queue_update',
-    title: 'Queue Update',
-    message: 'You are now #3 in the queue at Campus Coffee Shop',
-    read: false,
-    createdAt: '2 min ago',
-  },
-  {
-    id: 'n2',
-    type: 'loyalty',
-    title: 'Points Earned',
-    message: 'You earned 50 loyalty points from your last visit!',
-    read: true,
-    createdAt: '1 hour ago',
-  },
-];
 
 export const useStore = create<AppState>((set, get) => ({
   // Initial state
   isAuthenticated: false,
+  isLoading: true,
   user: null,
+  session: null,
+  authError: null,
   activeQueues: [],
   queueHistory: [],
   orders: [],
@@ -181,15 +180,135 @@ export const useStore = create<AppState>((set, get) => ({
   locationEnabled: true,
   darkMode: false,
 
-  // Auth actions
+  // Auth Actions
+  login: async (data: LoginData) => {
+    set({ isLoading: true, authError: null });
+
+    const result = await loginUser(data);
+
+    if (result.success && result.user) {
+      // Fetch user profile from database
+      const profile = await getUserProfile(result.user.id);
+      const user = mapSupabaseUserToUser(result.user, profile);
+
+      set({
+        isAuthenticated: true,
+        user,
+        session: result.session,
+        isLoading: false,
+        authError: null,
+      });
+
+      return { success: true };
+    } else {
+      set({
+        isAuthenticated: false,
+        user: null,
+        session: null,
+        isLoading: false,
+        authError: result.error || 'Login failed',
+      });
+
+      return { success: false, error: result.error };
+    }
+  },
+
+  register: async (data: RegisterData) => {
+    set({ isLoading: true, authError: null });
+
+    const result = await registerUser(data);
+
+    if (result.success && result.user) {
+      const user = mapSupabaseUserToUser(result.user, {
+        full_name: data.fullName,
+        phone_number: data.phone,
+      });
+
+      set({
+        isAuthenticated: true,
+        user,
+        session: result.session,
+        isLoading: false,
+        authError: null,
+      });
+
+      return { success: true };
+    } else {
+      set({
+        isAuthenticated: false,
+        user: null,
+        session: null,
+        isLoading: false,
+        authError: result.error || 'Registration failed',
+      });
+
+      return { success: false, error: result.error };
+    }
+  },
+
+  logout: async () => {
+    set({ isLoading: true });
+
+    await logoutUser();
+
+    set({
+      isAuthenticated: false,
+      user: null,
+      session: null,
+      activeQueues: [],
+      queueHistory: [],
+      orders: [],
+      notifications: [],
+      unreadCount: 0,
+      isLoading: false,
+      authError: null,
+    });
+  },
+
+  initializeAuth: async () => {
+    set({ isLoading: true });
+
+    try {
+      const session = await getCurrentSession();
+
+      if (session?.user) {
+        const profile = await getUserProfile(session.user.id);
+        const user = mapSupabaseUserToUser(session.user, profile);
+
+        set({
+          isAuthenticated: true,
+          user,
+          session,
+          isLoading: false,
+        });
+      } else {
+        set({
+          isAuthenticated: false,
+          user: null,
+          session: null,
+          isLoading: false,
+        });
+      }
+    } catch (error) {
+      console.error('Auth initialization error:', error);
+      set({
+        isAuthenticated: false,
+        user: null,
+        session: null,
+        isLoading: false,
+      });
+    }
+  },
+
+  setAuthError: (error) => set({ authError: error }),
+  clearAuthError: () => set({ authError: null }),
+
+  // User Actions
   setUser: (user) => set({ user }),
-  setAuthenticated: (value) => set({
-    isAuthenticated: value,
-    user: value ? mockUser : null,
-    activeQueues: value ? mockActiveQueues : [],
-    notifications: value ? mockNotifications : [],
-    unreadCount: value ? mockNotifications.filter(n => !n.read).length : 0,
-  }),
+
+  updateUserProfile: (updates) => set((state) => ({
+    user: state.user ? { ...state.user, ...updates } : null,
+  })),
 
   // Queue actions
   joinQueue: (queue) => set((state) => ({
@@ -274,15 +393,36 @@ export const useStore = create<AppState>((set, get) => ({
   toggleDarkMode: () => set((state) => ({
     darkMode: !state.darkMode,
   })),
-
-  // Logout
-  logout: () => set({
-    isAuthenticated: false,
-    user: null,
-    activeQueues: [],
-    queueHistory: [],
-    orders: [],
-    notifications: [],
-    unreadCount: 0,
-  }),
 }));
+
+// Setup auth state listener
+// Call this in your app's root component
+export const setupAuthListener = () => {
+  return onAuthStateChange(async (event, session) => {
+    const store = useStore.getState();
+
+    if (event === 'SIGNED_IN' && session?.user) {
+      const profile = await getUserProfile(session.user.id);
+      const user = mapSupabaseUserToUser(session.user, profile);
+
+      useStore.setState({
+        isAuthenticated: true,
+        user,
+        session,
+      });
+    } else if (event === 'SIGNED_OUT') {
+      useStore.setState({
+        isAuthenticated: false,
+        user: null,
+        session: null,
+        activeQueues: [],
+        queueHistory: [],
+        orders: [],
+        notifications: [],
+        unreadCount: 0,
+      });
+    } else if (event === 'TOKEN_REFRESHED' && session) {
+      useStore.setState({ session });
+    }
+  });
+};
