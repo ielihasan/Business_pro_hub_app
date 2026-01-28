@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,6 +29,8 @@ export default function RegisterScreen() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
 
   const { register, isLoading, authError, clearAuthError } = useStore();
 
@@ -109,24 +112,28 @@ export default function RegisterScreen() {
           ]
         );
       } else {
-        // Email confirmation enabled - user needs to verify email
-        Alert.alert(
-          'Verify Your Email',
-          'Your account has been created. Please check your email and click the verification link before logging in.',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/(auth)/login'),
-            },
-          ]
-        );
+        // Email confirmation enabled - show verification modal
+        setRegisteredEmail(formData.email);
+        setShowVerificationModal(true);
       }
     } else {
-      Alert.alert(
-        'Registration Failed',
-        result.error || 'Something went wrong. Please try again.',
-        [{ text: 'OK' }]
-      );
+      // Check if it's a duplicate email error
+      if (result.error?.includes('already registered')) {
+        Alert.alert(
+          'Email Already Registered',
+          'This email is already registered. Please sign in or use a different email address.',
+          [
+            { text: 'Sign In', onPress: () => router.push('/(auth)/login') },
+            { text: 'Try Again', style: 'cancel' },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Registration Failed',
+          result.error || 'Something went wrong. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
     }
   };
 
@@ -339,6 +346,66 @@ export default function RegisterScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Email Verification Modal */}
+      <Modal
+        visible={showVerificationModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            {/* Email Icon */}
+            <View style={[styles.modalIconContainer, { backgroundColor: colors.primary + '20' }]}>
+              <Ionicons name="mail-outline" size={48} color={colors.primary} />
+            </View>
+
+            {/* Title */}
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+              Verify Your Email
+            </Text>
+
+            {/* Description */}
+            <Text style={[styles.modalDescription, { color: colors.mutedForeground }]}>
+              We've sent a verification link to:
+            </Text>
+            <Text style={[styles.modalEmail, { color: colors.primary }]}>
+              {registeredEmail}
+            </Text>
+            <Text style={[styles.modalDescription, { color: colors.mutedForeground }]}>
+              Please check your inbox and click the link to verify your account before signing in.
+            </Text>
+
+            {/* Tips */}
+            <View style={[styles.tipsContainer, { backgroundColor: colors.secondary }]}>
+              <View style={styles.tipRow}>
+                <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                <Text style={[styles.tipText, { color: colors.mutedForeground }]}>
+                  Check your spam/junk folder
+                </Text>
+              </View>
+              <View style={styles.tipRow}>
+                <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                <Text style={[styles.tipText, { color: colors.mutedForeground }]}>
+                  Email may take a few minutes to arrive
+                </Text>
+              </View>
+            </View>
+
+            {/* Button */}
+            <Button
+              onPress={() => {
+                setShowVerificationModal(false);
+                router.replace('/(auth)/login');
+              }}
+              style={styles.modalButton}
+            >
+              Go to Sign In
+            </Button>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -459,5 +526,72 @@ const styles = StyleSheet.create({
   loginLink: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semibold,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing[6],
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing[6],
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  modalIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing[4],
+  },
+  modalTitle: {
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: Typography.fontWeight.bold,
+    marginBottom: Spacing[3],
+    textAlign: 'center',
+  },
+  modalDescription: {
+    fontSize: Typography.fontSize.base,
+    textAlign: 'center',
+    lineHeight: Typography.fontSize.base * Typography.lineHeight.relaxed,
+    marginBottom: Spacing[2],
+  },
+  modalEmail: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    marginBottom: Spacing[3],
+    textAlign: 'center',
+  },
+  tipsContainer: {
+    width: '100%',
+    borderRadius: BorderRadius.DEFAULT,
+    padding: Spacing[4],
+    marginTop: Spacing[4],
+    marginBottom: Spacing[4],
+    gap: Spacing[2],
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing[2],
+  },
+  tipText: {
+    fontSize: Typography.fontSize.sm,
+    flex: 1,
+  },
+  modalButton: {
+    width: '100%',
+    marginTop: Spacing[2],
   },
 });

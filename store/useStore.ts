@@ -187,6 +187,21 @@ export const useStore = create<AppState>((set, get) => ({
     const result = await loginUser(data);
 
     if (result.success && result.user) {
+      // Check if email is confirmed
+      if (!result.user.email_confirmed_at && !result.user.confirmed_at) {
+        set({
+          isAuthenticated: false,
+          user: null,
+          session: null,
+          isLoading: false,
+          authError: null,
+        });
+        return {
+          success: false,
+          error: 'Please verify your email address before logging in. Check your inbox for a confirmation link.'
+        };
+      }
+
       // Fetch user profile from database
       const profile = await getUserProfile(result.user.id);
       const user = mapSupabaseUserToUser(result.user, profile);
@@ -219,18 +234,32 @@ export const useStore = create<AppState>((set, get) => ({
     const result = await registerUser(data);
 
     if (result.success && result.user) {
-      const user = mapSupabaseUserToUser(result.user, {
-        full_name: data.fullName,
-        phone_number: data.phone,
-      });
+      // Check if session exists - if not, email confirmation is required
+      if (result.session) {
+        // Email confirmation disabled - user can login immediately
+        const user = mapSupabaseUserToUser(result.user, {
+          full_name: data.fullName,
+          phone_number: data.phone,
+        });
 
-      set({
-        isAuthenticated: true,
-        user,
-        session: result.session,
-        isLoading: false,
-        authError: null,
-      });
+        set({
+          isAuthenticated: true,
+          user,
+          session: result.session,
+          isLoading: false,
+          authError: null,
+        });
+      } else {
+        // Email confirmation enabled - user needs to verify email first
+        // Don't set isAuthenticated to true
+        set({
+          isAuthenticated: false,
+          user: null,
+          session: null,
+          isLoading: false,
+          authError: null,
+        });
+      }
 
       return { success: true };
     } else {
@@ -271,7 +300,8 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const session = await getCurrentSession();
 
-      if (session?.user) {
+      // Only authenticate if session exists AND email is confirmed
+      if (session?.user && (session.user.email_confirmed_at || session.user.confirmed_at)) {
         const profile = await getUserProfile(session.user.id);
         const user = mapSupabaseUserToUser(session.user, profile);
 
@@ -401,15 +431,21 @@ export const setupAuthListener = () => {
   return onAuthStateChange(async (event, session) => {
     const store = useStore.getState();
 
+    // Only update auth state if there's a valid session with confirmed email
     if (event === 'SIGNED_IN' && session?.user) {
-      const profile = await getUserProfile(session.user.id);
-      const user = mapSupabaseUserToUser(session.user, profile);
+      // Check if email is confirmed (user has valid session)
+      // Don't auto-login if this is from a registration without email confirmation
+      if (session.user.email_confirmed_at || session.user.confirmed_at) {
+        const profile = await getUserProfile(session.user.id);
+        const user = mapSupabaseUserToUser(session.user, profile);
 
-      useStore.setState({
-        isAuthenticated: true,
-        user,
-        session,
-      });
+        useStore.setState({
+          isAuthenticated: true,
+          user,
+          session,
+        });
+      }
+      // If email not confirmed, don't set isAuthenticated
     } else if (event === 'SIGNED_OUT') {
       useStore.setState({
         isAuthenticated: false,

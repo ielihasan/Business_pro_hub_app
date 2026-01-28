@@ -40,9 +40,15 @@ export async function registerUser(data: RegisterData): Promise<AuthResponse> {
     });
 
     if (authError) {
+      // Check for user already exists error
+      let errorMessage = authError.message;
+      if (authError.message.includes('User already registered') ||
+          authError.message.includes('already been registered')) {
+        errorMessage = 'This email is already registered. Please sign in or use a different email.';
+      }
       return {
         success: false,
-        error: authError.message,
+        error: errorMessage,
       };
     }
 
@@ -50,6 +56,15 @@ export async function registerUser(data: RegisterData): Promise<AuthResponse> {
       return {
         success: false,
         error: 'Registration failed. Please try again.',
+      };
+    }
+
+    // Check if user already exists (Supabase returns user but no session when email exists)
+    // This happens when email confirmation is enabled and user tries to register again
+    if (authData.user && !authData.session && authData.user.identities?.length === 0) {
+      return {
+        success: false,
+        error: 'This email is already registered. Please sign in or use a different email.',
       };
     }
 

@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,6 +23,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
 
   const { login, isLoading, authError, clearAuthError } = useStore();
 
@@ -55,12 +57,17 @@ export default function LoginScreen() {
     if (result.success) {
       router.replace('/(tabs)');
     } else {
-      // Show error alert
-      Alert.alert(
-        'Login Failed',
-        result.error || 'Invalid email or password. Please try again.',
-        [{ text: 'OK' }]
-      );
+      // Check if email not verified
+      if (result.error?.includes('verify your email') || result.error?.includes('Email not confirmed')) {
+        setShowVerifyModal(true);
+      } else {
+        // Show error alert
+        Alert.alert(
+          'Login Failed',
+          result.error || 'Invalid email or password. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
     }
   };
 
@@ -220,6 +227,66 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Email Verification Required Modal */}
+      <Modal
+        visible={showVerifyModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowVerifyModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            {/* Warning Icon */}
+            <View style={[styles.modalIconContainer, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="warning-outline" size={48} color="#F59E0B" />
+            </View>
+
+            {/* Title */}
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+              Email Not Verified
+            </Text>
+
+            {/* Description */}
+            <Text style={[styles.modalDescription, { color: colors.mutedForeground }]}>
+              Please verify your email address before signing in.
+            </Text>
+            <Text style={[styles.modalEmail, { color: colors.primary }]}>
+              {email}
+            </Text>
+
+            {/* Tips */}
+            <View style={[styles.tipsContainer, { backgroundColor: colors.secondary }]}>
+              <View style={styles.tipRow}>
+                <Ionicons name="mail-outline" size={16} color={colors.primary} />
+                <Text style={[styles.tipText, { color: colors.mutedForeground }]}>
+                  Check your inbox for the verification email
+                </Text>
+              </View>
+              <View style={styles.tipRow}>
+                <Ionicons name="folder-outline" size={16} color={colors.primary} />
+                <Text style={[styles.tipText, { color: colors.mutedForeground }]}>
+                  Also check your spam/junk folder
+                </Text>
+              </View>
+              <View style={styles.tipRow}>
+                <Ionicons name="link-outline" size={16} color={colors.primary} />
+                <Text style={[styles.tipText, { color: colors.mutedForeground }]}>
+                  Click the link in the email to verify
+                </Text>
+              </View>
+            </View>
+
+            {/* Button */}
+            <Button
+              onPress={() => setShowVerifyModal(false)}
+              style={styles.modalButton}
+            >
+              Got It
+            </Button>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -322,5 +389,72 @@ const styles = StyleSheet.create({
   registerLink: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semibold,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing[6],
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing[6],
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  modalIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing[4],
+  },
+  modalTitle: {
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: Typography.fontWeight.bold,
+    marginBottom: Spacing[3],
+    textAlign: 'center',
+  },
+  modalDescription: {
+    fontSize: Typography.fontSize.base,
+    textAlign: 'center',
+    lineHeight: Typography.fontSize.base * Typography.lineHeight.relaxed,
+    marginBottom: Spacing[2],
+  },
+  modalEmail: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    marginBottom: Spacing[3],
+    textAlign: 'center',
+  },
+  tipsContainer: {
+    width: '100%',
+    borderRadius: BorderRadius.DEFAULT,
+    padding: Spacing[4],
+    marginTop: Spacing[4],
+    marginBottom: Spacing[4],
+    gap: Spacing[3],
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing[2],
+  },
+  tipText: {
+    fontSize: Typography.fontSize.sm,
+    flex: 1,
+  },
+  modalButton: {
+    width: '100%',
+    marginTop: Spacing[2],
   },
 });
