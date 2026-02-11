@@ -1,0 +1,140 @@
+{
+    "translation": {
+        "common": {
+            "search_placeholder": "Rechercher des entreprises...",
+            "see_all": "Voir tout",
+            "view_details": "Voir les détails",
+            "open": "Ouvert",
+            "closed": "Fermé",
+            "loading": "Chargement...",
+            "error": "Une erreur est survenue",
+            "success": "Succès",
+            "cancel": "Annuler",
+            "confirm": "Confirmer"
+        },
+        "tabs": {
+            "home": "Accueil",
+            "queue": "Ma File",
+            "scan": "Scanner",
+            "orders": "Commandes",
+            "profile": "Profil"
+        },
+        "home": {
+            "categories": {
+                "title": "Catégories",
+                "all": "Tout",
+                "food": "Nourriture",
+                "print": "Impression",
+                "health": "Santé",
+                "repair": "Réparation",
+                "salon": "Salon"
+            },
+            "active_queue": {
+                "title": "Actuellement dans la file",
+                "position": "Position",
+                "est_wait": "Attente est."
+            },
+            "nearby": {
+                "title": "Entreprises à proximité",
+                "in_queue": "dans la file",
+                "wait_time": "temps d'attente"
+            }
+        },
+        "queue": {
+            "tabs": {
+                "active": "Actif",
+                "history": "Historique"
+            },
+            "card": {
+                "your_position": "Votre position",
+                "in_queue": "dans la file",
+                "est_wait": "Temps d'attente est.",
+                "joined_at": "Rejoint à",
+                "progress": "Progression de la file",
+                "leave": "Quitter la file",
+                "service_time": "Temps de service"
+            },
+            "status": {
+                "waiting": "En attente",
+                "completed": "Terminé",
+                "cancelled": "Annulé"
+            },
+            "empty": {
+                "active_title": "Aucune file d'attente active",
+                "active_desc": "Scannez un code QR ou recherchez une entreprise pour rejoindre une file d'attente",
+                "history_title": "Aucun historique",
+                "history_desc": "Vos visites précédentes apparaîtront ici",
+                "scan_button": "Scanner le code QR"
+            },
+            "leave_modal": {
+                "title": "Quitter la file",
+                "message": "Êtes-vous sûr de vouloir quitter cette file ? Vous perdrez votre position.",
+                "confirm_action": "Quitter la file"
+            }
+        },
+        "orders": {
+            "tabs": {
+                "all": "Toutes les commandes",
+                "active": "Actives",
+                "completed": "Terminées"
+            },
+            "status": {
+                "pending": "En attente",
+                "in_progress": "En préparation",
+                "ready": "Prêt",
+                "completed": "Terminé",
+                "cancelled": "Annulé",
+                "unknown": "Inconnu"
+            },
+            "card": {
+                "total": "Total",
+                "ready_message": "Votre commande est prête à être récupérée !"
+            },
+            "empty": {
+                "title": "Aucune commande trouvée",
+                "active_desc": "Vous n'avez aucune commande active pour le moment",
+                "completed_desc": "Vos commandes terminées apparaîtront ici",
+                "all_desc": "Votre historique de commandes apparaîtra ici"
+            }
+        },
+        "profile": {
+            "title": "Profil",
+            "edit_badge": "Modifier",
+            "guest": "Invité",
+            "stats": {
+                "points": "Points",
+                "visits": "Visites",
+                "since": "Depuis"
+            },
+            "sections": {
+                "account": "Compte",
+                "preferences": "Préférences",
+                "support": "Support"
+            },
+            "menu": {
+                "edit_profile": "Modifier le profil",
+                "loyalty": "Fidélité et Récompenses",
+                "payment": "Méthodes de paiement",
+                "addresses": "Adresses enregistrées",
+                "notifications": "Notifications",
+                "location": "Services de localisation",
+                "language": "Langue",
+                "dark_mode": "Mode sombre",
+                "help": "Centre d'aide",
+                "feedback": "Envoyer des commentaires",
+                "about": "À propos",
+                "terms": "Termes et confidentialité"
+            },
+            "sign_out": "Se déconnecter",
+            "confirm_sign_out": {
+                "title": "Se déconnecter",
+                "message": "Êtes-vous sûr de vouloir vous déconnecter ?",
+                "cancel": "Annuler",
+                "confirm": "Se déconnecter"
+            },
+            "change_language": "Changer de langue",
+            "select_language": "Sélectionnez votre langue préférée",
+            "cancel": "Annuler"
+        }
+    }
+}

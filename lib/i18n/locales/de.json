@@ -1,0 +1,140 @@
+{
+    "translation": {
+        "common": {
+            "search_placeholder": "Geschäfte suchen...",
+            "see_all": "Alle ansehen",
+            "view_details": "Details ansehen",
+            "open": "Geöffnet",
+            "closed": "Geschlossen",
+            "loading": "Laden...",
+            "error": "Etwas ist schief gelaufen",
+            "success": "Erfolg",
+            "cancel": "Abbrechen",
+            "confirm": "Bestätigen"
+        },
+        "tabs": {
+            "home": "Startseite",
+            "queue": "Meine Warteschlange",
+            "scan": "Scannen",
+            "orders": "Bestellungen",
+            "profile": "Profil"
+        },
+        "home": {
+            "categories": {
+                "title": "Kategorien",
+                "all": "Alle",
+                "food": "Essen",
+                "print": "Drucken",
+                "health": "Gesundheit",
+                "repair": "Reparatur",
+                "salon": "Salon"
+            },
+            "active_queue": {
+                "title": "Aktuell in der Warteschlange",
+                "position": "Position",
+                "est_wait": "Geschätzte Wartezeit"
+            },
+            "nearby": {
+                "title": "Geschäfte in der Nähe",
+                "in_queue": "in der Warteschlange",
+                "wait_time": "Wartezeit"
+            }
+        },
+        "queue": {
+            "tabs": {
+                "active": "Aktiv",
+                "history": "Verlauf"
+            },
+            "card": {
+                "your_position": "Ihre Position",
+                "in_queue": "in der Warteschlange",
+                "est_wait": "Geschätzte Wartezeit",
+                "joined_at": "Beigetreten um",
+                "progress": "Warteschlangenfortschritt",
+                "leave": "Warteschlange verlassen",
+                "service_time": "Servicezeit"
+            },
+            "status": {
+                "waiting": "Warten",
+                "completed": "Abgeschlossen",
+                "cancelled": "Storniert"
+            },
+            "empty": {
+                "active_title": "Keine aktiven Warteschlangen",
+                "active_desc": "Scannen Sie einen QR-Code oder suchen Sie nach einem Geschäft, um einer Warteschlange beizutreten",
+                "history_title": "Kein Warteschlangenverlauf",
+                "history_desc": "Ihre vergangenen Warteschlangenbesuche werden hier angezeigt",
+                "scan_button": "QR-Code scannen"
+            },
+            "leave_modal": {
+                "title": "Warteschlange verlassen",
+                "message": "Sind Sie sicher, dass Sie diese Warteschlange verlassen möchten? Sie verlieren Ihre Position.",
+                "confirm_action": "Warteschlange verlassen"
+            }
+        },
+        "orders": {
+            "tabs": {
+                "all": "Alle Bestellungen",
+                "active": "Aktiv",
+                "completed": "Abgeschlossen"
+            },
+            "status": {
+                "pending": "Ausstehend",
+                "in_progress": "In Vorbereitung",
+                "ready": "Bereit",
+                "completed": "Abgeschlossen",
+                "cancelled": "Storniert",
+                "unknown": "Unbekannt"
+            },
+            "card": {
+                "total": "Gesamt",
+                "ready_message": "Ihre Bestellung ist zur Abholung bereit!"
+            },
+            "empty": {
+                "title": "Keine Bestellungen gefunden",
+                "active_desc": "Sie haben derzeit keine aktiven Bestellungen",
+                "completed_desc": "Ihre abgeschlossenen Bestellungen werden hier angezeigt",
+                "all_desc": "Ihr Bestellverlauf wird hier angezeigt"
+            }
+        },
+        "profile": {
+            "title": "Profil",
+            "edit_badge": "Bearbeiten",
+            "guest": "Gastbenutzer",
+            "stats": {
+                "points": "Punkte",
+                "visits": "Besuche",
+                "since": "Seit"
+            },
+            "sections": {
+                "account": "Konto",
+                "preferences": "Einstellungen",
+                "support": "Support"
+            },
+            "menu": {
+                "edit_profile": "Profil bearbeiten",
+                "loyalty": "Treue & Belohnungen",
+                "payment": "Zahlungsmethoden",
+                "addresses": "Gespeicherte Adressen",
+                "notifications": "Benachrichtigungen",
+                "location": "Standortdienste",
+                "language": "Sprache",
+                "dark_mode": "Dunkelmodus",
+                "help": "Hilfezentrum",
+                "feedback": "Feedback senden",
+                "about": "Über",
+                "terms": "AGB & Datenschutz"
+            },
+            "sign_out": "Abmelden",
+            "confirm_sign_out": {
+                "title": "Abmelden",
+                "message": "Sind Sie sicher, dass Sie sich abmelden möchten?",
+                "cancel": "Abbrechen",
+                "confirm": "Abmelden"
+            },
+            "change_language": "Sprache ändern",
+            "select_language": "Wählen Sie Ihre bevorzugte Sprache",
+            "cancel": "Abbrechen"
+        }
+    }
+}

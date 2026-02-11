@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm start)",
+      "Bash(npx expo install:*)",
+      "Bash(npx expo start:*)",
+      "Bash(npm install:*)",
+      "Bash(npx kill-port:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}

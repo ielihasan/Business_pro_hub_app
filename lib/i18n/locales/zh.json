@@ -1,0 +1,140 @@
+{
+    "translation": {
+        "common": {
+            "search_placeholder": "搜索商家...",
+            "see_all": "查看全部",
+            "view_details": "查看详情",
+            "open": "营业中",
+            "closed": "已关闭",
+            "loading": "加载中...",
+            "error": "出错了",
+            "success": "成功",
+            "cancel": "取消",
+            "confirm": "确认"
+        },
+        "tabs": {
+            "home": "首页",
+            "queue": "我的排队",
+            "scan": "扫一扫",
+            "orders": "订单",
+            "profile": "个人中心"
+        },
+        "home": {
+            "categories": {
+                "title": "分类",
+                "all": "全部",
+                "food": "美食",
+                "print": "打印",
+                "health": "健康",
+                "repair": "维修",
+                "salon": "美容"
+            },
+            "active_queue": {
+                "title": "当前正在排队",
+                "position": "位置",
+                "est_wait": "预计等待"
+            },
+            "nearby": {
+                "title": "附近商家",
+                "in_queue": "排队中",
+                "wait_time": "等待时间"
+            }
+        },
+        "queue": {
+            "tabs": {
+                "active": "进行中",
+                "history": "历史记录"
+            },
+            "card": {
+                "your_position": "您的位置",
+                "in_queue": "排队中",
+                "est_wait": "预计等待时间",
+                "joined_at": "加入时间",
+                "progress": "排队进度",
+                "leave": "离开队列",
+                "service_time": "服务时间"
+            },
+            "status": {
+                "waiting": "等待中",
+                "completed": "已完成",
+                "cancelled": "已取消"
+            },
+            "empty": {
+                "active_title": "没有正在进行的排队",
+                "active_desc": "扫描二维码或搜索商家加入队列",
+                "history_title": "没有历史记录",
+                "history_desc": "您过去的排队访问将显示在这里",
+                "scan_button": "扫描二维码"
+            },
+            "leave_modal": {
+                "title": "离开队列",
+                "message": "您确定要离开此队列吗？您将失去您的位置。",
+                "confirm_action": "离开队列"
+            }
+        },
+        "orders": {
+            "tabs": {
+                "all": "全部订单",
+                "active": "进行中",
+                "completed": "已完成"
+            },
+            "status": {
+                "pending": "待处理",
+                "in_progress": "准备中",
+                "ready": "就绪",
+                "completed": "已完成",
+                "cancelled": "已取消",
+                "unknown": "未知"
+            },
+            "card": {
+                "total": "总计",
+                "ready_message": "您的订单已准备好取货！"
+            },
+            "empty": {
+                "title": "未找到订单",
+                "active_desc": "您目前没有进行中的订单",
+                "completed_desc": "这里将显示您已完成的订单",
+                "all_desc": "这里将显示您的订单历史记录"
+            }
+        },
+        "profile": {
+            "title": "个人资料",
+            "edit_badge": "编辑",
+            "guest": "访客用户",
+            "stats": {
+                "points": "积分",
+                "visits": "访问",
+                "since": "自"
+            },
+            "sections": {
+                "account": "账户",
+                "preferences": "偏好设置",
+                "support": "支持"
+            },
+            "menu": {
+                "edit_profile": "编辑个人资料",
+                "loyalty": "忠诚度与奖励",
+                "payment": "支付方式",
+                "addresses": "保存的地址",
+                "notifications": "通知",
+                "location": "定位服务",
+                "language": "语言",
+                "dark_mode": "深色模式",
+                "help": "帮助中心",
+                "feedback": "发送反馈",
+                "about": "关于",
+                "terms": "条款与隐私"
+            },
+            "sign_out": "退出登录",
+            "confirm_sign_out": {
+                "title": "退出登录",
+                "message": "您确定要退出登录吗？",
+                "cancel": "取消",
+                "confirm": "退出"
+            },
+            "change_language": "更改语言",
+            "select_language": "选择您的首选语言",
+            "cancel": "取消"
+        }
+    }
+}

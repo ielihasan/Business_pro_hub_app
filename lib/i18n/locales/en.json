@@ -1,0 +1,140 @@
+{
+    "translation": {
+        "common": {
+            "search_placeholder": "Search businesses...",
+            "see_all": "See All",
+            "view_details": "View Details",
+            "open": "Open",
+            "closed": "Closed",
+            "loading": "Loading...",
+            "error": "Something went wrong",
+            "success": "Success",
+            "cancel": "Cancel",
+            "confirm": "Confirm"
+        },
+        "tabs": {
+            "home": "Home",
+            "queue": "My Queue",
+            "scan": "Scan",
+            "orders": "Orders",
+            "profile": "Profile"
+        },
+        "home": {
+            "categories": {
+                "title": "Categories",
+                "all": "All",
+                "food": "Food",
+                "print": "Print",
+                "health": "Health",
+                "repair": "Repair",
+                "salon": "Salon"
+            },
+            "active_queue": {
+                "title": "Currently in queue",
+                "position": "Position",
+                "est_wait": "Est. Wait"
+            },
+            "nearby": {
+                "title": "Nearby Businesses",
+                "in_queue": "in queue",
+                "wait_time": "wait time"
+            }
+        },
+        "queue": {
+            "tabs": {
+                "active": "Active",
+                "history": "History"
+            },
+            "card": {
+                "your_position": "Your Position",
+                "in_queue": "in queue",
+                "est_wait": "Est. Wait Time",
+                "joined_at": "Joined at",
+                "progress": "Queue Progress",
+                "leave": "Leave Queue",
+                "service_time": "Service time"
+            },
+            "status": {
+                "waiting": "Waiting",
+                "completed": "Completed",
+                "cancelled": "Cancelled"
+            },
+            "empty": {
+                "active_title": "No Active Queues",
+                "active_desc": "Scan a QR code or search for a business to join a queue",
+                "history_title": "No Queue History",
+                "history_desc": "Your past queue visits will appear here",
+                "scan_button": "Scan QR Code"
+            },
+            "leave_modal": {
+                "title": "Leave Queue",
+                "message": "Are you sure you want to leave this queue? You will lose your position.",
+                "confirm_action": "Leave Queue"
+            }
+        },
+        "orders": {
+            "tabs": {
+                "all": "All Orders",
+                "active": "Active",
+                "completed": "Completed"
+            },
+            "status": {
+                "pending": "Pending",
+                "in_progress": "Preparing",
+                "ready": "Ready",
+                "completed": "Completed",
+                "cancelled": "Cancelled",
+                "unknown": "Unknown"
+            },
+            "card": {
+                "total": "Total",
+                "ready_message": "Your order is ready for pickup!"
+            },
+            "empty": {
+                "title": "No Orders Found",
+                "active_desc": "You have no active orders at the moment",
+                "completed_desc": "Your completed orders will appear here",
+                "all_desc": "Your order history will appear here"
+            }
+        },
+        "profile": {
+            "title": "Profile",
+            "edit_badge": "Edit",
+            "guest": "Guest User",
+            "stats": {
+                "points": "Points",
+                "visits": "Visits",
+                "since": "Since"
+            },
+            "sections": {
+                "account": "Account",
+                "preferences": "Preferences",
+                "support": "Support"
+            },
+            "menu": {
+                "edit_profile": "Edit Profile",
+                "loyalty": "Loyalty & Rewards",
+                "payment": "Payment Methods",
+                "addresses": "Saved Addresses",
+                "notifications": "Notifications",
+                "location": "Location Services",
+                "language": "Language",
+                "dark_mode": "Dark Mode",
+                "help": "Help Center",
+                "feedback": "Send Feedback",
+                "about": "About",
+                "terms": "Terms & Privacy"
+            },
+            "sign_out": "Sign Out",
+            "confirm_sign_out": {
+                "title": "Sign Out",
+                "message": "Are you sure you want to sign out?",
+                "cancel": "Cancel",
+                "confirm": "Sign Out"
+            },
+            "change_language": "Change Language",
+            "select_language": "Select your preferred language",
+            "cancel": "Cancel"
+        }
+    }
+}

@@ -1,0 +1,140 @@
+{
+    "translation": {
+        "common": {
+            "search_placeholder": "व्यवसाय खोजें...",
+            "see_all": "सभी देखें",
+            "view_details": "विवरण देखें",
+            "open": "खुला है",
+            "closed": "बंद है",
+            "loading": "लोड हो रहा है...",
+            "error": "कुछ गलत हो गया",
+            "success": "सफलता",
+            "cancel": "रद्द करें",
+            "confirm": "पुष्टि करें"
+        },
+        "tabs": {
+            "home": "होम",
+            "queue": "मेरी कतार",
+            "scan": "स्कैन",
+            "orders": "आदेश",
+            "profile": "प्रोफ़ाइल"
+        },
+        "home": {
+            "categories": {
+                "title": "श्रेणियाँ",
+                "all": "सभी",
+                "food": "खाना",
+                "print": "प्रिंट",
+                "health": "स्वास्थ्य",
+                "repair": "मरम्मत",
+                "salon": "सैलून"
+            },
+            "active_queue": {
+                "title": "वर्तमान में कतार में",
+                "position": "स्थान",
+                "est_wait": "अनुमानित प्रतीक्षा"
+            },
+            "nearby": {
+                "title": "निकटवर्ती व्यवसाय",
+                "in_queue": "कतार में",
+                "wait_time": "प्रतीक्षा समय"
+            }
+        },
+        "queue": {
+            "tabs": {
+                "active": "सक्रिय",
+                "history": "इतिहास"
+            },
+            "card": {
+                "your_position": "आपका स्थान",
+                "in_queue": "कतार में",
+                "est_wait": "अनुमानित प्रतीक्षा समय",
+                "joined_at": "शामिल हुए",
+                "progress": "कतार प्रगति",
+                "leave": "कतार छोड़ें",
+                "service_time": "सेवा समय"
+            },
+            "status": {
+                "waiting": "प्रतीक्षा",
+                "completed": "पूर्ण",
+                "cancelled": "रद्द"
+            },
+            "empty": {
+                "active_title": "कोई सक्रिय कतार नहीं",
+                "active_desc": "कतार में शामिल होने के लिए QR कोड स्कैन करें या व्यवसाय खोजें",
+                "history_title": "कोई कतार इतिहास नहीं",
+                "history_desc": "आपकी पिछली कतार यात्राएं यहां दिखाई देंगी",
+                "scan_button": "QR कोड स्कैन करें"
+            },
+            "leave_modal": {
+                "title": "कतार छोड़ें",
+                "message": "क्या आप वाकई इस कतार को छोड़ना चाहते हैं? आप अपना स्थान खो देंगे।",
+                "confirm_action": "कतार छोड़ें"
+            }
+        },
+        "orders": {
+            "tabs": {
+                "all": "सभी आदेश",
+                "active": "सक्रिय",
+                "completed": "पूर्ण"
+            },
+            "status": {
+                "pending": "लंबित",
+                "in_progress": "तैयारी",
+                "ready": "तैयार",
+                "completed": "पूर्ण",
+                "cancelled": "रद्द",
+                "unknown": "अज्ञात"
+            },
+            "card": {
+                "total": "कुल",
+                "ready_message": "आपका आदेश पिकअप के लिए तैयार है!"
+            },
+            "empty": {
+                "title": "कोई आदेश नहीं मिला",
+                "active_desc": "इस समय आपके पास कोई सक्रिय आदेश नहीं है",
+                "completed_desc": "आपके पूर्ण किए गए आदेश यहां दिखाई देंगे",
+                "all_desc": "आपका आदेश इतिहास यहां दिखाई देगा"
+            }
+        },
+        "profile": {
+            "title": "प्रोफ़ाइल",
+            "edit_badge": "संपादित करें",
+            "guest": "अतिथि उपयोगकर्ता",
+            "stats": {
+                "points": "अंक",
+                "visits": "यात्राएं",
+                "since": "से"
+            },
+            "sections": {
+                "account": "खाता",
+                "preferences": "प्राथमिकताएं",
+                "support": "समर्थन"
+            },
+            "menu": {
+                "edit_profile": "प्रोफ़ाइल संपादित करें",
+                "loyalty": "वफादारी और पुरस्कार",
+                "payment": "भुगतान विधियां",
+                "addresses": "सहेजे गए पते",
+                "notifications": "सूचनाएं",
+                "location": "स्थान सेवाएं",
+                "language": "भाषा",
+                "dark_mode": "डार्क मोड",
+                "help": "सहायता केंद्र",
+                "feedback": "सुझाव भेजें",
+                "about": "के बारे में",
+                "terms": "शर्तें और गोपनीयता"
+            },
+            "sign_out": "साइन आउट",
+            "confirm_sign_out": {
+                "title": "साइन आउट",
+                "message": "क्या आप वाकई साइन आउट करना चाहते हैं?",
+                "cancel": "रद्द करें",
+                "confirm": "साइन आउट"
+            },
+            "change_language": "भाषा बदलें",
+            "select_language": "अपनी पसंदीदा भाषा चुनें",
+            "cancel": "रद्द करें"
+        }
+    }
+}

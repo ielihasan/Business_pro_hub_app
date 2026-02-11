@@ -1,0 +1,140 @@
+{
+    "translation": {
+        "common": {
+            "search_placeholder": "Поиск компаний...",
+            "see_all": "Показать все",
+            "view_details": "Подробнее",
+            "open": "Открыто",
+            "closed": "Закрыто",
+            "loading": "Загрузка...",
+            "error": "Что-то пошло не так",
+            "success": "Успех",
+            "cancel": "Отмена",
+            "confirm": "Подтвердить"
+        },
+        "tabs": {
+            "home": "Главная",
+            "queue": "Очередь",
+            "scan": "Скан",
+            "orders": "Заказы",
+            "profile": "Профиль"
+        },
+        "home": {
+            "categories": {
+                "title": "Категории",
+                "all": "Все",
+                "food": "Еда",
+                "print": "Печать",
+                "health": "Здоровье",
+                "repair": "Ремонт",
+                "salon": "Салон"
+            },
+            "active_queue": {
+                "title": "Сейчас в очереди",
+                "position": "Позиция",
+                "est_wait": "Ожид. время"
+            },
+            "nearby": {
+                "title": "Компании рядом",
+                "in_queue": "в очереди",
+                "wait_time": "время ожидания"
+            }
+        },
+        "queue": {
+            "tabs": {
+                "active": "Активные",
+                "history": "История"
+            },
+            "card": {
+                "your_position": "Ваша позиция",
+                "in_queue": "в очереди",
+                "est_wait": "Ожид. время",
+                "joined_at": "В очереди с",
+                "progress": "Прогресс",
+                "leave": "Покинуть очередь",
+                "service_time": "Время обслуживания"
+            },
+            "status": {
+                "waiting": "Ожидание",
+                "completed": "Завершено",
+                "cancelled": "Отменено"
+            },
+            "empty": {
+                "active_title": "Нет активных очередей",
+                "active_desc": "Сканируйте QR-код или ищите компанию, чтобы встать в очередь",
+                "history_title": "История пуста",
+                "history_desc": "Здесь появятся ваши прошлые визиты",
+                "scan_button": "Сканировать QR"
+            },
+            "leave_modal": {
+                "title": "Покинуть очередь",
+                "message": "Вы уверены? Вы потеряете свое место.",
+                "confirm_action": "Покинуть"
+            }
+        },
+        "orders": {
+            "tabs": {
+                "all": "Все заказы",
+                "active": "Активные",
+                "completed": "Завершенные"
+            },
+            "status": {
+                "pending": "Ожидание",
+                "in_progress": "Готовится",
+                "ready": "Готово",
+                "completed": "Завершено",
+                "cancelled": "Отменено",
+                "unknown": "Неизвестно"
+            },
+            "card": {
+                "total": "Итого",
+                "ready_message": "Заказ готов к выдаче!"
+            },
+            "empty": {
+                "title": "Заказы не найдены",
+                "active_desc": "У вас нет активных заказов",
+                "completed_desc": "Здесь появятся завершенные заказы",
+                "all_desc": "Здесь появится история заказов"
+            }
+        },
+        "profile": {
+            "title": "Профиль",
+            "edit_badge": "Редактировать",
+            "guest": "Гость",
+            "stats": {
+                "points": "Баллы",
+                "visits": "Визиты",
+                "since": "С"
+            },
+            "sections": {
+                "account": "Аккаунт",
+                "preferences": "Настройки",
+                "support": "Поддержка"
+            },
+            "menu": {
+                "edit_profile": "Редактировать профиль",
+                "loyalty": "Лояльность и награды",
+                "payment": "Способы оплаты",
+                "addresses": "Сохраненные адреса",
+                "notifications": "Уведомления",
+                "location": "Сервисы геолокации",
+                "language": "Язык",
+                "dark_mode": "Темный режим",
+                "help": "Центр помощи",
+                "feedback": "Отправить отзыв",
+                "about": "О приложении",
+                "terms": "Условия и конфиденциальность"
+            },
+            "sign_out": "Выйти",
+            "confirm_sign_out": {
+                "title": "Выйти",
+                "message": "Вы уверены, что хотите выйти?",
+                "cancel": "Отмена",
+                "confirm": "Выйти"
+            },
+            "change_language": "Изменить язык",
+            "select_language": "Выберите предпочитаемый язык",
+            "cancel": "Отмена"
+        }
+    }
+}

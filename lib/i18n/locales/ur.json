@@ -1,0 +1,140 @@
+{
+    "translation": {
+        "common": {
+            "search_placeholder": "كاروبار تلاش کریں...",
+            "see_all": "سب دیکھیں",
+            "view_details": "تفصیلات دیکھیں",
+            "open": "کھلا ہے",
+            "closed": "بند ہے",
+            "loading": "لوڈ ہو رہا ہے...",
+            "error": "کچھ غلط ہو گیا",
+            "success": "کامیابی",
+            "cancel": "منسوخ کریں",
+            "confirm": "تصدیق کریں"
+        },
+        "tabs": {
+            "home": "ہوم",
+            "queue": "میری قطار",
+            "scan": "اسکین",
+            "orders": "آرڈرز",
+            "profile": "پروفائل"
+        },
+        "home": {
+            "categories": {
+                "title": "زمرہ جات",
+                "all": "سب",
+                "food": "کھانا",
+                "print": "پرنٹ",
+                "health": "صحت",
+                "repair": "مرمت",
+                "salon": "سیلون"
+            },
+            "active_queue": {
+                "title": "فی الحال قطار میں",
+                "position": "پوزیشن",
+                "est_wait": "متوقع انتظار"
+            },
+            "nearby": {
+                "title": "قریبی کاروبار",
+                "in_queue": "قطار میں",
+                "wait_time": "انتظار کا وقت"
+            }
+        },
+        "queue": {
+            "tabs": {
+                "active": "فعال",
+                "history": "تاریخ"
+            },
+            "card": {
+                "your_position": "آپ کی پوزیشن",
+                "in_queue": "قطار میں",
+                "est_wait": "متوقع انتظار",
+                "joined_at": "شامل ہوئے",
+                "progress": "قطار کی پیشرفت",
+                "leave": "قطار چھوڑیں",
+                "service_time": "سروس کا وقت"
+            },
+            "status": {
+                "waiting": "انتظار",
+                "completed": "مکمل",
+                "cancelled": "منسوخ"
+            },
+            "empty": {
+                "active_title": "کوئی فعال قطار نہیں",
+                "active_desc": "قطار میں شامل ہونے کے لیے QR کوڈ اسکین کریں یا کاروبار تلاش کریں",
+                "history_title": "کوئی قطار کی تاریخ نہیں",
+                "history_desc": "آپ کے ماضی کے قطار کے دورے یہاں ظاہر ہوں گے",
+                "scan_button": "QR کوڈ اسکین کریں"
+            },
+            "leave_modal": {
+                "title": "قطار چھوڑیں",
+                "message": "کیا آپ واقعی یہ قطار چھوڑنا چاہتے ہیں؟ آپ اپنی پوزیشن کھو دیں گے۔",
+                "confirm_action": "قطار چھوڑیں"
+            }
+        },
+        "orders": {
+            "tabs": {
+                "all": "تمام آرڈرز",
+                "active": "فعال",
+                "completed": "مکمل"
+            },
+            "status": {
+                "pending": "زیر التواء",
+                "in_progress": "تیاری جاری ہے",
+                "ready": "تیار ہے",
+                "completed": "مکمل",
+                "cancelled": "منسوخ",
+                "unknown": "نامعلوم"
+            },
+            "card": {
+                "total": "کل",
+                "ready_message": "آپ کا آرڈر پک اپ کے لیے تیار ہے!"
+            },
+            "empty": {
+                "title": "کوئی آرڈر نہیں ملا",
+                "active_desc": "اس وقت آپ کے پاس کوئی فعال آرڈر نہیں ہے",
+                "completed_desc": "آپ کے مکمل شدہ آرڈرز یہاں ظاہر ہوں گے",
+                "all_desc": "آپ کے آرڈر کی تاریخ یہاں ظاہر ہوگی"
+            }
+        },
+        "profile": {
+            "title": "پروفائل",
+            "edit_badge": "ترمیم",
+            "guest": "مہمان صارف",
+            "stats": {
+                "points": "پوائنٹس",
+                "visits": "دورے",
+                "since": "سے"
+            },
+            "sections": {
+                "account": "اکاؤنٹ",
+                "preferences": "ترجیحات",
+                "support": "سپورٹ"
+            },
+            "menu": {
+                "edit_profile": "پروفائل میں ترمیم کریں",
+                "loyalty": "لائلٹی اور انعامات",
+                "payment": "ادائیگی کے طریقے",
+                "addresses": "محفوظ شدہ پتے",
+                "notifications": "اطلاعات",
+                "location": "مقام کی خدمات",
+                "language": "زبان",
+                "dark_mode": "ڈارک موڈ",
+                "help": "مدد کا مرکز",
+                "feedback": "رائے بھیجیں",
+                "about": "کے بارے میں",
+                "terms": "شرائط اور رازداری"
+            },
+            "sign_out": "سائن آؤٹ",
+            "confirm_sign_out": {
+                "title": "سائن آؤٹ",
+                "message": "کیا آپ واقعی سائن آؤٹ کرنا چاہتے ہیں؟",
+                "cancel": "منسوخ کریں",
+                "confirm": "سائن آؤٹ"
+            },
+            "change_language": "زبان تبدیل کریں",
+            "select_language": "اپنی پسندیدہ زبان منتخب کریں",
+            "cancel": "منسوخ کریں"
+        }
+    }
+}

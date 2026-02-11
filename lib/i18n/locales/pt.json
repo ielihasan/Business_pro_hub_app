@@ -1,0 +1,140 @@
+{
+    "translation": {
+        "common": {
+            "search_placeholder": "Pesquisar empresas...",
+            "see_all": "Ver tudo",
+            "view_details": "Ver detalhes",
+            "open": "Aberto",
+            "closed": "Fechado",
+            "loading": "Carregando...",
+            "error": "Algo deu errado",
+            "success": "Sucesso",
+            "cancel": "Cancelar",
+            "confirm": "Confirmar"
+        },
+        "tabs": {
+            "home": "Início",
+            "queue": "Minha Fila",
+            "scan": "Digitalizar",
+            "orders": "Pedidos",
+            "profile": "Perfil"
+        },
+        "home": {
+            "categories": {
+                "title": "Categorias",
+                "all": "Todos",
+                "food": "Comida",
+                "print": "Impressão",
+                "health": "Saúde",
+                "repair": "Reparo",
+                "salon": "Salão"
+            },
+            "active_queue": {
+                "title": "Atualmente na fila",
+                "position": "Posição",
+                "est_wait": "Espera est."
+            },
+            "nearby": {
+                "title": "Empresas próximas",
+                "in_queue": "na fila",
+                "wait_time": "tempo de espera"
+            }
+        },
+        "queue": {
+            "tabs": {
+                "active": "Ativo",
+                "history": "Histórico"
+            },
+            "card": {
+                "your_position": "Sua Posição",
+                "in_queue": "na fila",
+                "est_wait": "Tempo de espera est.",
+                "joined_at": "Entrou às",
+                "progress": "Progresso da fila",
+                "leave": "Sair da fila",
+                "service_time": "Tempo de serviço"
+            },
+            "status": {
+                "waiting": "Aguardando",
+                "completed": "Concluído",
+                "cancelled": "Cancelado"
+            },
+            "empty": {
+                "active_title": "Sem filas ativas",
+                "active_desc": "Digitalize um código QR ou pesquise uma empresa para entrar em uma fila",
+                "history_title": "Sem histórico de filas",
+                "history_desc": "Suas visitas anteriores aparecerão aqui",
+                "scan_button": "Digitalizar código QR"
+            },
+            "leave_modal": {
+                "title": "Sair da fila",
+                "message": "Tem certeza de que deseja sair desta fila? Você perderá sua posição.",
+                "confirm_action": "Sair da fila"
+            }
+        },
+        "orders": {
+            "tabs": {
+                "all": "Todos os pedidos",
+                "active": "Ativos",
+                "completed": "Concluídos"
+            },
+            "status": {
+                "pending": "Pendente",
+                "in_progress": "Preparando",
+                "ready": "Pronto",
+                "completed": "Concluído",
+                "cancelled": "Cancelado",
+                "unknown": "Desconhecido"
+            },
+            "card": {
+                "total": "Total",
+                "ready_message": "Seu pedido está pronto para retirada!"
+            },
+            "empty": {
+                "title": "Nenhum pedido encontrado",
+                "active_desc": "Você não tem pedidos ativos no momento",
+                "completed_desc": "Seus pedidos concluídos aparecerão aqui",
+                "all_desc": "Seu histórico de pedidos aparecerá aqui"
+            }
+        },
+        "profile": {
+            "title": "Perfil",
+            "edit_badge": "Editar",
+            "guest": "Usuário Convidado",
+            "stats": {
+                "points": "Pontos",
+                "visits": "Visitas",
+                "since": "Desde"
+            },
+            "sections": {
+                "account": "Conta",
+                "preferences": "Preferências",
+                "support": "Suporte"
+            },
+            "menu": {
+                "edit_profile": "Editar Perfil",
+                "loyalty": "Lealdade e Recompensas",
+                "payment": "Métodos de Pagamento",
+                "addresses": "Endereços Salvos",
+                "notifications": "Notificações",
+                "location": "Serviços de Localização",
+                "language": "Idioma",
+                "dark_mode": "Modo Escuro",
+                "help": "Central de Ajuda",
+                "feedback": "Enviar Feedback",
+                "about": "Sobre",
+                "terms": "Termos e Privacidade"
+            },
+            "sign_out": "Sair",
+            "confirm_sign_out": {
+                "title": "Sair",
+                "message": "Tem certeza de que deseja sair?",
+                "cancel": "Cancelar",
+                "confirm": "Sair"
+            },
+            "change_language": "Mudar Idioma",
+            "select_language": "Selecione seu idioma preferido",
+            "cancel": "Cancelar"
+        }
+    }
+}
