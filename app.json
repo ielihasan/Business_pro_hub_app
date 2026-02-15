@@ -32,8 +32,12 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",
+<<<<<<< HEAD
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.RECORD_AUDIO"
+=======
+        "android.permission.ACCESS_COARSE_LOCATION"
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
       ]
     },
     "web": {
@@ -59,6 +63,7 @@
     ],
     "experiments": {
       "typedRoutes": true
+<<<<<<< HEAD
     },
     "extra": {
       "router": {},
@@ -67,5 +72,8 @@
       }
     },
     "owner": "meeru456"
+=======
+    }
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
   }
 }

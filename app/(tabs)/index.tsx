@@ -15,18 +15,30 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Card, CardContent, Badge, Avatar, QueueStatusBadge } from '@/components/ui';
 import { Typography, Spacing, BorderRadius, Shadows } from '@/constants/theme';
+<<<<<<< HEAD
 import { useTranslation } from 'react-i18next';
+=======
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 
 const { width } = Dimensions.get('window');
 
 // Mock data for businesses
 const categories = [
+<<<<<<< HEAD
   { id: 'all', name: 'home.categories.all', icon: 'grid-outline' },
   { id: 'food', name: 'home.categories.food', icon: 'restaurant-outline' },
   { id: 'print', name: 'home.categories.print', icon: 'print-outline' },
   { id: 'health', name: 'home.categories.health', icon: 'medical-outline' },
   { id: 'repair', name: 'home.categories.repair', icon: 'construct-outline' },
   { id: 'salon', name: 'home.categories.salon', icon: 'cut-outline' },
+=======
+  { id: 'all', name: 'All', icon: 'grid-outline' },
+  { id: 'food', name: 'Food', icon: 'restaurant-outline' },
+  { id: 'print', name: 'Print', icon: 'print-outline' },
+  { id: 'health', name: 'Health', icon: 'medical-outline' },
+  { id: 'repair', name: 'Repair', icon: 'construct-outline' },
+  { id: 'salon', name: 'Salon', icon: 'cut-outline' },
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 ];
 
 const nearbyBusinesses = [
@@ -87,7 +99,10 @@ const activeQueue = {
 
 export default function HomeScreen() {
   const { colors, isDark } = useTheme();
+<<<<<<< HEAD
   const { t } = useTranslation();
+=======
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -120,7 +135,11 @@ export default function HomeScreen() {
             <Ionicons name="search-outline" size={20} color={colors.mutedForeground} />
             <TextInput
               style={[styles.searchInput, { color: colors.foreground }]}
+<<<<<<< HEAD
               placeholder={t('common.search_placeholder')}
+=======
+              placeholder="Search businesses..."
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
               placeholderTextColor={colors.mutedForeground}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -149,7 +168,11 @@ export default function HomeScreen() {
                 <View style={styles.activeQueueHeader}>
                   <View>
                     <Text style={[styles.activeQueueLabel, { color: colors.mutedForeground }]}>
+<<<<<<< HEAD
                       {t('home.active_queue.title')}
+=======
+                      Currently in queue
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                     </Text>
                     <Text style={[styles.activeQueueBusiness, { color: colors.foreground }]}>
                       {activeQueue.businessName}
@@ -163,7 +186,11 @@ export default function HomeScreen() {
                       #{activeQueue.position}
                     </Text>
                     <Text style={[styles.activeQueueStatLabel, { color: colors.mutedForeground }]}>
+<<<<<<< HEAD
                       {t('home.active_queue.position')}
+=======
+                      Position
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                     </Text>
                   </View>
                   <View style={[styles.activeQueueDivider, { backgroundColor: colors.border }]} />
@@ -172,13 +199,21 @@ export default function HomeScreen() {
                       {activeQueue.estimatedWait}
                     </Text>
                     <Text style={[styles.activeQueueStatLabel, { color: colors.mutedForeground }]}>
+<<<<<<< HEAD
                       {t('home.active_queue.est_wait')}
+=======
+                      Est. Wait
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                     </Text>
                   </View>
                 </View>
                 <View style={styles.viewDetailsRow}>
                   <Text style={[styles.viewDetailsText, { color: colors.primary }]}>
+<<<<<<< HEAD
                     {t('common.view_details')}
+=======
+                    View Details
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                   </Text>
                   <Ionicons name="chevron-forward" size={16} color={colors.primary} />
                 </View>
@@ -190,7 +225,11 @@ export default function HomeScreen() {
         {/* Categories */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+<<<<<<< HEAD
             {t('home.categories.title')}
+=======
+            Categories
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
           </Text>
           <ScrollView
             horizontal
@@ -232,7 +271,11 @@ export default function HomeScreen() {
                     },
                   ]}
                 >
+<<<<<<< HEAD
                   {t(category.name)}
+=======
+                  {category.name}
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                 </Text>
               </TouchableOpacity>
             ))}
@@ -243,11 +286,19 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+<<<<<<< HEAD
               {t('home.nearby.title')}
             </Text>
             <TouchableOpacity>
               <Text style={[styles.seeAllText, { color: colors.primary }]}>
                 {t('common.see_all')}
+=======
+              Nearby Businesses
+            </Text>
+            <TouchableOpacity>
+              <Text style={[styles.seeAllText, { color: colors.primary }]}>
+                See All
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
               </Text>
             </TouchableOpacity>
           </View>
@@ -307,7 +358,11 @@ export default function HomeScreen() {
                           {business.queueLength}
                         </Text>
                         <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
+<<<<<<< HEAD
                           {t('home.nearby.in_queue')}
+=======
+                          in queue
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                         </Text>
                       </View>
                       <View style={styles.statItem}>
@@ -315,11 +370,19 @@ export default function HomeScreen() {
                           {business.waitTime}
                         </Text>
                         <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
+<<<<<<< HEAD
                           {t('home.nearby.wait_time')}
                         </Text>
                       </View>
                       <Badge variant={business.isOpen ? 'success' : 'secondary'}>
                         {business.isOpen ? t('common.open') : t('common.closed')}
+=======
+                          wait time
+                        </Text>
+                      </View>
+                      <Badge variant={business.isOpen ? 'success' : 'secondary'}>
+                        {business.isOpen ? 'Open' : 'Closed'}
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                       </Badge>
                     </View>
                   </CardContent>
