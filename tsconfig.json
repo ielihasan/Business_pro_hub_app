@@ -4,30 +4,17 @@
     "strict": true,
     "jsx": "react-jsx",
     "paths": {
-<<<<<<< HEAD
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     },
     "resolveJsonModule": true,
     "moduleResolution": "bundler",
     "esModuleInterop": true
-=======
-      "@/*": ["./*"]
-    }
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
-<<<<<<< HEAD
     "expo-env.d.ts",
     "**/*.json"
   ]
 }
-=======
-    "expo-env.d.ts"
-  ]
-}
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5

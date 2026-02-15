@@ -7,23 +7,16 @@ import * as Linking from 'expo-linking';
 import { Colors } from '@/constants/theme';
 import { useStore, setupAuthListener } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
-<<<<<<< HEAD
 import '@/lib/i18n';
-=======
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-<<<<<<< HEAD
-  const { theme, initializeAuth, isLoading } = useStore();
-  const colors = Colors[theme];
-=======
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
-  const { initializeAuth, isLoading } = useStore();
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
+  const { theme, initializeAuth, isLoading } = useStore();
+  const resolvedTheme = theme ?? (colorScheme === 'dark' ? 'dark' : 'light');
+  const colors = Colors[resolvedTheme];
 
   useEffect(() => {
     // Initialize authentication on app start
@@ -92,11 +85,7 @@ export default function RootLayout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-<<<<<<< HEAD
-      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-=======
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
+      <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerShown: false,

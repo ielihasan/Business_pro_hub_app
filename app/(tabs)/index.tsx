@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,78 +15,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Card, CardContent, Badge, Avatar, QueueStatusBadge } from '@/components/ui';
 import { Typography, Spacing, BorderRadius, Shadows } from '@/constants/theme';
-<<<<<<< HEAD
+import * as Location from 'expo-location';
+import { fetchBusinesses, subscribeToBusinesses, BusinessRecord } from '@/lib/business';
 import { useTranslation } from 'react-i18next';
-=======
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 
 const { width } = Dimensions.get('window');
 
-// Mock data for businesses
+// Categories
 const categories = [
-<<<<<<< HEAD
   { id: 'all', name: 'home.categories.all', icon: 'grid-outline' },
   { id: 'food', name: 'home.categories.food', icon: 'restaurant-outline' },
   { id: 'print', name: 'home.categories.print', icon: 'print-outline' },
   { id: 'health', name: 'home.categories.health', icon: 'medical-outline' },
   { id: 'repair', name: 'home.categories.repair', icon: 'construct-outline' },
   { id: 'salon', name: 'home.categories.salon', icon: 'cut-outline' },
-=======
-  { id: 'all', name: 'All', icon: 'grid-outline' },
-  { id: 'food', name: 'Food', icon: 'restaurant-outline' },
-  { id: 'print', name: 'Print', icon: 'print-outline' },
-  { id: 'health', name: 'Health', icon: 'medical-outline' },
-  { id: 'repair', name: 'Repair', icon: 'construct-outline' },
-  { id: 'salon', name: 'Salon', icon: 'cut-outline' },
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 ];
 
-const nearbyBusinesses = [
-  {
-    id: '1',
-    name: 'Campus Coffee Shop',
-    category: 'Food & Beverage',
-    distance: '0.2 km',
-    waitTime: '~10 min',
-    queueLength: 5,
-    rating: 4.8,
-    isOpen: true,
-    image: null,
-  },
-  {
-    id: '2',
-    name: 'UniPrint Station',
-    category: 'Print Services',
-    distance: '0.3 km',
-    waitTime: '~15 min',
-    queueLength: 8,
-    rating: 4.5,
-    isOpen: true,
-    image: null,
-  },
-  {
-    id: '3',
-    name: 'Quick Fix Mobile',
-    category: 'Phone Repair',
-    distance: '0.5 km',
-    waitTime: '~25 min',
-    queueLength: 3,
-    rating: 4.7,
-    isOpen: true,
-    image: null,
-  },
-  {
-    id: '4',
-    name: 'Student Health Center',
-    category: 'Healthcare',
-    distance: '0.7 km',
-    waitTime: '~45 min',
-    queueLength: 12,
-    rating: 4.2,
-    isOpen: true,
-    image: null,
-  },
-];
+// runtime business list
+let _placeholder: Array<BusinessRecord & { distanceKm: number }> = [];
 
 // Mock active queue
 const activeQueue = {
@@ -99,18 +45,60 @@ const activeQueue = {
 
 export default function HomeScreen() {
   const { colors, isDark } = useTheme();
-<<<<<<< HEAD
   const { t } = useTranslation();
-=======
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [nearbyBusinesses, setNearbyBusinesses] = useState<Array<any>>(_placeholder);
+  const [radiusKm, setRadiusKm] = useState<number>(5);
 
   const onRefresh = () => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 1500);
   };
+
+  useEffect(() => {
+    let unsub: (() => Promise<void>) | null = null;
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        const { latitude, longitude } = pos.coords;
+        setUserLocation({ latitude, longitude });
+        const businesses = await fetchBusinesses({ latitude, longitude, radiusKm, category: selectedCategory, query: searchQuery });
+        setNearbyBusinesses(businesses);
+
+        unsub = subscribeToBusinesses((payload) => {
+          // On change, refetch nearby businesses
+          (async () => {
+            if (!userLocation) return;
+            const bs = await fetchBusinesses({ latitude: userLocation.latitude, longitude: userLocation.longitude, radiusKm, category: selectedCategory, query: searchQuery });
+            setNearbyBusinesses(bs);
+          })();
+        });
+      } catch (err) {
+        console.warn('Location / fetch error', err);
+      }
+    })();
+
+    return () => { if (unsub) unsub(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // refetch when filters change
+        (async () => {
+      try {
+        if (!userLocation) return;
+        const bs = await fetchBusinesses({ latitude: userLocation.latitude, longitude: userLocation.longitude, radiusKm, category: selectedCategory, query: searchQuery });
+        setNearbyBusinesses(bs);
+      } catch (err) {
+        console.warn('Refetch failed', err);
+      }
+    })();
+  }, [selectedCategory, searchQuery, userLocation, radiusKm]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -135,11 +123,7 @@ export default function HomeScreen() {
             <Ionicons name="search-outline" size={20} color={colors.mutedForeground} />
             <TextInput
               style={[styles.searchInput, { color: colors.foreground }]}
-<<<<<<< HEAD
               placeholder={t('common.search_placeholder')}
-=======
-              placeholder="Search businesses..."
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
               placeholderTextColor={colors.mutedForeground}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -168,11 +152,7 @@ export default function HomeScreen() {
                 <View style={styles.activeQueueHeader}>
                   <View>
                     <Text style={[styles.activeQueueLabel, { color: colors.mutedForeground }]}>
-<<<<<<< HEAD
                       {t('home.active_queue.title')}
-=======
-                      Currently in queue
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                     </Text>
                     <Text style={[styles.activeQueueBusiness, { color: colors.foreground }]}>
                       {activeQueue.businessName}
@@ -186,11 +166,7 @@ export default function HomeScreen() {
                       #{activeQueue.position}
                     </Text>
                     <Text style={[styles.activeQueueStatLabel, { color: colors.mutedForeground }]}>
-<<<<<<< HEAD
                       {t('home.active_queue.position')}
-=======
-                      Position
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                     </Text>
                   </View>
                   <View style={[styles.activeQueueDivider, { backgroundColor: colors.border }]} />
@@ -199,21 +175,13 @@ export default function HomeScreen() {
                       {activeQueue.estimatedWait}
                     </Text>
                     <Text style={[styles.activeQueueStatLabel, { color: colors.mutedForeground }]}>
-<<<<<<< HEAD
                       {t('home.active_queue.est_wait')}
-=======
-                      Est. Wait
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                     </Text>
                   </View>
                 </View>
                 <View style={styles.viewDetailsRow}>
                   <Text style={[styles.viewDetailsText, { color: colors.primary }]}>
-<<<<<<< HEAD
                     {t('common.view_details')}
-=======
-                    View Details
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                   </Text>
                   <Ionicons name="chevron-forward" size={16} color={colors.primary} />
                 </View>
@@ -225,11 +193,7 @@ export default function HomeScreen() {
         {/* Categories */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-<<<<<<< HEAD
             {t('home.categories.title')}
-=======
-            Categories
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
           </Text>
           <ScrollView
             horizontal
@@ -271,12 +235,30 @@ export default function HomeScreen() {
                     },
                   ]}
                 >
-<<<<<<< HEAD
                   {t(category.name)}
-=======
-                  {category.name}
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                 </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Radius Filter */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Radius</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.radiusContainer}>
+            {[1, 3, 5, 10].map((r) => (
+              <TouchableOpacity
+                key={r}
+                onPress={() => setRadiusKm(r)}
+                style={[
+                  styles.radiusChip,
+                  {
+                    backgroundColor: radiusKm === r ? colors.primary : colors.secondary,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Text style={{ color: radiusKm === r ? colors.primaryForeground : colors.foreground }}>{r} km</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -286,24 +268,16 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-<<<<<<< HEAD
               {t('home.nearby.title')}
             </Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/map')}>
               <Text style={[styles.seeAllText, { color: colors.primary }]}>
                 {t('common.see_all')}
-=======
-              Nearby Businesses
-            </Text>
-            <TouchableOpacity>
-              <Text style={[styles.seeAllText, { color: colors.primary }]}>
-                See All
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
               </Text>
             </TouchableOpacity>
           </View>
           <View style={styles.businessList}>
-            {nearbyBusinesses.map((business) => (
+            {nearbyBusinesses.map((business: any) => (
               <TouchableOpacity
                 key={business.id}
                 onPress={() => router.push(`/business/${business.id}`)}
@@ -334,7 +308,7 @@ export default function HomeScreen() {
                             <Text
                               style={[styles.metaText, { color: colors.mutedForeground }]}
                             >
-                              {business.distance}
+                              {business.distanceKm ? `${business.distanceKm.toFixed(2)} km` : '-'}
                             </Text>
                           </View>
                           <View style={styles.metaItem}>
@@ -355,34 +329,22 @@ export default function HomeScreen() {
                     <View style={[styles.businessStats, { borderTopColor: colors.border }]}>
                       <View style={styles.statItem}>
                         <Text style={[styles.statValue, { color: colors.foreground }]}>
-                          {business.queueLength}
+                          {business.queue_length ?? '-'}
                         </Text>
                         <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
-<<<<<<< HEAD
                           {t('home.nearby.in_queue')}
-=======
-                          in queue
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                         </Text>
                       </View>
                       <View style={styles.statItem}>
                         <Text style={[styles.statValue, { color: colors.foreground }]}>
-                          {business.waitTime}
+                          {business.wait_time ?? '-'}
                         </Text>
                         <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
-<<<<<<< HEAD
                           {t('home.nearby.wait_time')}
                         </Text>
                       </View>
                       <Badge variant={business.isOpen ? 'success' : 'secondary'}>
-                        {business.isOpen ? t('common.open') : t('common.closed')}
-=======
-                          wait time
-                        </Text>
-                      </View>
-                      <Badge variant={business.isOpen ? 'success' : 'secondary'}>
-                        {business.isOpen ? 'Open' : 'Closed'}
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
+                        {business.is_open ? t('common.open') : t('common.closed')}
                       </Badge>
                     </View>
                   </CardContent>
@@ -506,6 +468,20 @@ const styles = StyleSheet.create({
   categoriesContainer: {
     paddingRight: Spacing[6],
     gap: Spacing[2],
+  },
+  radiusContainer: {
+    paddingHorizontal: Spacing[2],
+    flexDirection: 'row',
+    gap: Spacing[3],
+  },
+  radiusChip: {
+    paddingHorizontal: Spacing[4],
+    paddingVertical: Spacing[2],
+    borderRadius: BorderRadius.DEFAULT,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing[3],
   },
   categoryChip: {
     flexDirection: 'row',

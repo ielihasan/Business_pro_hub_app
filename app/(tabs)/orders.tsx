@@ -13,10 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Card, CardContent, Badge, Avatar, Separator } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
-<<<<<<< HEAD
 import { useTranslation } from 'react-i18next';
-=======
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 
 // Mock data for orders
 const orders = [
@@ -97,10 +94,7 @@ const getStatusConfig = (status: string) => {
 
 export default function OrdersScreen() {
   const { colors } = useTheme();
-<<<<<<< HEAD
   const { t } = useTranslation();
-=======
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
 
@@ -139,11 +133,7 @@ export default function OrdersScreen() {
                 </Text>
               </View>
               <Badge variant={statusConfig.variant}>
-<<<<<<< HEAD
                 {t(`orders.status.${order.status}`)}
-=======
-                {statusConfig.label}
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
               </Badge>
             </View>
 
@@ -188,11 +178,7 @@ export default function OrdersScreen() {
               </View>
               <View style={styles.totalContainer}>
                 <Text style={[styles.totalLabel, { color: colors.mutedForeground }]}>
-<<<<<<< HEAD
                   {t('orders.card.total')}
-=======
-                  Total
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                 </Text>
                 <Text style={[styles.totalValue, { color: colors.foreground }]}>
                   {formatPrice(order.total)}
@@ -205,11 +191,7 @@ export default function OrdersScreen() {
               <View style={[styles.readyBanner, { backgroundColor: colors.success + '15' }]}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.success} />
                 <Text style={[styles.readyText, { color: colors.success }]}>
-<<<<<<< HEAD
                   {t('orders.card.ready_message')}
-=======
-                  Your order is ready for pickup!
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                 </Text>
               </View>
             )}
@@ -225,15 +207,9 @@ export default function OrdersScreen() {
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {[
-<<<<<<< HEAD
             { key: 'all', label: 'orders.tabs.all' },
             { key: 'active', label: 'orders.tabs.active' },
             { key: 'completed', label: 'orders.tabs.completed' },
-=======
-            { key: 'all', label: 'All Orders' },
-            { key: 'active', label: 'Active' },
-            { key: 'completed', label: 'Completed' },
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
           ].map((tab) => (
             <TouchableOpacity
               key={tab.key}
@@ -254,11 +230,7 @@ export default function OrdersScreen() {
                   },
                 ]}
               >
-<<<<<<< HEAD
                 {t(tab.label)}
-=======
-                {tab.label}
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
               </Text>
             </TouchableOpacity>
           ))}
@@ -286,25 +258,14 @@ export default function OrdersScreen() {
               <Ionicons name="receipt-outline" size={48} color={colors.mutedForeground} />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-<<<<<<< HEAD
               {t('orders.empty.title')}
             </Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
               {filter === 'active'
                 ? t('orders.empty.active_desc')
                 : filter === 'completed'
-                  ? t('orders.empty.completed_desc')
-                  : t('orders.empty.all_desc')}
-=======
-              No Orders Found
-            </Text>
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              {filter === 'active'
-                ? 'You have no active orders at the moment'
-                : filter === 'completed'
-                ? 'Your completed orders will appear here'
-                : 'Your order history will appear here'}
->>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
+                ? t('orders.empty.completed_desc')
+                : t('orders.empty.all_desc')}
             </Text>
           </View>
         )}

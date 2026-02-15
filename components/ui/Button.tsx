@@ -7,6 +7,7 @@ import {
   TextStyle,
   ActivityIndicator,
   View,
+  StyleProp,
 } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { BorderRadius, Spacing, Typography } from '@/constants/theme';
@@ -21,8 +22,8 @@ interface ButtonProps {
   size?: ButtonSize;
   disabled?: boolean;
   loading?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   icon?: React.ReactNode;
   iconPosition?: 'left' | 'right';
 }
