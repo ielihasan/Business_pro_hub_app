@@ -6,3 +6,6 @@ export { Badge, QueueStatusBadge } from './Badge';
 export { Avatar, AvatarGroup } from './Avatar';
 export { Separator } from './Separator';
 export { Progress, CircularProgress } from './Progress';
+export { ImageViewer } from './ImageViewer';
+export { ProfilePhotoModal } from './ProfilePhotoModal';
+export { LanguageSelectorModal } from './LanguageSelectorModal';

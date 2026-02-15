@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,21 @@ import {
   Platform,
   Alert,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useTheme } from '@/hooks/useTheme';
 import { Button, Input } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
+import { signInWithGoogle, signInWithApple } from '@/lib/oauth';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const { colors } = useTheme();
@@ -24,8 +31,25 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | null>(null);
 
   const { login, isLoading, authError, clearAuthError } = useStore();
+
+  // Google Auth Config
+  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
+    redirectUrl: 'businesshubpro://oauth/google/callback',
+  });
+
+  // Handle Google OAuth response
+  useEffect(() => {
+    if (googleResponse?.type === 'success') {
+      const { id_token } = googleResponse.params;
+      if (id_token) {
+        handleGoogleSignIn(id_token);
+      }
+    }
+  }, [googleResponse]);
 
   const handleLogin = async () => {
     // Clear previous errors
@@ -71,13 +95,48 @@ export default function LoginScreen() {
     }
   };
 
-  const handleSocialLogin = (provider: string) => {
-    // Social login will be implemented later
-    Alert.alert(
-      'Coming Soon',
-      `${provider} login will be available soon!`,
-      [{ text: 'OK' }]
-    );
+  const handleGoogleSignIn = async (idToken: string) => {
+    setSocialLoading('google');
+    try {
+      const result = await signInWithGoogle(idToken);
+      if (result.success) {
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Google Sign-In Failed', result.error || 'Please try again.');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An unexpected error occurred.');
+    } finally {
+      setSocialLoading(null);
+    }
+  };
+
+  const handleGooglePress = async () => {
+    try {
+      const result = await googlePromptAsync();
+      if (result?.type !== 'success') {
+        console.log('Google sign-in cancelled or error');
+      }
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      Alert.alert('Error', 'Failed to initiate Google sign-in.');
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setSocialLoading('apple');
+    try {
+      const result = await signInWithApple();
+      if (result.success) {
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Apple Sign-In Failed', result.error || 'Please try again.');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An unexpected error occurred.');
+    } finally {
+      setSocialLoading(null);
+    }
   };
 
   return (
@@ -134,7 +193,7 @@ export default function LoginScreen() {
               autoComplete="email"
               leftIcon="mail-outline"
               error={errors.email}
-              editable={!isLoading}
+              editable={!isLoading && socialLoading === null}
             />
             <Input
               label="Password"
@@ -149,13 +208,13 @@ export default function LoginScreen() {
               autoComplete="password"
               leftIcon="lock-closed-outline"
               error={errors.password}
-              editable={!isLoading}
+              editable={!isLoading && socialLoading === null}
             />
 
             <TouchableOpacity
               style={styles.forgotPassword}
               onPress={() => router.push('/(auth)/forgot-password')}
-              disabled={isLoading}
+              disabled={isLoading || socialLoading !== null}
             >
               <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
                 Forgot password?
@@ -166,7 +225,7 @@ export default function LoginScreen() {
               onPress={handleLogin}
               loading={isLoading}
               style={styles.loginButton}
-              disabled={isLoading}
+              disabled={isLoading || socialLoading !== null}
             >
               Sign In
             </Button>
@@ -186,29 +245,51 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={[
                 styles.socialButton,
-                { backgroundColor: colors.secondary, borderColor: colors.border },
+                { 
+                  backgroundColor: colors.secondary, 
+                  borderColor: colors.border,
+                  opacity: (isLoading || socialLoading !== null) ? 0.5 : 1
+                },
               ]}
-              onPress={() => handleSocialLogin('Google')}
-              disabled={isLoading}
+              onPress={handleGooglePress}
+              disabled={isLoading || socialLoading !== null}
             >
-              <Ionicons name="logo-google" size={20} color={colors.foreground} />
-              <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
-                Google
-              </Text>
+              {socialLoading === 'google' ? (
+                <ActivityIndicator color={colors.foreground} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color={colors.foreground} />
+                  <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
+                    Google
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.socialButton,
-                { backgroundColor: colors.secondary, borderColor: colors.border },
-              ]}
-              onPress={() => handleSocialLogin('Apple')}
-              disabled={isLoading}
-            >
-              <Ionicons name="logo-apple" size={20} color={colors.foreground} />
-              <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
-                Apple
-              </Text>
-            </TouchableOpacity>
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={[
+                  styles.socialButton,
+                  { 
+                    backgroundColor: colors.secondary, 
+                    borderColor: colors.border,
+                    opacity: (isLoading || socialLoading !== null) ? 0.5 : 1
+                  },
+                ]}
+                onPress={handleAppleSignIn}
+                disabled={isLoading || socialLoading !== null}
+              >
+                {socialLoading === 'apple' ? (
+                  <ActivityIndicator color={colors.foreground} size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="logo-apple" size={20} color={colors.foreground} />
+                    <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
+                      Apple
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Register Link */}

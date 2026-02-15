@@ -8,8 +8,6 @@ import {
   Switch,
   Alert,
   ActivityIndicator,
-  Modal,
-  Pressable,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,9 +15,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
 import { useTranslation } from 'react-i18next';
+import i18n from '@/lib/i18n';
 
 import { useTheme } from '@/hooks/useTheme';
-import { Card, CardContent, Avatar, Badge, Separator, Button } from '@/components/ui';
+import { Card, CardContent, Avatar, Badge, Separator, Button, ImageViewer, ProfilePhotoModal, LanguageSelectorModal } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
@@ -28,31 +27,27 @@ type MenuItem = {
   id: string;
   icon: string;
   label: string;
-  type: 'link' | 'toggle' | 'select';
+  type: 'link' | 'toggle';
   badge?: string;
   value?: boolean | string;
 };
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
-  const { user, logout, isLoading, updateProfile, theme, setTheme } = useStore();
-  const { t, i18n } = useTranslation();
+  const { user, logout, isLoading, updateProfile, theme, toggleDarkMode } = useStore();
+  const { i18n: i18nInstance, t } = useTranslation();
   const [isUploading, setIsUploading] = useState(false);
-  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [languageSelectorVisible, setLanguageSelectorVisible] = useState(false);
+  const [currentLanguage, setCurrentLanguage] = useState(i18nInstance.language || 'en');
   const [toggleStates, setToggleStates] = useState<Record<string, boolean>>({
     notifications: true,
     location: true,
+    theme: theme === 'dark',
   });
 
-  const displayUser = user || {
-    name: t('profile.guest'),
-    email: 'guest@example.com',
-    phone: '',
-    loyaltyPoints: 0,
-    totalVisits: 0,
-    memberSince: t('profile.stats.since') + ' Today',
-  };
-
+  // Dynamic menu sections with translations
   const menuSections: Array<{ title: string; items: MenuItem[] }> = [
     {
       title: t('profile.sections.account'),
@@ -68,26 +63,8 @@ export default function ProfileScreen() {
       items: [
         { id: 'notifications', icon: 'notifications-outline', label: t('profile.menu.notifications'), type: 'toggle', value: true },
         { id: 'location', icon: 'navigate-outline', label: t('profile.menu.location'), type: 'toggle', value: true },
-        {
-          id: 'language',
-          icon: 'language-outline',
-          label: t('profile.menu.language'),
-          type: 'link',
-          value: {
-            en: 'English',
-            ur: 'اردو',
-            es: 'Español',
-            fr: 'Français',
-            de: 'Deutsch',
-            zh: '中文',
-            ar: 'العربية',
-            hi: 'हिन्दी',
-            pt: 'Português',
-            ru: 'Русский',
-          }[i18n.language] || 'English'
-        },
-        { id: 'theme-dark', icon: 'moon', label: t('profile.menu.dark_mode') || 'Dark Mode', type: 'select', value: theme === 'dark' },
-        { id: 'theme-light', icon: 'sunny', label: t('profile.menu.light_mode') || 'Light Mode', type: 'select', value: theme === 'light' },
+        { id: 'language', icon: 'language-outline', label: t('profile.menu.language'), type: 'link', value: currentLanguage.toUpperCase() },
+        { id: 'theme', icon: 'moon-outline', label: t('profile.menu.dark_mode'), type: 'toggle', value: false },
       ],
     },
     {
@@ -101,7 +78,24 @@ export default function ProfileScreen() {
     },
   ];
 
-  const handlePhotoUpload = async () => {
+  const displayUser = user || {
+    name: t('profile.guest'),
+    email: 'guest@example.com',
+    phone: '',
+    loyaltyPoints: 0,
+    totalVisits: 0,
+    memberSince: 'Today',
+  };
+
+  const handleAvatarPress = () => {
+    setPhotoModalVisible(true);
+  };
+
+  const handleViewPhoto = () => {
+    setImageViewerVisible(true);
+  };
+
+  const handleEditPhoto = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
@@ -109,6 +103,44 @@ export default function ProfileScreen() {
         return;
       }
 
+      Alert.alert(
+        'Edit Profile Photo',
+        'What would you like to do?',
+        [
+          {
+            text: 'Choose New Photo',
+            onPress: async () => {
+              await uploadNewPhoto();
+            },
+          },
+          {
+            text: 'Remove Photo',
+            style: 'destructive',
+            onPress: async () => {
+              Alert.alert(
+                'Remove Photo',
+                'Are you sure you want to remove your profile photo?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Remove',
+                    style: 'destructive',
+                    onPress: removePhoto,
+                  },
+                ]
+              );
+            },
+          },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to edit photo');
+    }
+  };
+
+  const uploadNewPhoto = async () => {
+    try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -148,40 +180,76 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleToggle = (id: string, value: boolean) => {
-    setToggleStates((prev) => ({ ...prev, [id]: value }));
+  const removePhoto = async () => {
+    try {
+      setIsUploading(true);
+
+      // If user has an avatar, delete it from Supabase storage
+      if (user?.avatar) {
+        // Extract the file path from the public URL
+        // URL format: https://[project].supabase.co/storage/v1/object/public/avatars/[userId]/[filename]
+        const urlParts = user.avatar.split('/avatars/');
+        if (urlParts.length === 2) {
+          const filePath = `avatars/${urlParts[1]}`;
+          
+          // Delete from storage
+          const { error: deleteError } = await supabase.storage
+            .from('avatars')
+            .remove([filePath]);
+
+          if (deleteError) {
+            console.warn('Storage deletion warning:', deleteError);
+            // Continue even if storage deletion fails, but log it
+          }
+        }
+      }
+
+      // Update profile to remove avatar_url
+      const response = await updateProfile({ avatar_url: null });
+      if (!response.success) throw response.error;
+
+      Alert.alert('Success', 'Profile picture removed!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to remove photo');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
-  const changeLanguage = (lang: string) => {
-    i18n.changeLanguage(lang);
-    setShowLanguageModal(false);
+  const handleToggle = (id: string, value: boolean) => {
+    setToggleStates((prev) => ({ ...prev, [id]: value }));
+    
+    // Handle dark mode toggle
+    if (id === 'theme') {
+      toggleDarkMode();
+    }
+  };
+
+  const handleSelectLanguage = async (langCode: string) => {
+    try {
+      await i18n.changeLanguage(langCode);
+      setCurrentLanguage(langCode);
+    } catch (error) {
+      console.error('Failed to change language:', error);
+    }
   };
 
   const handleMenuPress = (itemId: string) => {
     if (itemId === 'edit-profile') {
       router.push('/profile/edit');
-      return;
+    } else if (itemId === 'language') {
+      setLanguageSelectorVisible(true);
     }
-
-    if (itemId === 'language') {
-      setShowLanguageModal(true);
-      return;
-    }
-
     switch (itemId) {
-      case 'edit-profile':
+      case 'edit-profile': 
+        break;
+      case 'language':
         break;
       case 'loyalty':
         break;
       case 'payment':
         break;
       case 'help':
-        break;
-      case 'theme-dark':
-        setTheme('dark');
-        break;
-      case 'theme-light':
-        setTheme('light');
         break;
       default:
         break;
@@ -190,12 +258,12 @@ export default function ProfileScreen() {
 
   const handleLogout = () => {
     Alert.alert(
-      t('profile.confirm_sign_out.title'),
-      t('profile.confirm_sign_out.message'),
+      t('profile.logout_title'),
+      t('profile.logout_message'),
       [
-        { text: t('profile.confirm_sign_out.cancel'), style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('profile.confirm_sign_out.confirm'),
+          text: t('profile.logout_title'),
           style: 'destructive',
           onPress: async () => {
             await logout();
@@ -211,21 +279,21 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.avatarContainer}
-            onPress={handlePhotoUpload}
+          <TouchableOpacity 
+            style={styles.avatarContainer} 
+            onPress={handleAvatarPress}
             disabled={isUploading}
           >
-            <Avatar
+            <Avatar 
               source={user?.avatar ? { uri: user.avatar } : undefined}
-              name={displayUser.name}
-              size="xl"
+              name={displayUser.name} 
+              size="xl" 
             />
             <View style={[styles.editBadge, { backgroundColor: colors.primary }]}>
               {isUploading ? (
                 <ActivityIndicator size="small" color={colors.primaryForeground} />
               ) : (
-                <Ionicons name="camera" size={14} color={colors.primaryForeground} />
+                <Ionicons name="image" size={14} color={colors.primaryForeground} />
               )}
             </View>
           </TouchableOpacity>
@@ -289,11 +357,11 @@ export default function ProfileScreen() {
             <Card>
               <CardContent style={styles.menuContent}>
                 {section.items.map((item, itemIndex) => (
-                  <View key={item.id + item.label}>
+                  <View key={item.id}>
                     {itemIndex > 0 && <Separator style={{ marginVertical: 0 }} />}
                     <TouchableOpacity
                       style={styles.menuItem}
-                      onPress={() => item.type !== 'toggle' && handleMenuPress(item.id)}
+                      onPress={() => item.type === 'link' && handleMenuPress(item.id)}
                       disabled={item.type === 'toggle'}
                     >
                       <View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}>
@@ -309,17 +377,10 @@ export default function ProfileScreen() {
                       {item.type === 'toggle' ? (
                         <Switch
                           value={toggleStates[item.id] ?? (typeof item.value === 'boolean' ? item.value : false)}
-                          // onValueChange={(value) => handleToggle(item.id, value)}
-                          onValueChange={() => { }} // Disabled for now to prevent errors
+                          onValueChange={(value) => handleToggle(item.id, value)}
                           trackColor={{ false: colors.border, true: colors.primary }}
                           thumbColor={colors.primaryForeground}
                         />
-                      ) : item.type === 'select' ? (
-                        <View style={styles.menuRight}>
-                          {item.value && (
-                            <Ionicons name="checkmark" size={20} color={colors.primary} />
-                          )}
-                        </View>
                       ) : (
                         <View style={styles.menuRight}>
                           {item.badge && (
@@ -358,68 +419,43 @@ export default function ProfileScreen() {
             textStyle={{ color: colors.destructive }}
             icon={<Ionicons name="log-out-outline" size={20} color={colors.destructive} />}
           >
-            {t('profile.sign_out')}
+            {t('profile.logout_title')}
           </Button>
         </View>
 
         {/* App Version */}
         <Text style={[styles.version, { color: colors.mutedForeground }]}>
-          BusinessHub Pro v1.0.0
+          {t('profile.version')}
         </Text>
 
         <View style={{ height: Spacing[6] }} />
       </ScrollView>
 
-      {/* Language Selection Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showLanguageModal}
-        onRequestClose={() => setShowLanguageModal(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowLanguageModal(false)}
-        >
-          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-            <Text style={[styles.modalTitle, { color: colors.foreground }]}>
-              {t('profile.change_language')}
-            </Text>
+      {/* Profile Photo Modal */}
+      <ProfilePhotoModal
+        visible={photoModalVisible}
+        hasPhoto={!!user?.avatar}
+        onViewPhoto={handleViewPhoto}
+        onEditPhoto={handleEditPhoto}
+        onCancel={() => setPhotoModalVisible(false)}
+      />
 
-            {[
-              { code: 'en', label: 'English' },
-              { code: 'ur', label: 'اردو (Urdu)' },
-              { code: 'es', label: 'Español (Spanish)' },
-              { code: 'fr', label: 'Français (French)' },
-              { code: 'de', label: 'Deutsch (German)' },
-              { code: 'zh', label: '中文 (Chinese)' },
-              { code: 'ar', label: 'العربية (Arabic)' },
-              { code: 'hi', label: 'हिन्दी (Hindi)' },
-              { code: 'pt', label: 'Português (Portuguese)' },
-              { code: 'ru', label: 'Русский (Russian)' },
-            ].map((lang) => (
-              <TouchableOpacity
-                key={lang.code}
-                style={[styles.languageOption, i18n.language === lang.code && styles.selectedOption]}
-                onPress={() => changeLanguage(lang.code)}
-              >
-                <Text style={[styles.languageText, { color: colors.foreground }]}>{lang.label}</Text>
-                {i18n.language === lang.code && (
-                  <Ionicons name="checkmark" size={24} color={colors.primary} />
-                )}
-              </TouchableOpacity>
-            ))}
+      {/* Image Viewer Modal */}
+      {imageViewerVisible && user?.avatar && (
+        <ImageViewer
+          image={user.avatar}
+          title={t('profile.photo.view_title')}
+          onClose={() => setImageViewerVisible(false)}
+        />
+      )}
 
-            <Button
-              variant="outline"
-              onPress={() => setShowLanguageModal(false)}
-              style={styles.closeButton}
-            >
-              {t('profile.cancel')}
-            </Button>
-          </View>
-        </Pressable>
-      </Modal>
+      {/* Language Selector Modal */}
+      <LanguageSelectorModal
+        visible={languageSelectorVisible}
+        currentLanguage={currentLanguage}
+        onSelectLanguage={handleSelectLanguage}
+        onClose={() => setLanguageSelectorVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -457,38 +493,4 @@ const styles = StyleSheet.create({
   menuValue: { fontSize: Typography.fontSize.sm },
   logoutButton: { width: '100%' },
   version: { textAlign: 'center', fontSize: Typography.fontSize.xs, marginTop: Spacing[4] },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    padding: Spacing[6],
-    paddingBottom: Spacing[10],
-  },
-  modalTitle: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-    marginBottom: Spacing[4],
-    textAlign: 'center',
-  },
-  languageOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing[4],
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc', // You might want to use colors.border here if accessible
-  },
-  selectedOption: {
-    backgroundColor: 'transparent',
-  },
-  languageText: {
-    fontSize: Typography.fontSize.base,
-  },
-  closeButton: {
-    marginTop: Spacing[4],
-  },
 });

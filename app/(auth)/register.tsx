@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,21 @@ import {
   Platform,
   Alert,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useTheme } from '@/hooks/useTheme';
 import { Button, Input } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
+import { signInWithGoogle, signInWithApple } from '@/lib/oauth';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function RegisterScreen() {
   const { colors } = useTheme();
@@ -31,8 +38,25 @@ export default function RegisterScreen() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
+  const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | null>(null);
 
   const { register, isLoading, authError, clearAuthError } = useStore();
+
+  // Google Auth Config
+  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
+    redirectUrl: 'businesshubpro://oauth/google/callback',
+  });
+
+  // Handle Google OAuth response
+  useEffect(() => {
+    if (googleResponse?.type === 'success') {
+      const { id_token } = googleResponse.params;
+      if (id_token) {
+        handleGoogleSignUp(id_token);
+      }
+    }
+  }, [googleResponse]);
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -79,6 +103,50 @@ export default function RegisterScreen() {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleGoogleSignUp = async (idToken: string) => {
+    setSocialLoading('google');
+    try {
+      const result = await signInWithGoogle(idToken);
+      if (result.success) {
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Google Sign-Up Failed', result.error || 'Please try again.');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An unexpected error occurred.');
+    } finally {
+      setSocialLoading(null);
+    }
+  };
+
+  const handleGooglePress = async () => {
+    try {
+      const result = await googlePromptAsync();
+      if (result?.type !== 'success') {
+        console.log('Google sign-up cancelled or error');
+      }
+    } catch (error) {
+      console.error('Google sign-up error:', error);
+      Alert.alert('Error', 'Failed to initiate Google sign-up.');
+    }
+  };
+
+  const handleAppleSignUp = async () => {
+    setSocialLoading('apple');
+    try {
+      const result = await signInWithApple();
+      if (result.success) {
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Apple Sign-Up Failed', result.error || 'Please try again.');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An unexpected error occurred.');
+    } finally {
+      setSocialLoading(null);
+    }
   };
 
   const handleRegister = async () => {
@@ -234,7 +302,7 @@ export default function RegisterScreen() {
               leftIcon="lock-closed-outline"
               error={errors.password}
               hint="Must be at least 8 characters"
-              editable={!isLoading}
+              editable={!isLoading && socialLoading === null}
             />
 
             <Input
@@ -246,14 +314,14 @@ export default function RegisterScreen() {
               autoCapitalize="none"
               leftIcon="lock-closed-outline"
               error={errors.confirmPassword}
-              editable={!isLoading}
+              editable={!isLoading && socialLoading === null}
             />
 
             {/* Terms Checkbox */}
             <TouchableOpacity
               style={styles.termsContainer}
               onPress={() => setAgreedToTerms(!agreedToTerms)}
-              disabled={isLoading}
+              disabled={isLoading || socialLoading !== null}
             >
               <View
                 style={[
@@ -285,7 +353,7 @@ export default function RegisterScreen() {
               onPress={handleRegister}
               loading={isLoading}
               style={styles.registerButton}
-              disabled={isLoading}
+              disabled={isLoading || socialLoading !== null}
             >
               Create Account
             </Button>
@@ -305,29 +373,51 @@ export default function RegisterScreen() {
             <TouchableOpacity
               style={[
                 styles.socialButton,
-                { backgroundColor: colors.secondary, borderColor: colors.border },
+                { 
+                  backgroundColor: colors.secondary, 
+                  borderColor: colors.border,
+                  opacity: (isLoading || socialLoading !== null) ? 0.5 : 1
+                },
               ]}
-              onPress={() => handleSocialSignup('Google')}
-              disabled={isLoading}
+              onPress={handleGooglePress}
+              disabled={isLoading || socialLoading !== null}
             >
-              <Ionicons name="logo-google" size={20} color={colors.foreground} />
-              <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
-                Google
-              </Text>
+              {socialLoading === 'google' ? (
+                <ActivityIndicator color={colors.foreground} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color={colors.foreground} />
+                  <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
+                    Google
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.socialButton,
-                { backgroundColor: colors.secondary, borderColor: colors.border },
-              ]}
-              onPress={() => handleSocialSignup('Apple')}
-              disabled={isLoading}
-            >
-              <Ionicons name="logo-apple" size={20} color={colors.foreground} />
-              <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
-                Apple
-              </Text>
-            </TouchableOpacity>
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={[
+                  styles.socialButton,
+                  { 
+                    backgroundColor: colors.secondary, 
+                    borderColor: colors.border,
+                    opacity: (isLoading || socialLoading !== null) ? 0.5 : 1
+                  },
+                ]}
+                onPress={handleAppleSignUp}
+                disabled={isLoading || socialLoading !== null}
+              >
+                {socialLoading === 'apple' ? (
+                  <ActivityIndicator color={colors.foreground} size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="logo-apple" size={20} color={colors.foreground} />
+                    <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
+                      Apple
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Login Link */}

@@ -120,8 +120,9 @@ interface AppState {
   // User Actions
   setUser: (user: User | null) => void;
   updateUserProfile: (updates: Partial<User>) => void;
-  updateProfile: (updates: { avatar_url?: string; full_name?: string }) => Promise<{ success: boolean; error?: any }>;
+  updateProfile: (updates: { avatar_url?: string | null; full_name?: string }) => Promise<{ success: boolean; error?: any }>;
   updateFullProfile: (updates: { name: string; phone: string }) => Promise<{ success: boolean; error?: any }>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: any }>;
 
   // Queue actions
   joinQueue: (queue: QueueEntry) => void;
@@ -410,6 +411,47 @@ export const useStore = create<AppState>()(
         }
 
         return { success: true };
+      },
+
+      changePassword: async (currentPassword: string, newPassword: string) => {
+        set({ isLoading: true });
+
+        try {
+          // First, verify current password by attempting to sign in
+          const { user: sessionUser } = useStore.getState();
+          
+          if (!sessionUser?.email) {
+            set({ isLoading: false });
+            return { success: false, error: 'User email not found' };
+          }
+
+          // Verify current password
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email: sessionUser.email,
+            password: currentPassword,
+          });
+
+          if (signInError) {
+            set({ isLoading: false });
+            return { success: false, error: 'Current password is incorrect' };
+          }
+
+          // Update to new password
+          const { error: updateError } = await supabase.auth.updateUser({
+            password: newPassword,
+          });
+
+          if (updateError) {
+            set({ isLoading: false });
+            return { success: false, error: updateError.message };
+          }
+
+          set({ isLoading: false });
+          return { success: true };
+        } catch (error: any) {
+          set({ isLoading: false });
+          return { success: false, error: error.message || 'Failed to change password' };
+        }
       },
 
       // Queue actions

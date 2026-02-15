@@ -125,6 +125,8 @@
                 "about": "关于",
                 "terms": "条款与隐私"
             },
+            "logout_title": "退出登录",
+            "logout_message": "您确定要退出登录吗？",
             "sign_out": "退出登录",
             "confirm_sign_out": {
                 "title": "退出登录",
@@ -132,9 +134,56 @@
                 "cancel": "取消",
                 "confirm": "退出"
             },
+            "photo": {
+                "title": "个人资料照片",
+                "view_title": "个人资料照片",
+                "view": "查看个人资料照片",
+                "view_desc": "使用放大和缩小查看照片",
+                "edit": "编辑个人资料照片",
+                "edit_desc": "更改或删除您的照片",
+                "choose_new": "选择新照片",
+                "remove": "删除照片",
+                "remove_confirm": "您确定要删除个人资料照片吗？",
+                "success_updated": "个人资料照片已更新！",
+                "success_removed": "个人资料照片已删除！",
+                "error": "上传照片时出错"
+            },
+            "edit": {
+                "title": "编辑个人资料",
+                "full_name": "全名",
+                "full_name_placeholder": "输入您的全名",
+                "full_name_required": "需要填写全名",
+                "phone": "电话号码",
+                "phone_placeholder": "输入您的电话号码",
+                "phone_invalid": "请输入有效的电话号码",
+                "save": "保存个人资料",
+                "success": "个人资料更新成功",
+                "error": "更新个人资料时出错"
+            },
+            "password": {
+                "title": "更改密码",
+                "current": "当前密码",
+                "current_placeholder": "输入当前密码",
+                "new": "新密码",
+                "new_placeholder": "输入新密码（至少8个字符）",
+                "confirm": "确认密码",
+                "confirm_placeholder": "确认您的新密码",
+                "update": "更新密码",
+                "cancel": "取消",
+                "success": "密码成功更改！",
+                "error_current_required": "需要当前密码",
+                "error_new_required": "需要新密码",
+                "error_min_length": "新密码必须至少8个字符",
+                "error_confirm_required": "请确认您的新密码",
+                "error_not_match": "密码不匹配",
+                "error_same": "新密码必须与当前密码不同",
+                "error_incorrect": "当前密码不正确",
+                "error_failed": "更改密码失败"
+            },
             "change_language": "更改语言",
             "select_language": "选择您的首选语言",
-            "cancel": "取消"
+            "cancel": "取消",
+            "version": "BusinessHub Pro v1.0.0"
         }
     }
 }

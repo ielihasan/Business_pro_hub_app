@@ -125,6 +125,8 @@
                 "about": "Sobre",
                 "terms": "Termos e Privacidade"
             },
+            "logout_title": "Sair",
+            "logout_message": "Tem certeza de que deseja sair?",
             "sign_out": "Sair",
             "confirm_sign_out": {
                 "title": "Sair",
@@ -132,9 +134,56 @@
                 "cancel": "Cancelar",
                 "confirm": "Sair"
             },
+            "photo": {
+                "title": "Foto do Perfil",
+                "view_title": "Foto do Perfil",
+                "view": "Ver Foto do Perfil",
+                "view_desc": "Ver foto com zoom in e zoom out",
+                "edit": "Editar Foto do Perfil",
+                "edit_desc": "Alterar ou remover sua foto",
+                "choose_new": "Escolher Nova Foto",
+                "remove": "Remover Foto",
+                "remove_confirm": "Tem certeza de que deseja remover sua foto de perfil?",
+                "success_updated": "Foto do perfil atualizada!",
+                "success_removed": "Foto do perfil removida!",
+                "error": "Erro ao enviar a foto"
+            },
+            "edit": {
+                "title": "Editar Perfil",
+                "full_name": "Nome Completo",
+                "full_name_placeholder": "Digite seu nome completo",
+                "full_name_required": "Nome completo é obrigatório",
+                "phone": "Número de Telefone",
+                "phone_placeholder": "Digite seu número de telefone",
+                "phone_invalid": "Por favor, digite um número de telefone válido",
+                "save": "Salvar Perfil",
+                "success": "Perfil atualizado com sucesso",
+                "error": "Erro ao atualizar o perfil"
+            },
+            "password": {
+                "title": "Alterar Senha",
+                "current": "Senha Atual",
+                "current_placeholder": "Digite sua senha atual",
+                "new": "Nova Senha",
+                "new_placeholder": "Digite a nova senha (mín. 8 caracteres)",
+                "confirm": "Confirmar Senha",
+                "confirm_placeholder": "Confirme sua nova senha",
+                "update": "Atualizar Senha",
+                "cancel": "Cancelar",
+                "success": "Senha alterada com sucesso!",
+                "error_current_required": "Senha atual é obrigatória",
+                "error_new_required": "Nova senha é obrigatória",
+                "error_min_length": "Nova senha deve ter no mínimo 8 caracteres",
+                "error_confirm_required": "Por favor, confirme sua nova senha",
+                "error_not_match": "Senhas não correspondem",
+                "error_same": "Nova senha deve ser diferente da atual",
+                "error_incorrect": "Senha atual está incorreta",
+                "error_failed": "Erro ao alterar a senha"
+            },
             "change_language": "Mudar Idioma",
             "select_language": "Selecione seu idioma preferido",
-            "cancel": "Cancelar"
+            "cancel": "Cancelar",
+            "version": "BusinessHub Pro v1.0.0"
         }
     }
 }
