@@ -22,6 +22,10 @@ import {
   Separator,
 } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
+<<<<<<< HEAD
+import { useTranslation } from 'react-i18next';
+=======
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 
 // Mock data for active queues
 const activeQueues = [
@@ -73,6 +77,10 @@ const pastQueues = [
 
 export default function QueueScreen() {
   const { colors } = useTheme();
+<<<<<<< HEAD
+  const { t } = useTranslation();
+=======
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
@@ -83,12 +91,21 @@ export default function QueueScreen() {
 
   const handleLeaveQueue = (queueId: string) => {
     Alert.alert(
+<<<<<<< HEAD
+      t('queue.leave_modal.title'),
+      t('queue.leave_modal.message'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('queue.leave_modal.confirm_action'),
+=======
       'Leave Queue',
       'Are you sure you want to leave this queue? You will lose your position.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Leave Queue',
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
           style: 'destructive',
           onPress: () => {
             // Handle leave queue
@@ -135,25 +152,41 @@ export default function QueueScreen() {
             <View style={styles.statsContainer}>
               <View style={styles.statBox}>
                 <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
+<<<<<<< HEAD
+                  {t('queue.card.your_position')}
+=======
                   Your Position
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                 </Text>
                 <Text style={[styles.statValueLarge, { color: colors.foreground }]}>
                   #{queue.position}
                 </Text>
                 <Text style={[styles.statSubtext, { color: colors.mutedForeground }]}>
+<<<<<<< HEAD
+                  of {queue.totalInQueue} {t('queue.card.in_queue')}
+=======
                   of {queue.totalInQueue} in queue
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                 </Text>
               </View>
               <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
               <View style={styles.statBox}>
                 <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
+<<<<<<< HEAD
+                  {t('queue.card.est_wait')}
+=======
                   Est. Wait Time
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                 </Text>
                 <Text style={[styles.statValueLarge, { color: colors.foreground }]}>
                   {queue.estimatedWait}
                 </Text>
                 <Text style={[styles.statSubtext, { color: colors.mutedForeground }]}>
+<<<<<<< HEAD
+                  {t('queue.card.joined_at')} {queue.joinedAt}
+=======
                   Joined at {queue.joinedAt}
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                 </Text>
               </View>
             </View>
@@ -162,7 +195,11 @@ export default function QueueScreen() {
             <View style={styles.progressContainer}>
               <View style={styles.progressHeader}>
                 <Text style={[styles.progressLabel, { color: colors.mutedForeground }]}>
+<<<<<<< HEAD
+                  {t('queue.card.progress')}
+=======
                   Queue Progress
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
                 </Text>
                 <Text style={[styles.progressPercent, { color: colors.foreground }]}>
                   {Math.round(progressPercent)}%
@@ -180,7 +217,11 @@ export default function QueueScreen() {
                 style={styles.actionButton}
                 icon={<Ionicons name="exit-outline" size={16} color={colors.foreground} />}
               >
+<<<<<<< HEAD
+                {t('queue.card.leave')}
+=======
                 Leave Queue
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
               </Button>
               <Button
                 size="sm"
@@ -188,7 +229,11 @@ export default function QueueScreen() {
                 style={styles.actionButton}
                 icon={<Ionicons name="eye-outline" size={16} color={colors.primaryForeground} />}
               >
+<<<<<<< HEAD
+                {t('common.view_details')}
+=======
                 View Details
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
               </Button>
             </View>
           </CardContent>
@@ -220,7 +265,11 @@ export default function QueueScreen() {
             <View style={styles.serviceTimeRow}>
               <Ionicons name="time-outline" size={14} color={colors.mutedForeground} />
               <Text style={[styles.serviceTimeText, { color: colors.mutedForeground }]}>
+<<<<<<< HEAD
+                {t('queue.card.service_time')}: {queue.serviceTime}
+=======
                 Service time: {queue.serviceTime}
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
               </Text>
             </View>
           )}
@@ -246,7 +295,11 @@ export default function QueueScreen() {
               { color: activeTab === 'active' ? colors.foreground : colors.mutedForeground },
             ]}
           >
+<<<<<<< HEAD
+            {t('queue.tabs.active')} ({activeQueues.length})
+=======
             Active ({activeQueues.length})
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -262,7 +315,11 @@ export default function QueueScreen() {
               { color: activeTab === 'history' ? colors.foreground : colors.mutedForeground },
             ]}
           >
+<<<<<<< HEAD
+            {t('queue.tabs.history')}
+=======
             History
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
           </Text>
         </TouchableOpacity>
       </View>
@@ -289,17 +346,28 @@ export default function QueueScreen() {
                 <Ionicons name="list-outline" size={48} color={colors.mutedForeground} />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+<<<<<<< HEAD
+                {t('queue.empty.active_title')}
+              </Text>
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                {t('queue.empty.active_desc')}
+=======
                 No Active Queues
               </Text>
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
                 Scan a QR code or search for a business to join a queue
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
               </Text>
               <Button
                 onPress={() => router.push('/(tabs)/scan')}
                 style={styles.emptyButton}
                 icon={<Ionicons name="qr-code-outline" size={18} color={colors.primaryForeground} />}
               >
+<<<<<<< HEAD
+                {t('queue.empty.scan_button')}
+=======
                 Scan QR Code
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
               </Button>
             </View>
           )
@@ -314,10 +382,17 @@ export default function QueueScreen() {
                 <Ionicons name="time-outline" size={48} color={colors.mutedForeground} />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+<<<<<<< HEAD
+                {t('queue.empty.history_title')}
+              </Text>
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                {t('queue.empty.history_desc')}
+=======
                 No Queue History
               </Text>
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
                 Your past queue visits will appear here
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
               </Text>
             </View>
           )

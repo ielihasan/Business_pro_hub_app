@@ -1,0 +1,189 @@
+{
+    "translation": {
+        "common": {
+            "search_placeholder": "Geschäfte suchen...",
+            "see_all": "Alle ansehen",
+            "view_details": "Details ansehen",
+            "open": "Geöffnet",
+            "closed": "Geschlossen",
+            "loading": "Laden...",
+            "error": "Etwas ist schief gelaufen",
+            "success": "Erfolg",
+            "cancel": "Abbrechen",
+            "confirm": "Bestätigen"
+        },
+        "tabs": {
+            "home": "Startseite",
+            "queue": "Meine Warteschlange",
+            "scan": "Scannen",
+            "orders": "Bestellungen",
+            "profile": "Profil"
+        },
+        "home": {
+            "categories": {
+                "title": "Kategorien",
+                "all": "Alle",
+                "food": "Essen",
+                "print": "Drucken",
+                "health": "Gesundheit",
+                "repair": "Reparatur",
+                "salon": "Salon"
+            },
+            "active_queue": {
+                "title": "Aktuell in der Warteschlange",
+                "position": "Position",
+                "est_wait": "Geschätzte Wartezeit"
+            },
+            "nearby": {
+                "title": "Geschäfte in der Nähe",
+                "in_queue": "in der Warteschlange",
+                "wait_time": "Wartezeit"
+            }
+        },
+        "queue": {
+            "tabs": {
+                "active": "Aktiv",
+                "history": "Verlauf"
+            },
+            "card": {
+                "your_position": "Ihre Position",
+                "in_queue": "in der Warteschlange",
+                "est_wait": "Geschätzte Wartezeit",
+                "joined_at": "Beigetreten um",
+                "progress": "Warteschlangenfortschritt",
+                "leave": "Warteschlange verlassen",
+                "service_time": "Servicezeit"
+            },
+            "status": {
+                "waiting": "Warten",
+                "completed": "Abgeschlossen",
+                "cancelled": "Storniert"
+            },
+            "empty": {
+                "active_title": "Keine aktiven Warteschlangen",
+                "active_desc": "Scannen Sie einen QR-Code oder suchen Sie nach einem Geschäft, um einer Warteschlange beizutreten",
+                "history_title": "Kein Warteschlangenverlauf",
+                "history_desc": "Ihre vergangenen Warteschlangenbesuche werden hier angezeigt",
+                "scan_button": "QR-Code scannen"
+            },
+            "leave_modal": {
+                "title": "Warteschlange verlassen",
+                "message": "Sind Sie sicher, dass Sie diese Warteschlange verlassen möchten? Sie verlieren Ihre Position.",
+                "confirm_action": "Warteschlange verlassen"
+            }
+        },
+        "orders": {
+            "tabs": {
+                "all": "Alle Bestellungen",
+                "active": "Aktiv",
+                "completed": "Abgeschlossen"
+            },
+            "status": {
+                "pending": "Ausstehend",
+                "in_progress": "In Vorbereitung",
+                "ready": "Bereit",
+                "completed": "Abgeschlossen",
+                "cancelled": "Storniert",
+                "unknown": "Unbekannt"
+            },
+            "card": {
+                "total": "Gesamt",
+                "ready_message": "Ihre Bestellung ist zur Abholung bereit!"
+            },
+            "empty": {
+                "title": "Keine Bestellungen gefunden",
+                "active_desc": "Sie haben derzeit keine aktiven Bestellungen",
+                "completed_desc": "Ihre abgeschlossenen Bestellungen werden hier angezeigt",
+                "all_desc": "Ihr Bestellverlauf wird hier angezeigt"
+            }
+        },
+        "profile": {
+            "title": "Profil",
+            "edit_badge": "Bearbeiten",
+            "guest": "Gastbenutzer",
+            "stats": {
+                "points": "Punkte",
+                "visits": "Besuche",
+                "since": "Seit"
+            },
+            "sections": {
+                "account": "Konto",
+                "preferences": "Einstellungen",
+                "support": "Support"
+            },
+            "menu": {
+                "edit_profile": "Profil bearbeiten",
+                "loyalty": "Treue & Belohnungen",
+                "payment": "Zahlungsmethoden",
+                "addresses": "Gespeicherte Adressen",
+                "notifications": "Benachrichtigungen",
+                "location": "Standortdienste",
+                "language": "Sprache",
+                "dark_mode": "Dunkelmodus",
+                "help": "Hilfezentrum",
+                "feedback": "Feedback senden",
+                "about": "Über",
+                "terms": "AGB & Datenschutz"
+            },
+            "logout_title": "Abmelden",
+            "logout_message": "Sind Sie sicher, dass Sie sich abmelden möchten?",
+            "sign_out": "Abmelden",
+            "confirm_sign_out": {
+                "title": "Abmelden",
+                "message": "Sind Sie sicher, dass Sie sich abmelden möchten?",
+                "cancel": "Abbrechen",
+                "confirm": "Abmelden"
+            },
+            "photo": {
+                "title": "Profilfoto",
+                "view_title": "Profilfoto",
+                "view": "Profilfoto anschauen",
+                "view_desc": "Foto mit Zoomfunktion vergrößern und verkleinern",
+                "edit": "Profilfoto bearbeiten",
+                "edit_desc": "Foto ändern oder entfernen",
+                "choose_new": "Neues Foto auswählen",
+                "remove": "Foto entfernen",
+                "remove_confirm": "Sind Sie sicher, dass Sie Ihr Profilfoto entfernen möchten?",
+                "success_updated": "Profilfoto aktualisiert!",
+                "success_removed": "Profilfoto entfernt!",
+                "error": "Fehler beim Hochladen des Fotos"
+            },
+            "edit": {
+                "title": "Profil bearbeiten",
+                "full_name": "Vollständiger Name",
+                "full_name_placeholder": "Geben Sie Ihren vollständigen Namen ein",
+                "full_name_required": "Vollständiger Name erforderlich",
+                "phone": "Telefonnummer",
+                "phone_placeholder": "Geben Sie Ihre Telefonnummer ein",
+                "phone_invalid": "Bitte geben Sie eine gültige Telefonnummer ein",
+                "save": "Profil speichern",
+                "success": "Profil erfolgreich aktualisiert",
+                "error": "Fehler beim Aktualisieren des Profils"
+            },
+            "password": {
+                "title": "Passwort ändern",
+                "current": "Aktuelles Passwort",
+                "current_placeholder": "Geben Sie Ihr aktuelles Passwort ein",
+                "new": "Neues Passwort",
+                "new_placeholder": "Geben Sie das neue Passwort ein (min. 8 Zeichen)",
+                "confirm": "Passwort bestätigen",
+                "confirm_placeholder": "Bestätigen Sie Ihr neues Passwort",
+                "update": "Passwort aktualisieren",
+                "cancel": "Abbrechen",
+                "success": "Passwort erfolgreich geändert!",
+                "error_current_required": "Aktuelles Passwort erforderlich",
+                "error_new_required": "Neues Passwort erforderlich",
+                "error_min_length": "Neues Passwort muss mindestens 8 Zeichen lang sein",
+                "error_confirm_required": "Bitte bestätigen Sie Ihr neues Passwort",
+                "error_not_match": "Passwörter stimmen nicht überein",
+                "error_same": "Neues Passwort muss sich vom aktuellen unterscheiden",
+                "error_incorrect": "Aktuelles Passwort ist falsch",
+                "error_failed": "Fehler beim Ändern des Passworts"
+            },
+            "change_language": "Sprache ändern",
+            "select_language": "Wählen Sie Ihre bevorzugte Sprache",
+            "cancel": "Abbrechen",
+            "version": "BusinessHub Pro v1.0.0"
+        }
+    }
+}

@@ -1,0 +1,189 @@
+{
+    "translation": {
+        "common": {
+            "search_placeholder": "Rechercher des entreprises...",
+            "see_all": "Voir tout",
+            "view_details": "Voir les détails",
+            "open": "Ouvert",
+            "closed": "Fermé",
+            "loading": "Chargement...",
+            "error": "Une erreur est survenue",
+            "success": "Succès",
+            "cancel": "Annuler",
+            "confirm": "Confirmer"
+        },
+        "tabs": {
+            "home": "Accueil",
+            "queue": "Ma File",
+            "scan": "Scanner",
+            "orders": "Commandes",
+            "profile": "Profil"
+        },
+        "home": {
+            "categories": {
+                "title": "Catégories",
+                "all": "Tout",
+                "food": "Nourriture",
+                "print": "Impression",
+                "health": "Santé",
+                "repair": "Réparation",
+                "salon": "Salon"
+            },
+            "active_queue": {
+                "title": "Actuellement dans la file",
+                "position": "Position",
+                "est_wait": "Attente est."
+            },
+            "nearby": {
+                "title": "Entreprises à proximité",
+                "in_queue": "dans la file",
+                "wait_time": "temps d'attente"
+            }
+        },
+        "queue": {
+            "tabs": {
+                "active": "Actif",
+                "history": "Historique"
+            },
+            "card": {
+                "your_position": "Votre position",
+                "in_queue": "dans la file",
+                "est_wait": "Temps d'attente est.",
+                "joined_at": "Rejoint à",
+                "progress": "Progression de la file",
+                "leave": "Quitter la file",
+                "service_time": "Temps de service"
+            },
+            "status": {
+                "waiting": "En attente",
+                "completed": "Terminé",
+                "cancelled": "Annulé"
+            },
+            "empty": {
+                "active_title": "Aucune file d'attente active",
+                "active_desc": "Scannez un code QR ou recherchez une entreprise pour rejoindre une file d'attente",
+                "history_title": "Aucun historique",
+                "history_desc": "Vos visites précédentes apparaîtront ici",
+                "scan_button": "Scanner le code QR"
+            },
+            "leave_modal": {
+                "title": "Quitter la file",
+                "message": "Êtes-vous sûr de vouloir quitter cette file ? Vous perdrez votre position.",
+                "confirm_action": "Quitter la file"
+            }
+        },
+        "orders": {
+            "tabs": {
+                "all": "Toutes les commandes",
+                "active": "Actives",
+                "completed": "Terminées"
+            },
+            "status": {
+                "pending": "En attente",
+                "in_progress": "En préparation",
+                "ready": "Prêt",
+                "completed": "Terminé",
+                "cancelled": "Annulé",
+                "unknown": "Inconnu"
+            },
+            "card": {
+                "total": "Total",
+                "ready_message": "Votre commande est prête à être récupérée !"
+            },
+            "empty": {
+                "title": "Aucune commande trouvée",
+                "active_desc": "Vous n'avez aucune commande active pour le moment",
+                "completed_desc": "Vos commandes terminées apparaîtront ici",
+                "all_desc": "Votre historique de commandes apparaîtra ici"
+            }
+        },
+        "profile": {
+            "title": "Profil",
+            "edit_badge": "Modifier",
+            "guest": "Invité",
+            "stats": {
+                "points": "Points",
+                "visits": "Visites",
+                "since": "Depuis"
+            },
+            "sections": {
+                "account": "Compte",
+                "preferences": "Préférences",
+                "support": "Support"
+            },
+            "menu": {
+                "edit_profile": "Modifier le profil",
+                "loyalty": "Fidélité et Récompenses",
+                "payment": "Méthodes de paiement",
+                "addresses": "Adresses enregistrées",
+                "notifications": "Notifications",
+                "location": "Services de localisation",
+                "language": "Langue",
+                "dark_mode": "Mode sombre",
+                "help": "Centre d'aide",
+                "feedback": "Envoyer des commentaires",
+                "about": "À propos",
+                "terms": "Termes et confidentialité"
+            },
+            "logout_title": "Se déconnecter",
+            "logout_message": "Êtes-vous sûr de vouloir vous déconnecter ?",
+            "sign_out": "Se déconnecter",
+            "confirm_sign_out": {
+                "title": "Se déconnecter",
+                "message": "Êtes-vous sûr de vouloir vous déconnecter ?",
+                "cancel": "Annuler",
+                "confirm": "Se déconnecter"
+            },
+            "photo": {
+                "title": "Photo de profil",
+                "view_title": "Photo de profil",
+                "view": "Voir la photo de profil",
+                "view_desc": "Voir la photo avec zoom avant et arrière",
+                "edit": "Modifier la photo de profil",
+                "edit_desc": "Changer ou supprimer votre photo",
+                "choose_new": "Choisir une nouvelle photo",
+                "remove": "Supprimer la photo",
+                "remove_confirm": "Êtes-vous sûr de vouloir supprimer votre photo de profil ?",
+                "success_updated": "Photo de profil mise à jour !",
+                "success_removed": "Photo de profil supprimée !",
+                "error": "Erreur lors du téléchargement de la photo"
+            },
+            "edit": {
+                "title": "Modifier le profil",
+                "full_name": "Nom complet",
+                "full_name_placeholder": "Entrez votre nom complet",
+                "full_name_required": "Le nom complet est requis",
+                "phone": "Numéro de téléphone",
+                "phone_placeholder": "Entrez votre numéro de téléphone",
+                "phone_invalid": "Veuillez entrer un numéro de téléphone valide",
+                "save": "Enregistrer le profil",
+                "success": "Profil mis à jour avec succès",
+                "error": "Erreur lors de la mise à jour du profil"
+            },
+            "password": {
+                "title": "Changer le mot de passe",
+                "current": "Mot de passe actuel",
+                "current_placeholder": "Entrez votre mot de passe actuel",
+                "new": "Nouveau mot de passe",
+                "new_placeholder": "Entrez le nouveau mot de passe (min. 8 caractères)",
+                "confirm": "Confirmer le mot de passe",
+                "confirm_placeholder": "Confirmez votre nouveau mot de passe",
+                "update": "Mettre à jour le mot de passe",
+                "cancel": "Annuler",
+                "success": "Mot de passe changé avec succès !",
+                "error_current_required": "Le mot de passe actuel est requis",
+                "error_new_required": "Le nouveau mot de passe est requis",
+                "error_min_length": "Le nouveau mot de passe doit contenir au moins 8 caractères",
+                "error_confirm_required": "Veuillez confirmer votre nouveau mot de passe",
+                "error_not_match": "Les mots de passe ne correspondent pas",
+                "error_same": "Le nouveau mot de passe doit être différent de l'actuel",
+                "error_incorrect": "Le mot de passe actuel est incorrect",
+                "error_failed": "Erreur lors de la modification du mot de passe"
+            },
+            "change_language": "Changer de langue",
+            "select_language": "Sélectionnez votre langue préférée",
+            "cancel": "Annuler",
+            "version": "BusinessHub Pro v1.0.0"
+        }
+    }
+}

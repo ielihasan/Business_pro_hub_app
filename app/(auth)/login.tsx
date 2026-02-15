@@ -1,4 +1,8 @@
+<<<<<<< HEAD
+import { useState, useEffect } from 'react';
+=======
 import { useState } from 'react';
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 import {
   View,
   Text,
@@ -9,14 +13,30 @@ import {
   Platform,
   Alert,
   Modal,
+<<<<<<< HEAD
+  ActivityIndicator,
+=======
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+<<<<<<< HEAD
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import * as AppleAuthentication from 'expo-apple-authentication';
+=======
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 import { useTheme } from '@/hooks/useTheme';
 import { Button, Input } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
+<<<<<<< HEAD
+import { signInWithGoogle, signInWithApple } from '@/lib/oauth';
+
+WebBrowser.maybeCompleteAuthSession();
+=======
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 
 export default function LoginScreen() {
   const { colors } = useTheme();
@@ -24,9 +44,32 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+<<<<<<< HEAD
+  const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | null>(null);
 
   const { login, isLoading, authError, clearAuthError } = useStore();
 
+  // Google Auth Config
+  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
+    redirectUrl: 'businesshubpro://oauth/google/callback',
+  });
+
+  // Handle Google OAuth response
+  useEffect(() => {
+    if (googleResponse?.type === 'success') {
+      const { id_token } = googleResponse.params;
+      if (id_token) {
+        handleGoogleSignIn(id_token);
+      }
+    }
+  }, [googleResponse]);
+
+=======
+
+  const { login, isLoading, authError, clearAuthError } = useStore();
+
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
   const handleLogin = async () => {
     // Clear previous errors
     clearAuthError();
@@ -71,6 +114,50 @@ export default function LoginScreen() {
     }
   };
 
+<<<<<<< HEAD
+  const handleGoogleSignIn = async (idToken: string) => {
+    setSocialLoading('google');
+    try {
+      const result = await signInWithGoogle(idToken);
+      if (result.success) {
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Google Sign-In Failed', result.error || 'Please try again.');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An unexpected error occurred.');
+    } finally {
+      setSocialLoading(null);
+    }
+  };
+
+  const handleGooglePress = async () => {
+    try {
+      const result = await googlePromptAsync();
+      if (result?.type !== 'success') {
+        console.log('Google sign-in cancelled or error');
+      }
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      Alert.alert('Error', 'Failed to initiate Google sign-in.');
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setSocialLoading('apple');
+    try {
+      const result = await signInWithApple();
+      if (result.success) {
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Apple Sign-In Failed', result.error || 'Please try again.');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An unexpected error occurred.');
+    } finally {
+      setSocialLoading(null);
+    }
+=======
   const handleSocialLogin = (provider: string) => {
     // Social login will be implemented later
     Alert.alert(
@@ -78,6 +165,7 @@ export default function LoginScreen() {
       `${provider} login will be available soon!`,
       [{ text: 'OK' }]
     );
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
   };
 
   return (
@@ -134,7 +222,11 @@ export default function LoginScreen() {
               autoComplete="email"
               leftIcon="mail-outline"
               error={errors.email}
+<<<<<<< HEAD
+              editable={!isLoading && socialLoading === null}
+=======
               editable={!isLoading}
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
             />
             <Input
               label="Password"
@@ -149,13 +241,21 @@ export default function LoginScreen() {
               autoComplete="password"
               leftIcon="lock-closed-outline"
               error={errors.password}
+<<<<<<< HEAD
+              editable={!isLoading && socialLoading === null}
+=======
               editable={!isLoading}
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
             />
 
             <TouchableOpacity
               style={styles.forgotPassword}
               onPress={() => router.push('/(auth)/forgot-password')}
+<<<<<<< HEAD
+              disabled={isLoading || socialLoading !== null}
+=======
               disabled={isLoading}
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
             >
               <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
                 Forgot password?
@@ -166,7 +266,11 @@ export default function LoginScreen() {
               onPress={handleLogin}
               loading={isLoading}
               style={styles.loginButton}
+<<<<<<< HEAD
+              disabled={isLoading || socialLoading !== null}
+=======
               disabled={isLoading}
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
             >
               Sign In
             </Button>
@@ -186,6 +290,53 @@ export default function LoginScreen() {
             <TouchableOpacity
               style={[
                 styles.socialButton,
+<<<<<<< HEAD
+                { 
+                  backgroundColor: colors.secondary, 
+                  borderColor: colors.border,
+                  opacity: (isLoading || socialLoading !== null) ? 0.5 : 1
+                },
+              ]}
+              onPress={handleGooglePress}
+              disabled={isLoading || socialLoading !== null}
+            >
+              {socialLoading === 'google' ? (
+                <ActivityIndicator color={colors.foreground} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color={colors.foreground} />
+                  <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
+                    Google
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={[
+                  styles.socialButton,
+                  { 
+                    backgroundColor: colors.secondary, 
+                    borderColor: colors.border,
+                    opacity: (isLoading || socialLoading !== null) ? 0.5 : 1
+                  },
+                ]}
+                onPress={handleAppleSignIn}
+                disabled={isLoading || socialLoading !== null}
+              >
+                {socialLoading === 'apple' ? (
+                  <ActivityIndicator color={colors.foreground} size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="logo-apple" size={20} color={colors.foreground} />
+                    <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
+                      Apple
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+=======
                 { backgroundColor: colors.secondary, borderColor: colors.border },
               ]}
               onPress={() => handleSocialLogin('Google')}
@@ -209,6 +360,7 @@ export default function LoginScreen() {
                 Apple
               </Text>
             </TouchableOpacity>
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
           </View>
 
           {/* Register Link */}

@@ -1,0 +1,190 @@
+{
+    "translation": {
+        "common": {
+            "search_placeholder": "Search businesses...",
+            "see_all": "See All",
+            "view_details": "View Details",
+            "open": "Open",
+            "closed": "Closed",
+            "loading": "Loading...",
+            "error": "Something went wrong",
+            "success": "Success",
+            "cancel": "Cancel",
+            "confirm": "Confirm"
+        },
+        "tabs": {
+            "home": "Home",
+            "queue": "My Queue",
+            "scan": "Scan",
+            "orders": "Orders",
+            "profile": "Profile"
+        },
+        "home": {
+            "categories": {
+                "title": "Categories",
+                "all": "All",
+                "food": "Food",
+                "print": "Print",
+                "health": "Health",
+                "repair": "Repair",
+                "salon": "Salon"
+            },
+            "active_queue": {
+                "title": "Currently in queue",
+                "position": "Position",
+                "est_wait": "Est. Wait"
+            },
+            "nearby": {
+                "title": "Nearby Businesses",
+                "in_queue": "in queue",
+                "wait_time": "wait time"
+            }
+        },
+        "queue": {
+            "tabs": {
+                "active": "Active",
+                "history": "History"
+            },
+            "card": {
+                "your_position": "Your Position",
+                "in_queue": "in queue",
+                "est_wait": "Est. Wait Time",
+                "joined_at": "Joined at",
+                "progress": "Queue Progress",
+                "leave": "Leave Queue",
+                "service_time": "Service time"
+            },
+            "status": {
+                "waiting": "Waiting",
+                "completed": "Completed",
+                "cancelled": "Cancelled"
+            },
+            "empty": {
+                "active_title": "No Active Queues",
+                "active_desc": "Scan a QR code or search for a business to join a queue",
+                "history_title": "No Queue History",
+                "history_desc": "Your past queue visits will appear here",
+                "scan_button": "Scan QR Code"
+            },
+            "leave_modal": {
+                "title": "Leave Queue",
+                "message": "Are you sure you want to leave this queue? You will lose your position.",
+                "confirm_action": "Leave Queue"
+            }
+        },
+        "orders": {
+            "tabs": {
+                "all": "All Orders",
+                "active": "Active",
+                "completed": "Completed"
+            },
+            "status": {
+                "pending": "Pending",
+                "in_progress": "Preparing",
+                "ready": "Ready",
+                "completed": "Completed",
+                "cancelled": "Cancelled",
+                "unknown": "Unknown"
+            },
+            "card": {
+                "total": "Total",
+                "ready_message": "Your order is ready for pickup!"
+            },
+            "empty": {
+                "title": "No Orders Found",
+                "active_desc": "You have no active orders at the moment",
+                "completed_desc": "Your completed orders will appear here",
+                "all_desc": "Your order history will appear here"
+            }
+        },
+        "profile": {
+            "title": "Profile",
+            "edit_badge": "Edit",
+            "guest": "Guest User",
+            "stats": {
+                "points": "Points",
+                "visits": "Visits",
+                "since": "Since"
+            },
+            "sections": {
+                "account": "Account",
+                "preferences": "Preferences",
+                "support": "Support"
+            },
+            "menu": {
+                "edit_profile": "Edit Profile",
+                "loyalty": "Loyalty & Rewards",
+                "payment": "Payment Methods",
+                "addresses": "Saved Addresses",
+                "notifications": "Notifications",
+                "location": "Location Services",
+                "language": "Language",
+                "dark_mode": "Dark Mode",
+                "help": "Help Center",
+                "feedback": "Send Feedback",
+                "about": "About",
+                "terms": "Terms & Privacy"
+            },
+            "logout_title": "Sign Out",
+            "logout_message": "Are you sure you want to sign out?",
+            "sign_out": "Sign Out",
+            "confirm_sign_out": {
+                "title": "Sign Out",
+                "message": "Are you sure you want to sign out?",
+                "cancel": "Cancel",
+                "confirm": "Sign Out"
+            },
+            "photo": {
+                "title": "Profile Photo",
+                "view_title": "Profile Photo",
+                "view": "View Profile Photo",
+                "view_desc": "View photo with zoom in & zoom out",
+                "edit": "Edit Profile Photo",
+                "edit_desc": "Change or remove your photo",
+                "choose_new": "Choose New Photo",
+                "remove": "Remove Photo",
+                "remove_confirm": "Are you sure you want to remove your profile photo?",
+                "success_updated": "Profile picture updated!",
+                "success_removed": "Profile picture removed!",
+                "error": "Failed to upload photo"
+            },
+            "edit": {
+                "title": "Edit Profile",
+                "full_name": "Full Name",
+                "full_name_placeholder": "Enter your full name",
+                "full_name_required": "Full name is required",
+                "phone": "Phone Number",
+                "phone_placeholder": "Enter your phone number",
+                "phone_invalid": "Please enter a valid phone number",
+                "save": "Save Profile",
+                "success": "Profile updated successfully",
+                "error": "Failed to update profile"
+            },
+            "password": {
+                "title": "Change Password",
+                "current": "Current Password",
+                "current_placeholder": "Enter current password",
+                "new": "New Password",
+                "new_placeholder": "Enter new password (min. 8 characters)",
+                "confirm": "Confirm Password",
+                "confirm_placeholder": "Confirm new password",
+                "update": "Update Password",
+                "cancel": "Cancel",
+                "success": "Password changed successfully!",
+                "error_current_required": "Current password is required",
+                "error_new_required": "New password is required",
+                "error_min_length": "New password must be at least 8 characters",
+                "error_confirm_required": "Please confirm your new password",
+                "error_not_match": "Passwords do not match",
+                "error_same": "New password must be different from current password",
+                "error_incorrect": "Current password is incorrect",
+                "error_failed": "Failed to change password"
+            },
+            "change_language": "Change Language",
+            "select_language": "Select Language",
+            "select_language_desc": "Select your preferred language",
+            "cancel": "Cancel",
+            "version": "BusinessHub Pro v1.0.0"
+        }
+    }
+}

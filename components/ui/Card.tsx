@@ -1,36 +1,64 @@
 import React from 'react';
+<<<<<<< HEAD
+import { View, Text, StyleSheet, ViewStyle, TextStyle, StyleProp } from 'react-native';
+=======
 import { View, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 import { useTheme } from '@/hooks/useTheme';
 import { BorderRadius, Spacing, Typography, Shadows } from '@/constants/theme';
 
 interface CardProps {
   children: React.ReactNode;
+<<<<<<< HEAD
+  style?: StyleProp<ViewStyle>;
+=======
   style?: ViewStyle;
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 }
 
 interface CardHeaderProps {
   children: React.ReactNode;
+<<<<<<< HEAD
+  style?: StyleProp<ViewStyle>;
+=======
   style?: ViewStyle;
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 }
 
 interface CardTitleProps {
   children: React.ReactNode;
+<<<<<<< HEAD
+  style?: StyleProp<TextStyle>;
+=======
   style?: TextStyle;
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 }
 
 interface CardDescriptionProps {
   children: React.ReactNode;
+<<<<<<< HEAD
+  style?: StyleProp<TextStyle>;
+=======
   style?: TextStyle;
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 }
 
 interface CardContentProps {
   children: React.ReactNode;
+<<<<<<< HEAD
+  style?: StyleProp<ViewStyle>;
+=======
   style?: ViewStyle;
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 }
 
 interface CardFooterProps {
   children: React.ReactNode;
+<<<<<<< HEAD
+  style?: StyleProp<ViewStyle>;
+=======
   style?: ViewStyle;
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 }
 
 export function Card({ children, style }: CardProps) {

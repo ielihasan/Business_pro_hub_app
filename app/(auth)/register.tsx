@@ -1,4 +1,8 @@
+<<<<<<< HEAD
+import { useState, useEffect } from 'react';
+=======
 import { useState } from 'react';
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 import {
   View,
   Text,
@@ -9,14 +13,30 @@ import {
   Platform,
   Alert,
   Modal,
+<<<<<<< HEAD
+  ActivityIndicator,
+=======
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+<<<<<<< HEAD
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import * as AppleAuthentication from 'expo-apple-authentication';
+=======
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 import { useTheme } from '@/hooks/useTheme';
 import { Button, Input } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
+<<<<<<< HEAD
+import { signInWithGoogle, signInWithApple } from '@/lib/oauth';
+
+WebBrowser.maybeCompleteAuthSession();
+=======
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
 
 export default function RegisterScreen() {
   const { colors } = useTheme();
@@ -31,9 +51,32 @@ export default function RegisterScreen() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
+<<<<<<< HEAD
+  const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | null>(null);
 
   const { register, isLoading, authError, clearAuthError } = useStore();
 
+  // Google Auth Config
+  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
+    redirectUrl: 'businesshubpro://oauth/google/callback',
+  });
+
+  // Handle Google OAuth response
+  useEffect(() => {
+    if (googleResponse?.type === 'success') {
+      const { id_token } = googleResponse.params;
+      if (id_token) {
+        handleGoogleSignUp(id_token);
+      }
+    }
+  }, [googleResponse]);
+
+=======
+
+  const { register, isLoading, authError, clearAuthError } = useStore();
+
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
@@ -81,6 +124,53 @@ export default function RegisterScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
+<<<<<<< HEAD
+  const handleGoogleSignUp = async (idToken: string) => {
+    setSocialLoading('google');
+    try {
+      const result = await signInWithGoogle(idToken);
+      if (result.success) {
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Google Sign-Up Failed', result.error || 'Please try again.');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An unexpected error occurred.');
+    } finally {
+      setSocialLoading(null);
+    }
+  };
+
+  const handleGooglePress = async () => {
+    try {
+      const result = await googlePromptAsync();
+      if (result?.type !== 'success') {
+        console.log('Google sign-up cancelled or error');
+      }
+    } catch (error) {
+      console.error('Google sign-up error:', error);
+      Alert.alert('Error', 'Failed to initiate Google sign-up.');
+    }
+  };
+
+  const handleAppleSignUp = async () => {
+    setSocialLoading('apple');
+    try {
+      const result = await signInWithApple();
+      if (result.success) {
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Apple Sign-Up Failed', result.error || 'Please try again.');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An unexpected error occurred.');
+    } finally {
+      setSocialLoading(null);
+    }
+  };
+
+=======
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
   const handleRegister = async () => {
     // Clear previous errors
     clearAuthError();
@@ -234,7 +324,11 @@ export default function RegisterScreen() {
               leftIcon="lock-closed-outline"
               error={errors.password}
               hint="Must be at least 8 characters"
+<<<<<<< HEAD
+              editable={!isLoading && socialLoading === null}
+=======
               editable={!isLoading}
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
             />
 
             <Input
@@ -246,14 +340,22 @@ export default function RegisterScreen() {
               autoCapitalize="none"
               leftIcon="lock-closed-outline"
               error={errors.confirmPassword}
+<<<<<<< HEAD
+              editable={!isLoading && socialLoading === null}
+=======
               editable={!isLoading}
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
             />
 
             {/* Terms Checkbox */}
             <TouchableOpacity
               style={styles.termsContainer}
               onPress={() => setAgreedToTerms(!agreedToTerms)}
+<<<<<<< HEAD
+              disabled={isLoading || socialLoading !== null}
+=======
               disabled={isLoading}
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
             >
               <View
                 style={[
@@ -285,7 +387,11 @@ export default function RegisterScreen() {
               onPress={handleRegister}
               loading={isLoading}
               style={styles.registerButton}
+<<<<<<< HEAD
+              disabled={isLoading || socialLoading !== null}
+=======
               disabled={isLoading}
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
             >
               Create Account
             </Button>
@@ -305,6 +411,53 @@ export default function RegisterScreen() {
             <TouchableOpacity
               style={[
                 styles.socialButton,
+<<<<<<< HEAD
+                { 
+                  backgroundColor: colors.secondary, 
+                  borderColor: colors.border,
+                  opacity: (isLoading || socialLoading !== null) ? 0.5 : 1
+                },
+              ]}
+              onPress={handleGooglePress}
+              disabled={isLoading || socialLoading !== null}
+            >
+              {socialLoading === 'google' ? (
+                <ActivityIndicator color={colors.foreground} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color={colors.foreground} />
+                  <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
+                    Google
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={[
+                  styles.socialButton,
+                  { 
+                    backgroundColor: colors.secondary, 
+                    borderColor: colors.border,
+                    opacity: (isLoading || socialLoading !== null) ? 0.5 : 1
+                  },
+                ]}
+                onPress={handleAppleSignUp}
+                disabled={isLoading || socialLoading !== null}
+              >
+                {socialLoading === 'apple' ? (
+                  <ActivityIndicator color={colors.foreground} size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="logo-apple" size={20} color={colors.foreground} />
+                    <Text style={[styles.socialButtonText, { color: colors.foreground }]}>
+                      Apple
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+=======
                 { backgroundColor: colors.secondary, borderColor: colors.border },
               ]}
               onPress={() => handleSocialSignup('Google')}
@@ -328,6 +481,7 @@ export default function RegisterScreen() {
                 Apple
               </Text>
             </TouchableOpacity>
+>>>>>>> 57767a09a5d820a64e21b0c825da668d705595a5
           </View>
 
           {/* Login Link */}
