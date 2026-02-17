@@ -6,7 +6,9 @@
       "Bash(npx expo start:*)",
       "Bash(npm install:*)",
       "Bash(npx kill-port:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

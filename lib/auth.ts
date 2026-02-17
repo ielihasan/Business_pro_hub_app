@@ -201,7 +201,7 @@ export async function getUserProfile(userId: string) {
       .from('User')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Get profile error:', error);

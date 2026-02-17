@@ -117,13 +117,6 @@ export default function RootLayout() {
             headerShadowVisible: false,
           }}
         />
-        <Stack.Screen
-          name="scanner"
-          options={{
-            presentation: 'modal',
-            animation: 'slide_from_bottom',
-          }}
-        />
       </Stack>
     </View>
   );
