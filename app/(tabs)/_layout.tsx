@@ -1,8 +1,8 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { BorderRadius, Typography } from '@/constants/theme';
-import { View, StyleSheet, Platform } from 'react-native';
+import { Typography } from '@/constants/theme';
+import { Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -83,12 +83,7 @@ export default function TabLayout() {
         name="scan"
         options={{
           title: t('tabs.scan'),
-          tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.scanButton, { backgroundColor: colors.primary }]}>
-              <Ionicons name="qr-code" size={28} color={colors.primaryForeground} />
-            </View>
-          ),
-          tabBarLabel: () => null,
+          href: null, // hide from tab bar completely
         }}
       />
       <Tabs.Screen
@@ -120,19 +115,3 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  scanButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-});
