@@ -13,6 +13,15 @@ import {
   RegisterData,
   LoginData,
 } from '@/lib/auth';
+import {
+  joinBusinessQueue,
+  leaveQueueEntry,
+  fetchUserActiveQueues,
+  fetchUserQueueHistory,
+  QueueEntryRecord,
+  ticketLabel,
+  formatWait,
+} from '@/lib/queue';
 
 // Types
 export interface User {
@@ -129,6 +138,9 @@ interface AppState {
   leaveQueue: (queueId: string) => void;
   updateQueuePosition: (queueId: string, position: number, estimatedWait: string) => void;
   completeQueue: (queueId: string) => void;
+  joinQueueInSupabase: (businessId: string) => Promise<{ success: boolean; queueEntryId?: string; error?: string }>;
+  leaveQueueInSupabase: (entryId: string) => Promise<{ success: boolean; error?: string }>;
+  syncQueuesFromSupabase: () => Promise<void>;
 
   // Order actions
   addOrder: (order: Order) => void;
@@ -338,6 +350,78 @@ export const useStore = create<AppState>()(
         if (!queue) return state;
         return { activeQueues: state.activeQueues.filter(q => q.id !== queueId), queueHistory: [...state.queueHistory, { ...queue, status: 'completed' as const }] };
       }),
+
+      // Supabase-backed queue actions
+      joinQueueInSupabase: async (businessId: string) => {
+        const user = get().user;
+        if (!user) return { success: false, error: 'Not authenticated' };
+        const { data, error } = await joinBusinessQueue(businessId, user.id, {
+          customerName: user.name,
+          customerEmail: user.email,
+          customerPhone: user.phone,
+        });
+        if (error || !data) return { success: false, error: error ?? 'Failed to join queue' };
+        const entry: QueueEntry = {
+          id: data.id,
+          businessId: data.business_id,
+          businessName: data.business?.name ?? '',
+          businessCategory: data.business?.category ?? '',
+          ticketNumber: ticketLabel(data.position),
+          position: data.position,
+          totalInQueue: data.business?.queue_length ?? data.position,
+          estimatedWait: formatWait(data.estimated_wait_time),
+          status: data.status,
+          joinedAt: new Date(data.joined_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        };
+        // Remove duplicate if re-joining same business
+        set((state) => ({
+          activeQueues: [
+            ...state.activeQueues.filter(q => q.businessId !== businessId),
+            entry,
+          ],
+        }));
+        return { success: true, queueEntryId: data.id };
+      },
+
+      leaveQueueInSupabase: async (entryId: string) => {
+        const { error } = await leaveQueueEntry(entryId);
+        if (error) return { success: false, error };
+        set((state) => ({
+          activeQueues: state.activeQueues.filter(q => q.id !== entryId),
+          queueHistory: [
+            ...state.queueHistory,
+            ...state.activeQueues
+              .filter(q => q.id === entryId)
+              .map(q => ({ ...q, status: 'cancelled' as const })),
+          ],
+        }));
+        return { success: true };
+      },
+
+      syncQueuesFromSupabase: async () => {
+        const user = get().user;
+        if (!user) return;
+        const [activeRes, historyRes] = await Promise.all([
+          fetchUserActiveQueues(user.id),
+          fetchUserQueueHistory(user.id),
+        ]);
+        const mapEntry = (r: QueueEntryRecord): QueueEntry => ({
+          id: r.id,
+          businessId: r.business_id,
+          businessName: r.business?.name ?? '',
+          businessCategory: r.business?.category ?? '',
+          ticketNumber: ticketLabel(r.position),
+          position: r.position,
+          totalInQueue: r.business?.queue_length ?? r.position,
+          estimatedWait: formatWait(r.estimated_wait_time),
+          status: r.status,
+          joinedAt: new Date(r.joined_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        });
+        set({
+          activeQueues: (activeRes.data ?? []).map(mapEntry),
+          queueHistory: (historyRes.data ?? []).map(mapEntry),
+        });
+      },
 
       // Orders
       addOrder: (order) => set((state) => ({ orders: [order, ...state.orders] })),

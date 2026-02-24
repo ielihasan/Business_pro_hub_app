@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,42 +24,74 @@ import {
   QueueStatusBadge,
 } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
+import {
+  fetchQueueEntry,
+  subscribeToQueueEntry,
+  QueueEntryRecord,
+  ticketLabel,
+  formatWait,
+} from '@/lib/queue';
+import { useStore } from '@/store/useStore';
 
-// Mock queue data
-const queueData: Record<string, any> = {
-  'q1': {
-    id: 'q1',
-    ticketNumber: 'CC-042',
-    position: 3,
-    totalInQueue: 8,
-    estimatedWait: '8 min',
-    status: 'waiting',
-    joinedAt: '10:30 AM',
-    business: {
-      id: '1',
-      name: 'Campus Coffee Shop',
-      category: 'Food & Beverage',
-      address: 'Block A, University of Gujrat',
+function buildTimeline(entry: QueueEntryRecord) {
+  const joinedTime = new Date(entry.joined_at).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const isActive = entry.status === 'waiting' || entry.status === 'in_progress';
+  return [
+    { time: joinedTime, event: 'Joined queue', status: 'completed' },
+    {
+      time: entry.status === 'in_progress' ? 'Now' : (isActive ? 'Pending' : 'Done'),
+      event: 'Currently being served',
+      status: entry.status === 'in_progress' ? 'upcoming' : (entry.status === 'completed' ? 'completed' : 'pending'),
     },
-    timeline: [
-      { time: '10:30 AM', event: 'Joined queue', status: 'completed' },
-      { time: '10:35 AM', event: 'Position updated to #5', status: 'completed' },
-      { time: '10:40 AM', event: 'Position updated to #3', status: 'completed' },
-      { time: 'Soon', event: 'Your turn is coming up', status: 'upcoming' },
-      { time: 'Pending', event: 'Service completed', status: 'pending' },
-    ],
-  },
-};
+    {
+      time: entry.status === 'completed' ? 'Done' : 'Pending',
+      event: 'Service completed',
+      status: entry.status === 'completed' ? 'completed' : 'pending',
+    },
+  ];
+}
 
 export default function QueueDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
   const [loading, setLoading] = useState(false);
-  const queue = queueData[id || 'q1'] || queueData['q1'];
+  const [queue, setQueue] = useState<QueueEntryRecord | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const leaveQueueInSupabase = useStore((s) => s.leaveQueueInSupabase);
 
-  const progressPercent = ((queue.totalInQueue - queue.position + 1) / queue.totalInQueue) * 100;
+  // Load queue entry from Supabase
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      const { data, error } = await fetchQueueEntry(id);
+      if (error || !data) {
+        setFetchError(error ?? 'Queue entry not found');
+      } else {
+        setQueue(data);
+      }
+    })();
+  }, [id]);
+
+  // Real-time subscription for position/status updates
+  useEffect(() => {
+    if (!id) return;
+    const unsubscribe = subscribeToQueueEntry(id, (updated) => {
+      setQueue((prev) =>
+        prev ? ({ ...prev, ...updated } as QueueEntryRecord) : prev
+      );
+    });
+    return unsubscribe;
+  }, [id]);
+
+  const progressPercent = queue
+    ? ((( queue.business?.queue_length ?? queue.position) - queue.position + 1) / (queue.business?.queue_length ?? queue.position)) * 100
+    : 0;
 
   const handleLeaveQueue = () => {
+    if (!queue) return;
     Alert.alert(
       'Leave Queue',
       'Are you sure you want to leave this queue? You will lose your position.',
@@ -67,12 +100,15 @@ export default function QueueDetailScreen() {
         {
           text: 'Leave Queue',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
             setLoading(true);
-            setTimeout(() => {
-              setLoading(false);
-              router.replace('/(tabs)/queue');
-            }, 1000);
+            const result = await leaveQueueInSupabase(queue.id);
+            setLoading(false);
+            if (!result.success) {
+              Alert.alert('Error', result.error ?? 'Failed to leave queue.');
+              return;
+            }
+            router.replace('/(tabs)/queue');
           },
         },
       ]
@@ -80,8 +116,35 @@ export default function QueueDetailScreen() {
   };
 
   const handleViewBusiness = () => {
-    router.push(`/business/${queue.business.id}`);
+    if (queue?.business_id) router.push(`/business/${queue.business_id}`);
   };
+
+  // Loading / error states
+  if (!queue && !fetchError) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
+      </SafeAreaView>
+    );
+  }
+
+  if (fetchError || !queue) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.destructive} />
+          <Text style={{ color: colors.foreground, marginTop: 12, textAlign: 'center' }}>
+            {fetchError ?? 'Queue entry not found.'}
+          </Text>
+          <Button onPress={() => router.replace('/(tabs)/queue')} style={{ marginTop: 16 }}>
+            Go to My Queues
+          </Button>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const timeline = buildTimeline(queue);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
@@ -93,7 +156,7 @@ export default function QueueDetailScreen() {
               Your Ticket Number
             </Text>
             <Text style={[styles.ticketNumber, { color: colors.primaryForeground }]}>
-              {queue.ticketNumber}
+              {ticketLabel(queue.position)}
             </Text>
             <QueueStatusBadge status={queue.status} style={styles.statusBadge} />
           </View>
@@ -117,7 +180,7 @@ export default function QueueDetailScreen() {
                     #{queue.position}
                   </Text>
                   <Text style={[styles.positionSubtext, { color: colors.mutedForeground }]}>
-                    of {queue.totalInQueue} in queue
+                    of {queue.business?.queue_length ?? queue.position} in queue
                   </Text>
                 </View>
                 <View style={[styles.positionDivider, { backgroundColor: colors.border }]} />
@@ -126,7 +189,7 @@ export default function QueueDetailScreen() {
                     Est. Wait Time
                   </Text>
                   <Text style={[styles.positionValue, { color: colors.foreground }]}>
-                    {queue.estimatedWait}
+                    {formatWait(queue.estimated_wait_time)}
                   </Text>
                   <Text style={[styles.positionSubtext, { color: colors.mutedForeground }]}>
                     Updated just now
@@ -160,15 +223,15 @@ export default function QueueDetailScreen() {
                   <Avatar name={queue.business.name} size="lg" />
                   <View style={styles.businessInfo}>
                     <Text style={[styles.businessName, { color: colors.foreground }]}>
-                      {queue.business.name}
+                      {queue.business?.name ?? 'Unknown Business'}
                     </Text>
                     <Text style={[styles.businessCategory, { color: colors.mutedForeground }]}>
-                      {queue.business.category}
+                      {queue.business?.category ?? ''}
                     </Text>
                     <View style={styles.businessLocation}>
                       <Ionicons name="location-outline" size={14} color={colors.mutedForeground} />
                       <Text style={[styles.businessAddress, { color: colors.mutedForeground }]}>
-                        {queue.business.address}
+                        {queue.business?.address ?? ''}
                       </Text>
                     </View>
                   </View>
@@ -185,7 +248,7 @@ export default function QueueDetailScreen() {
             </Text>
             <Card>
               <CardContent style={styles.timelineContent}>
-                {queue.timeline.map((item: any, index: number) => (
+                {timeline.map((item: any, index: number) => (
                   <View key={index} style={styles.timelineItem}>
                     <View style={styles.timelineIndicator}>
                       <View
@@ -206,7 +269,7 @@ export default function QueueDetailScreen() {
                           <Ionicons name="time" size={10} color="#FFFFFF" />
                         )}
                       </View>
-                      {index < queue.timeline.length - 1 && (
+                      {index < timeline.length - 1 && (
                         <View
                           style={[
                             styles.timelineLine,
@@ -243,7 +306,7 @@ export default function QueueDetailScreen() {
                       Joined at
                     </Text>
                     <Text style={[styles.infoValue, { color: colors.foreground }]}>
-                      {queue.joinedAt}
+                      {new Date(queue.joined_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                     </Text>
                   </View>
                 </View>

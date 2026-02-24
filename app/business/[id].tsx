@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,88 +23,88 @@ import {
   Progress,
 } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { fetchBusinessById, BusinessDetail } from '@/lib/queue';
+import { useStore } from '@/store/useStore';
 
 const { width } = Dimensions.get('window');
-
-// Mock business data
-const businessData: Record<string, any> = {
-  '1': {
-    id: '1',
-    name: 'Campus Coffee Shop',
-    category: 'Food & Beverage',
-    description: 'Your favorite campus coffee spot serving freshly brewed coffee, pastries, and light snacks. Perfect for study breaks!',
-    address: 'Block A, University of Gujrat',
-    phone: '+92 300 1234567',
-    rating: 4.8,
-    reviewCount: 234,
-    isOpen: true,
-    waitTime: '~10 min',
-    queueLength: 5,
-    hours: {
-      today: '8:00 AM - 10:00 PM',
-      status: 'Open until 10:00 PM',
-    },
-    services: [
-      { name: 'Coffee', icon: 'cafe-outline', avgTime: '5 min' },
-      { name: 'Pastries', icon: 'pizza-outline', avgTime: '3 min' },
-      { name: 'Sandwiches', icon: 'fast-food-outline', avgTime: '8 min' },
-    ],
-    amenities: ['WiFi', 'Seating', 'AC', 'Card Payment'],
-    images: [],
-  },
-  '2': {
-    id: '2',
-    name: 'UniPrint Station',
-    category: 'Print Services',
-    description: 'Professional printing services for students and faculty. Color prints, binding, lamination, and document processing.',
-    address: 'IT Building, University of Gujrat',
-    phone: '+92 300 9876543',
-    rating: 4.5,
-    reviewCount: 156,
-    isOpen: true,
-    waitTime: '~15 min',
-    queueLength: 8,
-    hours: {
-      today: '9:00 AM - 6:00 PM',
-      status: 'Open until 6:00 PM',
-    },
-    services: [
-      { name: 'B&W Print', icon: 'document-outline', avgTime: '3 min' },
-      { name: 'Color Print', icon: 'color-palette-outline', avgTime: '5 min' },
-      { name: 'Binding', icon: 'book-outline', avgTime: '10 min' },
-    ],
-    amenities: ['WiFi', 'File Upload', 'Card Payment'],
-    images: [],
-  },
-};
 
 export default function BusinessDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
   const [loading, setLoading] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [business, setBusiness] = useState<BusinessDetail | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const joinQueueInSupabase = useStore((s) => s.joinQueueInSupabase);
+  const isAuthenticated = useStore((s) => s.isAuthenticated);
 
-  const business = businessData[id || '1'] || businessData['1'];
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      const { data, error } = await fetchBusinessById(id);
+      if (error || !data) {
+        setFetchError(error ?? 'Business not found');
+      } else {
+        setBusiness(data);
+      }
+    })();
+  }, [id]);
 
   const handleJoinQueue = () => {
+    if (!business) return;
+
+    if (!isAuthenticated) {
+      Alert.alert('Sign In Required', 'Please sign in to join a queue.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: () => router.push('/(auth)/login') },
+      ]);
+      return;
+    }
+
     Alert.alert(
-      'Join Queue',
-      `You're about to join the queue at ${business.name}. Current wait time is ${business.waitTime}.`,
+      `Join Queue — ${business.name}`,
+      `Current queue: ${business.queue_length} people\nEstimated wait: ${business.wait_time ?? 'N/A'}\n\nWould you like to join?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Join Queue',
-          onPress: () => {
+          onPress: async () => {
             setLoading(true);
-            setTimeout(() => {
-              setLoading(false);
-              router.push('/queue/q1');
-            }, 1000);
+            const result = await joinQueueInSupabase(business.id);
+            setLoading(false);
+            if (!result.success || !result.queueEntryId) {
+              Alert.alert('Could Not Join', result.error ?? 'An error occurred.');
+              return;
+            }
+            router.push(`/queue/${result.queueEntryId}`);
           },
         },
       ]
     );
   };
+
+  // Loading / error states
+  if (!business && !fetchError) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
+      </SafeAreaView>
+    );
+  }
+
+  if (fetchError || !business) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.destructive} />
+          <Text style={{ color: colors.foreground, marginTop: 12, textAlign: 'center' }}>
+            {fetchError ?? 'Business not found.'}
+          </Text>
+          <Button onPress={() => router.back()} style={{ marginTop: 16 }}>Go Back</Button>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const handleShare = () => {
     // Share functionality
@@ -158,8 +159,8 @@ export default function BusinessDetailScreen() {
                   {business.category}
                 </Text>
               </View>
-              <Badge variant={business.isOpen ? 'success' : 'secondary'}>
-                {business.isOpen ? 'Open' : 'Closed'}
+              <Badge variant={business.is_open ? 'success' : 'secondary'}>
+                {business.is_open ? 'Open' : 'Closed'}
               </Badge>
             </View>
 
@@ -168,22 +169,22 @@ export default function BusinessDetailScreen() {
               <View style={styles.ratingContainer}>
                 <Ionicons name="star" size={18} color="#F59E0B" />
                 <Text style={[styles.ratingText, { color: colors.foreground }]}>
-                  {business.rating}
+                  {business.rating ?? 'N/A'}
                 </Text>
                 <Text style={[styles.reviewCount, { color: colors.mutedForeground }]}>
-                  ({business.reviewCount} reviews)
+                  ({business.review_count ?? 0} reviews)
                 </Text>
               </View>
               <View style={styles.queueInfo}>
                 <Ionicons name="people-outline" size={18} color={colors.mutedForeground} />
                 <Text style={[styles.queueText, { color: colors.mutedForeground }]}>
-                  {business.queueLength} in queue
+                  {business.queue_length} in queue
                 </Text>
               </View>
             </View>
 
             <Text style={[styles.description, { color: colors.mutedForeground }]}>
-              {business.description}
+              {business.description || 'A registered business on BusinessHub Pro.'}
             </Text>
           </View>
 
@@ -197,13 +198,13 @@ export default function BusinessDetailScreen() {
                       Estimated Wait Time
                     </Text>
                     <Text style={[styles.queueTime, { color: colors.foreground }]}>
-                      {business.waitTime}
+                      {business.wait_time ?? 'N/A'}
                     </Text>
                   </View>
                   <View style={styles.queueStats}>
                     <View style={styles.queueStatItem}>
                       <Text style={[styles.queueStatValue, { color: colors.foreground }]}>
-                        {business.queueLength}
+                        {business.queue_length}
                       </Text>
                       <Text style={[styles.queueStatLabel, { color: colors.mutedForeground }]}>
                         in queue
@@ -255,31 +256,7 @@ export default function BusinessDetailScreen() {
             </View>
           </View>
 
-          {/* Services */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              Services
-            </Text>
-            <View style={styles.servicesList}>
-              {business.services.map((service: any, index: number) => (
-                <Card key={index} style={styles.serviceCard}>
-                  <CardContent style={styles.serviceContent}>
-                    <View style={[styles.serviceIcon, { backgroundColor: colors.secondary }]}>
-                      <Ionicons name={service.icon} size={24} color={colors.foreground} />
-                    </View>
-                    <View style={styles.serviceInfo}>
-                      <Text style={[styles.serviceName, { color: colors.foreground }]}>
-                        {service.name}
-                      </Text>
-                      <Text style={[styles.serviceTime, { color: colors.mutedForeground }]}>
-                        Avg. {service.avgTime}
-                      </Text>
-                    </View>
-                  </CardContent>
-                </Card>
-              ))}
-            </View>
-          </View>
+          {/* Services — omitted (not in Supabase schema); kept intentionally blank */}
 
           {/* Business Hours */}
           <View style={styles.section}>
@@ -292,10 +269,10 @@ export default function BusinessDetailScreen() {
                   <Ionicons name="time-outline" size={20} color={colors.mutedForeground} />
                   <View style={styles.hoursInfo}>
                     <Text style={[styles.hoursText, { color: colors.foreground }]}>
-                      {business.hours.today}
+                      {business.is_open ? 'Currently open' : 'Currently closed'}
                     </Text>
-                    <Text style={[styles.hoursStatus, { color: colors.success }]}>
-                      {business.hours.status}
+                    <Text style={[styles.hoursStatus, { color: business.is_open ? colors.success : colors.destructive }]}>
+                      {business.is_open ? 'Open now' : 'Closed'}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />
@@ -314,7 +291,7 @@ export default function BusinessDetailScreen() {
                 <View style={styles.locationRow}>
                   <Ionicons name="location-outline" size={20} color={colors.mutedForeground} />
                   <Text style={[styles.locationText, { color: colors.foreground }]}>
-                    {business.address}
+                    {business.address || `Lat: ${business.latitude?.toFixed(4)}, Lng: ${business.longitude?.toFixed(4)}`}
                   </Text>
                 </View>
                 <Button
@@ -329,36 +306,7 @@ export default function BusinessDetailScreen() {
             </Card>
           </View>
 
-          {/* Amenities */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              Amenities
-            </Text>
-            <View style={styles.amenitiesList}>
-              {business.amenities.map((amenity: string, index: number) => (
-                <View
-                  key={index}
-                  style={[styles.amenityChip, { backgroundColor: colors.secondary }]}
-                >
-                  <Ionicons
-                    name={
-                      amenity === 'WiFi' ? 'wifi-outline' :
-                      amenity === 'Seating' ? 'bed-outline' :
-                      amenity === 'AC' ? 'snow-outline' :
-                      amenity === 'Card Payment' ? 'card-outline' :
-                      amenity === 'File Upload' ? 'cloud-upload-outline' :
-                      'checkmark-outline'
-                    }
-                    size={16}
-                    color={colors.foreground}
-                  />
-                  <Text style={[styles.amenityText, { color: colors.foreground }]}>
-                    {amenity}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
+          {/* Amenities — loaded from Supabase when available */}
 
           <View style={{ height: Spacing[6] }} />
         </View>

@@ -17,7 +17,8 @@
             "queue": "My Queue",
             "scan": "Scan",
             "orders": "Orders",
-            "profile": "Profile"
+            "profile": "Profile",
+            "map": "Map"
         },
         "home": {
             "categories": {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,59 +8,13 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
+import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { Spacing, Typography } from '@/constants/theme';
 import { useTranslation } from 'react-i18next';
 import { ActiveQueueItem, PastQueueItem, QueueEmptyState } from '@/components/queue';
-
-// Mock data for active queues
-const activeQueues = [
-  {
-    id: 'q1',
-    businessId: '1',
-    businessName: 'Campus Coffee Shop',
-    businessCategory: 'Food & Beverage',
-    position: 3,
-    totalInQueue: 8,
-    estimatedWait: '8 min',
-    status: 'waiting' as const,
-    joinedAt: '10:30 AM',
-    ticketNumber: 'CC-042',
-  },
-];
-
-const pastQueues = [
-  {
-    id: 'q2',
-    businessId: '2',
-    businessName: 'UniPrint Station',
-    businessCategory: 'Print Services',
-    status: 'completed' as const,
-    completedAt: 'Today, 9:15 AM',
-    serviceTime: '12 min',
-    ticketNumber: 'UP-089',
-  },
-  {
-    id: 'q3',
-    businessId: '3',
-    businessName: 'Quick Fix Mobile',
-    businessCategory: 'Phone Repair',
-    status: 'completed' as const,
-    completedAt: 'Yesterday, 4:30 PM',
-    serviceTime: '25 min',
-    ticketNumber: 'QF-156',
-  },
-  {
-    id: 'q4',
-    businessId: '1',
-    businessName: 'Campus Coffee Shop',
-    businessCategory: 'Food & Beverage',
-    status: 'cancelled' as const,
-    completedAt: 'Yesterday, 11:00 AM',
-    ticketNumber: 'CC-038',
-  },
-];
+import { useStore } from '@/store/useStore';
 
 export default function QueueScreen() {
   const { colors } = useTheme();
@@ -68,9 +22,21 @@ export default function QueueScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
 
-  const onRefresh = () => {
+  const activeQueues = useStore((s) => s.activeQueues);
+  const queueHistory = useStore((s) => s.queueHistory);
+  const leaveQueueInSupabase = useStore((s) => s.leaveQueueInSupabase);
+  const syncQueuesFromSupabase = useStore((s) => s.syncQueuesFromSupabase);
+  const isAuthenticated = useStore((s) => s.isAuthenticated);
+
+  // Sync on mount
+  useEffect(() => {
+    if (isAuthenticated) syncQueuesFromSupabase();
+  }, [isAuthenticated]);
+
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1500);
+    await syncQueuesFromSupabase();
+    setRefreshing(false);
   };
 
   const handleLeaveQueue = (queueId: string) => {
@@ -82,7 +48,12 @@ export default function QueueScreen() {
         {
           text: t('queue.leave_modal.confirm_action'),
           style: 'destructive',
-          onPress: () => console.log('Leaving queue:', queueId),
+          onPress: async () => {
+            const result = await leaveQueueInSupabase(queueId);
+            if (!result.success) {
+              Alert.alert('Error', result.error ?? 'Failed to leave queue.');
+            }
+          },
         },
       ]
     );
@@ -120,16 +91,18 @@ export default function QueueScreen() {
           activeQueues.length > 0 ? (
             <View style={styles.list}>
               {activeQueues.map((q) => (
-                <ActiveQueueItem key={q.id} queue={q} onLeave={handleLeaveQueue} />
+                <TouchableOpacity key={q.id} onPress={() => router.push(`/queue/${q.id}`)}>
+                  <ActiveQueueItem queue={q} onLeave={handleLeaveQueue} />
+                </TouchableOpacity>
               ))}
             </View>
           ) : (
             <QueueEmptyState type="active" />
           )
-        ) : pastQueues.length > 0 ? (
+        ) : queueHistory.length > 0 ? (
           <View style={styles.list}>
-            {pastQueues.map((q) => (
-              <PastQueueItem key={q.id} queue={q} />
+            {queueHistory.map((q) => (
+              <PastQueueItem key={q.id} queue={q as any} />
             ))}
           </View>
         ) : (

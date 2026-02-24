@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useTheme } from '@/hooks/useTheme';
@@ -111,7 +112,11 @@ export default function MapScreen() {
               coordinate={{ latitude: b.latitude as number, longitude: b.longitude as number }}
               title={b.name}
               description={b.category}
-            />
+            >
+              <View style={[styles.markerContainer, { backgroundColor: colors.primary }]}>
+                <Ionicons name="location" size={20} color={colors.primaryForeground} />
+              </View>
+            </Marker>
           ) : null
         )}
       </MapView>
@@ -138,4 +143,15 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { width, height },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  markerContainer: {
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
 });
