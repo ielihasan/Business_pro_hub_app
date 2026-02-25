@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as Location from 'expo-location';
 import { fetchBusinesses, subscribeToBusinesses, BusinessRecord } from '@/lib/business';
+import { useStore } from '@/store/useStore';
 
 type BusinessWithDistance = BusinessRecord & { distanceKm: number };
 
@@ -11,11 +12,18 @@ interface UseNearbyBusinessesOptions {
 }
 
 export function useNearbyBusinesses({ radiusKm, category, query }: UseNearbyBusinessesOptions) {
+  const locationEnabled = useStore((s) => s.locationEnabled);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [businesses, setBusinesses] = useState<BusinessWithDistance[]>([]);
 
   // Initial load + realtime subscription
   useEffect(() => {
+    if (!locationEnabled) {
+      setUserLocation(null);
+      setBusinesses([]);
+      return;
+    }
+
     let unsub: (() => Promise<void>) | null = null;
 
     (async () => {
@@ -45,7 +53,7 @@ export function useNearbyBusinesses({ radiusKm, category, query }: UseNearbyBusi
       if (unsub) unsub();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [locationEnabled]);
 
   // Refetch when filters change
   useEffect(() => {

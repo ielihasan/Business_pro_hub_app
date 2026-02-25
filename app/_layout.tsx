@@ -9,6 +9,40 @@ import { useStore, setupAuthListener } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
 import '@/lib/i18n';
 
+// ─── Silence expo-notifications Expo Go SDK 53 warning ──────────────────────
+// expo-notifications prints this at native-module init time (before any of our
+// code runs) when the app is loaded inside Expo Go. It is purely informational
+// and cannot be prevented by guarding our own calls, so we filter it here.
+(function suppressExpoNotificationsExpoGoWarning() {
+  const IGNORED_PATTERNS = [
+    'expo-notifications: Android Push notifications',
+    'expo-notifications: Push notifications',
+    'removed from Expo Go',
+  ];
+  const originalError = console.error.bind(console);
+  console.error = (...args: any[]) => {
+    const msg = args[0];
+    if (
+      typeof msg === 'string' &&
+      IGNORED_PATTERNS.some((p) => msg.includes(p))
+    ) {
+      return; // swallow silently
+    }
+    originalError(...args);
+  };
+  const originalWarn = console.warn.bind(console);
+  console.warn = (...args: any[]) => {
+    const msg = args[0];
+    if (
+      typeof msg === 'string' &&
+      IGNORED_PATTERNS.some((p) => msg.includes(p))
+    ) {
+      return;
+    }
+    originalWarn(...args);
+  };
+})();
+
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 
@@ -115,6 +149,34 @@ export default function RootLayout() {
             headerStyle: { backgroundColor: colors.background },
             headerTintColor: colors.foreground,
             headerShadowVisible: false,
+          }}
+        />
+        <Stack.Screen
+          name="profile/terms"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="profile/feedback"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="profile/about"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="profile/help"
+          options={{
+            headerShown: false,
+            animation: 'slide_from_right',
           }}
         />
       </Stack>

@@ -1,16 +1,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Dimensions, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useTheme } from '@/hooks/useTheme';
 import { fetchBusinesses, BusinessRecord, subscribeToBusinesses, createBusiness } from '@/lib/business';
 import { MapControls } from '@/components/map';
+import { useStore } from '@/store/useStore';
 
 const { width, height } = Dimensions.get('window');
 
 export default function MapScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const { locationEnabled, toggleLocation } = useStore();
   const [region, setRegion] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [businesses, setBusinesses] = useState<Array<BusinessRecord & { distanceKm: number }>>([]);
@@ -21,6 +23,12 @@ export default function MapScreen() {
   const [newIsOpen, setNewIsOpen] = useState(true);
 
   useEffect(() => {
+    if (!locationEnabled) {
+      setRegion(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -44,7 +52,7 @@ export default function MapScreen() {
         setLoading(false);
       }
     })();
-  }, [radiusKm]);
+  }, [radiusKm, locationEnabled]);
 
   const handleRefresh = useCallback(() => {
     setLoading(true);
@@ -79,6 +87,28 @@ export default function MapScreen() {
     }
   }, [newName, newCategory, newIsOpen, radiusKm]);
 
+  if (!locationEnabled) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <View style={[styles.disabledIconBg, { backgroundColor: isDark ? '#1C1C1E' : '#F3F4F6' }]}>
+          <Ionicons name="location-outline" size={48} color={colors.mutedForeground} />
+        </View>
+        <Text style={[styles.disabledTitle, { color: colors.foreground }]}>Location Services Off</Text>
+        <Text style={[styles.disabledDesc, { color: colors.mutedForeground }]}>
+          Enable location services to see businesses near you on the map.
+        </Text>
+        <TouchableOpacity
+          style={[styles.enableBtn, { backgroundColor: colors.primary }]}
+          onPress={() => toggleLocation()}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="navigate-outline" size={18} color="#fff" />
+          <Text style={styles.enableBtnText}>Enable Location</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
@@ -91,7 +121,11 @@ export default function MapScreen() {
   if (!region) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.foreground }}>Location permission required to view map.</Text>
+        <Ionicons name="location-outline" size={48} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
+        <Text style={[styles.disabledTitle, { color: colors.foreground }]}>Location Access Required</Text>
+        <Text style={[styles.disabledDesc, { color: colors.mutedForeground }]}>
+          Please allow location permission in your device settings.
+        </Text>
       </View>
     );
   }
@@ -142,7 +176,19 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { width, height },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  disabledIconBg: {
+    width: 96, height: 96, borderRadius: 48,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 20,
+  },
+  disabledTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
+  disabledDesc: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 28 },
+  enableBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 24, paddingVertical: 14,
+    borderRadius: 12,
+  },
+  enableBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   markerContainer: {
     padding: 8,
     borderRadius: 20,

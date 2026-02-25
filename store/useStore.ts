@@ -22,6 +22,24 @@ import {
   ticketLabel,
   formatWait,
 } from '@/lib/queue';
+import {
+  requestNotificationPermissions,
+  notifyQueueJoined,
+  notifyAlmostYourTurn,
+  notifyYourTurnNow,
+  notifyOrderReady,
+  notifyLoyaltyPoints,
+  notifyWelcome,
+  setBadgeCount,
+} from '@/lib/notificationService';
+import Constants from 'expo-constants';
+import * as Location from 'expo-location';
+import { Linking } from 'react-native';
+
+/** True when running inside Expo Go (SDK 53+: push not available) */
+const runningInExpoGo =
+  Constants.executionEnvironment === 'storeClient' ||
+  Constants.appOwnership === 'expo';
 
 // Types
 export interface User {
@@ -149,14 +167,19 @@ interface AppState {
   // Favorites
   toggleFavorite: (businessId: string) => void;
 
+  // Feedback
+  submitFeedback: (data: { rating: number; category: string; message: string }) => Promise<{ success: boolean; error?: string }>;
+
   // Notifications
   addNotification: (notification: Notification) => void;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
+  deleteNotification: (notificationId: string) => void;
+  clearAllNotifications: () => void;
 
   // Settings
-  toggleNotifications: () => void;
-  toggleLocation: () => void;
+  toggleNotifications: () => Promise<void>;
+  toggleLocation: () => Promise<void>;
   toggleDarkMode: () => void;
   setTheme: (theme: 'light' | 'dark') => void;
 }
@@ -170,8 +193,9 @@ const mapSupabaseUserToUser = (supabaseUser: SupabaseUser, profile?: any): User 
     email: supabaseUser.email || '',
     phone: profile?.phone_number || metadata.phone_number || '',
     avatar: profile?.avatar_url || metadata.avatar_url || null,
-    loyaltyPoints: profile?.loyalty_points || 0,
-    totalVisits: profile?.total_visits || 0,
+    // DB column takes priority; fall back to metadata so points survive without SQL migration
+    loyaltyPoints: profile?.loyalty_points ?? metadata.loyalty_points ?? 0,
+    totalVisits: profile?.total_visits ?? metadata.total_visits ?? 0,
     memberSince: new Date(supabaseUser.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
   };
 };
@@ -223,6 +247,26 @@ export const useStore = create<AppState>()(
           const user = mapSupabaseUserToUser(result.user, profile);
 
           set({ isAuthenticated: true, user, session: result.session, isLoading: false, authError: null });
+
+          // Request notification permissions and send welcome notification
+          const { notificationsEnabled, addNotification } = get();
+          if (notificationsEnabled) {
+            if (!runningInExpoGo) {
+              // Only request OS permissions in development builds
+              const granted = await requestNotificationPermissions();
+              if (granted) await notifyWelcome(user.name);
+            }
+            // Always add in-app welcome notification
+            addNotification({
+              id: `welcome-${Date.now()}`,
+              type: 'promo',
+              title: '👋 Welcome to BusinessHub Pro!',
+              message: `Hi ${user.name}! Scan QR codes to join queues and track orders in real-time.`,
+              read: false,
+              createdAt: new Date().toISOString(),
+            });
+          }
+
           return { success: true };
         }
 
@@ -344,7 +388,45 @@ export const useStore = create<AppState>()(
         activeQueues: state.activeQueues.filter(q => q.id !== queueId),
         queueHistory: [...state.queueHistory, { ...state.activeQueues.find(q => q.id === queueId)!, status: 'cancelled' as const }].filter(Boolean) as QueueEntry[],
       })),
-      updateQueuePosition: (queueId, position, estimatedWait) => set((state) => ({ activeQueues: state.activeQueues.map(q => q.id === queueId ? { ...q, position, estimatedWait } : q) })),
+      updateQueuePosition: (queueId, position, estimatedWait) => {
+        set((state) => ({ activeQueues: state.activeQueues.map(q => q.id === queueId ? { ...q, position, estimatedWait } : q) }));
+        // Trigger position-based notifications
+        const { notificationsEnabled, addNotification, activeQueues, unreadCount } = get();
+        if (notificationsEnabled) {
+          const queue = activeQueues.find(q => q.id === queueId);
+          if (queue) {
+            if (position === 1) {
+              const notif = {
+                id: `your-turn-${queueId}-${Date.now()}`,
+                type: 'queue_update' as const,
+                title: "🔔 It's Your Turn!",
+                message: `Please proceed to ${queue.businessName} now.`,
+                read: false,
+                createdAt: new Date().toISOString(),
+              };
+              addNotification(notif);
+              if (!runningInExpoGo) {
+                notifyYourTurnNow(queue.businessName);
+                setBadgeCount(unreadCount + 1);
+              }
+            } else if (position <= 3) {
+              const notif = {
+                id: `almost-turn-${queueId}-${Date.now()}`,
+                type: 'queue_update' as const,
+                title: '⏰ Almost Your Turn!',
+                message: `You're #${position} at ${queue.businessName}. Get ready!`,
+                read: false,
+                createdAt: new Date().toISOString(),
+              };
+              addNotification(notif);
+              if (!runningInExpoGo) {
+                notifyAlmostYourTurn(queue.businessName, position);
+                setBadgeCount(unreadCount + 1);
+              }
+            }
+          }
+        }
+      },
       completeQueue: (queueId) => set((state) => {
         const queue = state.activeQueues.find(q => q.id === queueId);
         if (!queue) return state;
@@ -381,6 +463,34 @@ export const useStore = create<AppState>()(
             entry,
           ],
         }));
+
+        // Trigger in-app + push notification
+        const { notificationsEnabled, addNotification, unreadCount } = get();
+        if (notificationsEnabled) {
+          const notif = {
+            id: `queue-joined-${entry.id}`,
+            type: 'queue_update' as const,
+            title: '🎫 Queue Joined!',
+            message: `You're #${entry.position} in line at ${entry.businessName}. Est. wait: ${entry.estimatedWait}`,
+            read: false,
+            createdAt: new Date().toISOString(),
+          };
+          addNotification(notif);
+          if (!runningInExpoGo) {
+            await notifyQueueJoined(entry.businessName, entry.position, entry.estimatedWait);
+            await setBadgeCount(unreadCount + 1);
+          }
+        }
+
+        // Increment total_visits in auth metadata + User table
+        const currentVisits = (get().user?.totalVisits ?? 0) + 1;
+        supabase.auth.updateUser({ data: { total_visits: currentVisits } });
+        supabase.from('User').update({ total_visits: currentVisits }).eq('id', user.id)
+          .then(({ error }) => { if (error) console.warn('total_visits update:', error.message); });
+        set((state) => ({
+          user: state.user ? { ...state.user, totalVisits: currentVisits } : null,
+        }));
+
         return { success: true, queueEntryId: data.id };
       },
 
@@ -426,26 +536,167 @@ export const useStore = create<AppState>()(
 
       // Orders
       addOrder: (order) => set((state) => ({ orders: [order, ...state.orders] })),
-      updateOrderStatus: (orderId, status) => set((state) => ({ orders: state.orders.map(o => o.id === orderId ? { ...o, status } : o) })),
+      updateOrderStatus: (orderId, status) => {
+        set((state) => ({ orders: state.orders.map(o => o.id === orderId ? { ...o, status } : o) }));
+        if (status === 'ready') {
+          const { notificationsEnabled, addNotification, orders, unreadCount } = get();
+          if (notificationsEnabled) {
+            const order = orders.find(o => o.id === orderId);
+            if (order) {
+              const notif = {
+                id: `order-ready-${orderId}-${Date.now()}`,
+                type: 'order_ready' as const,
+                title: '✅ Order Ready!',
+                message: `Order #${order.orderNumber} from ${order.businessName} is ready for pickup!`,
+                read: false,
+                createdAt: new Date().toISOString(),
+              };
+              addNotification(notif);
+              if (!runningInExpoGo) {
+                notifyOrderReady(order.businessName, order.orderNumber);
+                setBadgeCount(unreadCount + 1);
+              }
+            }
+          }
+        }
+      },
 
       // Favorites
       toggleFavorite: (businessId) => set((state) => ({ favoriteBusinesses: state.favoriteBusinesses.includes(businessId) ? state.favoriteBusinesses.filter(id => id !== businessId) : [...state.favoriteBusinesses, businessId] })),
 
+      // Feedback
+      submitFeedback: async ({ rating, category, message }) => {
+        const user = get().user;
+        if (!user) return { success: false, error: 'You must be logged in to submit feedback.' };
+
+        const POINTS_PER_FEEDBACK = 50;
+        const newPoints = (user.loyaltyPoints ?? 0) + POINTS_PER_FEEDBACK;
+
+        try {
+          // ── 1. Save to auth.users metadata (always works, no SQL migration needed) ──
+          await supabase.auth.updateUser({
+            data: { loyalty_points: newPoints },
+          });
+
+          // ── 2. Try to update User table loyalty_points (works after SQL migration) ──
+          await supabase
+            .from('User')
+            .update({ loyalty_points: newPoints, updated_at: new Date().toISOString() })
+            .eq('id', user.id)
+            .then(({ error }) => {
+              if (error) console.warn('User.loyalty_points update (run migration SQL to fix):', error.message);
+            });
+
+          // ── 3. Try to insert Feedback record (works after SQL migration) ──
+          await supabase.from('Feedback').insert({
+            user_id: user.id,
+            user_name: user.name,
+            user_email: user.email,
+            rating,
+            category,
+            message,
+            points_awarded: POINTS_PER_FEEDBACK,
+            created_at: new Date().toISOString(),
+          }).then(({ error }) => {
+            if (error) console.warn('Feedback insert (run migration SQL to fix):', error.message);
+          });
+
+          // ── 4. Always update local store immediately ──
+          set((state) => ({
+            user: state.user ? { ...state.user, loyaltyPoints: newPoints } : null,
+          }));
+
+          // ── 5. In-app notification ──
+          const { addNotification, notificationsEnabled, unreadCount } = get();
+          if (notificationsEnabled) {
+            addNotification({
+              id: `feedback-points-${Date.now()}`,
+              type: 'loyalty',
+              title: '⭐ Loyalty Points Earned!',
+              message: `Thanks for your feedback! You earned +${POINTS_PER_FEEDBACK} points. Total: ${newPoints} pts.`,
+              read: false,
+              createdAt: new Date().toISOString(),
+            });
+            if (!runningInExpoGo) {
+              await notifyLoyaltyPoints(POINTS_PER_FEEDBACK, newPoints);
+              await setBadgeCount(unreadCount + 1);
+            }
+          }
+
+          return { success: true };
+        } catch (error: any) {
+          console.error('submitFeedback error:', error);
+          return { success: false, error: error?.message ?? 'Failed to submit feedback.' };
+        }
+      },
+
       // Notifications
       addNotification: (notification) => set((state) => ({ notifications: [notification, ...state.notifications], unreadCount: state.unreadCount + 1 })),
-      markNotificationRead: (notificationId) => set((state) => ({ notifications: state.notifications.map(n => n.id === notificationId ? { ...n, read: true } : n), unreadCount: Math.max(0, state.unreadCount - 1) })),
-      markAllNotificationsRead: () => set((state) => ({ notifications: state.notifications.map(n => ({ ...n, read: true })), unreadCount: 0 })),
+      markNotificationRead: (notificationId) => set((state) => {
+        const updated = { notifications: state.notifications.map(n => n.id === notificationId ? { ...n, read: true } : n), unreadCount: Math.max(0, state.unreadCount - 1) };
+        setBadgeCount(updated.unreadCount);
+        return updated;
+      }),
+      markAllNotificationsRead: () => {
+        set((state) => ({ notifications: state.notifications.map(n => ({ ...n, read: true })), unreadCount: 0 }));
+        setBadgeCount(0);
+      },
+      deleteNotification: (notificationId) => set((state) => {
+        const notif = state.notifications.find(n => n.id === notificationId);
+        const newUnread = notif && !notif.read ? Math.max(0, state.unreadCount - 1) : state.unreadCount;
+        setBadgeCount(newUnread);
+        return { notifications: state.notifications.filter(n => n.id !== notificationId), unreadCount: newUnread };
+      }),
+      clearAllNotifications: () => {
+        setBadgeCount(0);
+        set({ notifications: [], unreadCount: 0 });
+      },
 
       // Settings
-      toggleNotifications: () => set((state) => ({ notificationsEnabled: !state.notificationsEnabled })),
-      toggleLocation: () => set((state) => ({ locationEnabled: !state.locationEnabled })),
+      toggleNotifications: async () => {
+        const current = get().notificationsEnabled;
+        if (!current) {
+          if (!runningInExpoGo) {
+            // Development build: request OS permission first
+            const granted = await requestNotificationPermissions();
+            if (!granted) return; // OS denied – leave toggle off
+          }
+          // Expo Go: allow in-app toggle without OS permission
+        } else {
+          // Disabling: clear badge
+          await setBadgeCount(0);
+        }
+        set((state) => ({ notificationsEnabled: !state.notificationsEnabled }));
+      },
+      toggleLocation: async () => {
+        const current = get().locationEnabled;
+        if (!current) {
+          // Enabling — request OS permission
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            // Permission denied — prompt user to open Settings
+            const { Alert } = await import('react-native');
+            Alert.alert(
+              'Location Permission Required',
+              'Please enable location access for BusinessHub Pro in your device Settings to use this feature.',
+              [
+                { text: 'Not Now', style: 'cancel' },
+                { text: 'Open Settings', onPress: () => Linking.openSettings() },
+              ]
+            );
+            return; // leave toggle OFF
+          }
+        }
+        // If disabling, we can't revoke the OS grant — just disable in-app usage
+        set({ locationEnabled: !current });
+      },
       setTheme: (theme) => set({ theme, darkMode: theme === 'dark' }),
       toggleDarkMode: () => set((state) => { const newTheme = state.theme === 'dark' ? 'light' : 'dark'; return { theme: newTheme, darkMode: !state.darkMode }; }),
     }),
     {
       name: 'business-hub-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ isAuthenticated: state.isAuthenticated, user: state.user, session: state.session, notificationsEnabled: state.notificationsEnabled, locationEnabled: state.locationEnabled, darkMode: state.darkMode, theme: state.theme }),
+      partialize: (state) => ({ isAuthenticated: state.isAuthenticated, user: state.user, session: state.session, notificationsEnabled: state.notificationsEnabled, locationEnabled: state.locationEnabled, darkMode: state.darkMode, theme: state.theme, notifications: state.notifications, unreadCount: state.unreadCount }),
     }
   )
 );

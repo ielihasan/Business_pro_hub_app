@@ -203,7 +203,26 @@
             "select_language": "Select Language",
             "select_language_desc": "Select your preferred language",
             "cancel": "Cancel",
-            "version": "BusinessHub Pro v1.0.0"
+            "version": "BusinessHub Pro v1.0.0",
+            "notifications_panel": {
+                "title": "Notifications",
+                "mark_all_read": "Mark all read",
+                "no_notifications": "No Notifications",
+                "no_notifications_enabled": "You're all caught up! Queue updates, order alerts, and rewards will appear here.",
+                "no_notifications_disabled": "Enable notifications in Settings to receive queue updates and alerts.",
+                "types": {
+                    "queue": "Queue",
+                    "orders": "Orders",
+                    "rewards": "Rewards",
+                    "promos": "Promos"
+                },
+                "time": {
+                    "just_now": "Just now",
+                    "minutes_ago": "{{count}}m ago",
+                    "hours_ago": "{{count}}h ago",
+                    "days_ago": "{{count}}d ago"
+                }
+            }
         }
     }
 }
