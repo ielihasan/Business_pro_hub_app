@@ -138,7 +138,7 @@ interface AppState {
   leaveQueue: (queueId: string) => void;
   updateQueuePosition: (queueId: string, position: number, estimatedWait: string) => void;
   completeQueue: (queueId: string) => void;
-  joinQueueInSupabase: (businessId: string) => Promise<{ success: boolean; queueEntryId?: string; error?: string }>;
+  joinQueueInSupabase: (businessId: string, serviceType?: string) => Promise<{ success: boolean; queueEntryId?: string; error?: string }>;
   leaveQueueInSupabase: (entryId: string) => Promise<{ success: boolean; error?: string }>;
   syncQueuesFromSupabase: () => Promise<void>;
 
@@ -352,13 +352,14 @@ export const useStore = create<AppState>()(
       }),
 
       // Supabase-backed queue actions
-      joinQueueInSupabase: async (businessId: string) => {
+      joinQueueInSupabase: async (businessId: string, serviceType?: string) => {
         const user = get().user;
         if (!user) return { success: false, error: 'Not authenticated' };
         const { data, error } = await joinBusinessQueue(businessId, user.id, {
           customerName: user.name,
           customerEmail: user.email,
           customerPhone: user.phone,
+          serviceType,
         });
         if (error || !data) return { success: false, error: error ?? 'Failed to join queue' };
         const entry: QueueEntry = {

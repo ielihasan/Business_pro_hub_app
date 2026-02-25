@@ -67,10 +67,93 @@ export function formatWait(minutes: number): string {
   return `~${minutes} min`;
 }
 
+/**
+ * Unified business info resolved from either the `Business` table
+ * or the `admins` table (business_owner rows).
+ */
+export interface ResolvedBusiness {
+  id: string;
+  name: string;
+  category: string;
+  address?: string;
+  phone?: string;
+  description?: string;
+  is_open: boolean;
+  /** Source table so caller knows origin */
+  source: 'Business' | 'admins';
+}
+
+/**
+ * Service row from the `services` table.
+ */
+export interface ServiceRecord {
+  id: string;
+  business_id: string;
+  name: string;
+  description?: string;
+  price?: number | null;
+  estimated_duration?: number | null;
+  is_active: boolean;
+}
+
 // ─── Business ─────────────────────────────────────────────────────────────────
 
 /**
- * Fetch a single business by its ID.
+ * Resolve a business by ID — checks `Business` first, then `admins`.
+ * Returns a unified `ResolvedBusiness` regardless of which table it came from.
+ */
+export async function resolveBusinessById(
+  businessId: string
+): Promise<{ data: ResolvedBusiness | null; error: string | null }> {
+  // 1. Try the Business table
+  const { data: biz } = await supabase
+    .from('Business')
+    .select('id, name, category, latitude, longitude, queue_length, wait_time, rating, is_open')
+    .eq('id', businessId)
+    .maybeSingle();
+
+  if (biz) {
+    return {
+      data: {
+        id: biz.id,
+        name: biz.name,
+        category: biz.category ?? '',
+        is_open: biz.is_open ?? true,
+        source: 'Business',
+      },
+      error: null,
+    };
+  }
+
+  // 2. Fall back to admins table (business_owner rows)
+  const { data: admin, error: adminError } = await supabase
+    .from('admins')
+    .select('id, business_name, business_type, business_address, business_phone, business_description, is_approved')
+    .eq('id', businessId)
+    .eq('role', 'business_owner')
+    .maybeSingle();
+
+  if (adminError || !admin) {
+    return { data: null, error: adminError?.message ?? 'Business not found' };
+  }
+
+  return {
+    data: {
+      id: admin.id,
+      name: admin.business_name ?? 'Unknown Business',
+      category: admin.business_type ?? '',
+      address: admin.business_address ?? '',
+      phone: admin.business_phone ?? '',
+      description: admin.business_description ?? '',
+      is_open: admin.is_approved ?? true,
+      source: 'admins',
+    },
+    error: null,
+  };
+}
+
+/**
+ * Fetch a single business by its ID from the Business table only.
  * Only queries columns that actually exist in the Business table.
  */
 export async function fetchBusinessById(
@@ -86,18 +169,35 @@ export async function fetchBusinessById(
   return { data: data as BusinessDetail, error: null };
 }
 
+/**
+ * Fetch a service/queue-type by its ID from the `services` table.
+ */
+export async function fetchServiceById(
+  serviceId: string
+): Promise<{ data: ServiceRecord | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from('services')
+    .select('id, business_id, name, description, price, estimated_duration, is_active')
+    .eq('id', serviceId)
+    .maybeSingle();
+
+  if (error || !data) return { data: null, error: error?.message ?? 'Service not found' };
+  return { data: data as ServiceRecord, error: null };
+}
+
 // ─── Queue ────────────────────────────────────────────────────────────────────
 
 /**
  * Join the queue for a business.
- * Inserts a row in `queues`, increments `Business.queue_length`.
+ * Works with both the `Business` table and `admins`-based businesses.
+ * Position is computed from active queue count — no reliance on queue_length.
  */
 export async function joinBusinessQueue(
   businessId: string,
   userId: string,
   opts?: { customerName?: string; customerPhone?: string; customerEmail?: string; serviceType?: string }
 ): Promise<{ data: QueueEntryRecord | null; error: string | null }> {
-  // 1. Check if user already has an active entry for this business
+  // 1. Prevent duplicate active entry for same user + business
   const { data: existing } = await supabase
     .from('queues')
     .select('id')
@@ -110,20 +210,39 @@ export async function joinBusinessQueue(
     return fetchQueueEntry(existing.id);
   }
 
-  // 2. Get current queue length to determine position
-  const { data: biz, error: bizError } = await supabase
-    .from('Business')
-    .select('queue_length, wait_time, name, category')
-    .eq('id', businessId)
-    .single();
+  // 2. Count active entries to determine next position
+  const { count: activeCount } = await supabase
+    .from('queues')
+    .select('id', { count: 'exact', head: true })
+    .eq('business_id', businessId)
+    .in('status', ['waiting', 'in_progress']);
 
-  if (bizError) return { data: null, error: bizError.message };
+  const newPosition = (activeCount ?? 0) + 1;
 
-  const newPosition = (biz.queue_length ?? 0) + 1;
-  // wait_time stored as "~10 min" — extract numeric part, fallback to position*5
-  const waitMinutes = parseInt((biz.wait_time ?? '').replace(/\D/g, '')) || newPosition * 5;
+  // 3. Resolve wait time from service estimated_duration if provided
+  let waitMinutes = newPosition * 5; // fallback default
+  if (opts?.serviceType) {
+    const { data: svc } = await supabase
+      .from('services')
+      .select('estimated_duration')
+      .eq('id', opts.serviceType)
+      .maybeSingle();
+    if (svc?.estimated_duration) {
+      waitMinutes = svc.estimated_duration * newPosition;
+    }
+  } else {
+    // Try Business table for wait_time string
+    const { data: biz } = await supabase
+      .from('Business')
+      .select('wait_time')
+      .eq('id', businessId)
+      .maybeSingle();
+    if (biz?.wait_time) {
+      waitMinutes = parseInt(biz.wait_time.replace(/\D/g, '')) || waitMinutes;
+    }
+  }
 
-  // 3. Insert into `queues`
+  // 4. Insert into `queues`
   const { data: entry, error: insertError } = await supabase
     .from('queues')
     .insert({
@@ -143,25 +262,22 @@ export async function joinBusinessQueue(
 
   if (insertError) return { data: null, error: insertError.message };
 
-  // 4. Increment Business.queue_length
-  await supabase
-    .from('Business')
-    .update({ queue_length: newPosition })
-    .eq('id', businessId);
+  // 5. Resolve business name for the embedded stub
+  const { data: resolvedBiz } = await resolveBusinessById(businessId);
 
-  // 5. Return with embedded business stub
   return {
     data: {
       ...(entry as QueueEntryRecord),
-      business: {
-        id: businessId,
-        name: biz.name,
-        category: biz.category ?? '',
+      business: resolvedBiz ? {
+        id: resolvedBiz.id,
+        name: resolvedBiz.name,
+        category: resolvedBiz.category,
+        address: resolvedBiz.address,
         queue_length: newPosition,
-        wait_time: biz.wait_time ?? '',
+        wait_time: formatWait(waitMinutes),
         rating: 0,
-        is_open: true,
-      },
+        is_open: resolvedBiz.is_open,
+      } : undefined,
     },
     error: null,
   };
