@@ -105,36 +105,47 @@ export interface ServiceRecord {
 export async function resolveBusinessById(
   businessId: string
 ): Promise<{ data: ResolvedBusiness | null; error: string | null }> {
-  // 1. Try the Business table
-  const { data: biz } = await supabase
-    .from('Business')
-    .select('id, name, category, latitude, longitude, queue_length, wait_time, rating, is_open')
-    .eq('id', businessId)
-    .maybeSingle();
+  // Fetch live queue count in parallel with business lookup
+  const [liveQueue, bizResult, adminResult] = await Promise.all([
+    supabase
+      .from('queues')
+      .select('id', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+      .in('status', ['waiting', 'in_progress']),
+    supabase.from('businesses').select('*').eq('id', businessId).maybeSingle(),
+    supabase
+      .from('admins')
+      .select('id, business_name, business_type, business_address, business_phone, business_description, is_approved')
+      .eq('id', businessId)
+      .eq('role', 'business_owner')
+      .maybeSingle(),
+  ]);
 
+  const liveCount = liveQueue.count ?? 0;
+  const waitStr = liveCount > 0 ? `~${liveCount * 5} min` : 'No wait';
+
+  // 1. Try the businesses table first
+  const biz = bizResult.data;
   if (biz) {
     return {
       data: {
         id: biz.id,
-        name: biz.name,
-        category: biz.category ?? '',
-        is_open: biz.is_open ?? true,
+        name: biz.name ?? biz.business_name ?? biz.business_title ?? 'Unknown',
+        category: biz.category ?? biz.business_type ?? biz.type ?? '',
+        is_open: biz.is_open ?? biz.isOpen ?? biz.open ?? true,
+        queue_length: liveCount,
+        wait_time: biz.wait_time ?? biz.waitTime ?? waitStr,
+        rating: biz.rating ?? null,
         source: 'Business',
-      },
+      } as any,
       error: null,
     };
   }
 
   // 2. Fall back to admins table (business_owner rows)
-  const { data: admin, error: adminError } = await supabase
-    .from('admins')
-    .select('id, business_name, business_type, business_address, business_phone, business_description, is_approved')
-    .eq('id', businessId)
-    .eq('role', 'business_owner')
-    .maybeSingle();
-
-  if (adminError || !admin) {
-    return { data: null, error: adminError?.message ?? 'Business not found' };
+  const admin = adminResult.data;
+  if (!admin) {
+    return { data: null, error: adminResult.error?.message ?? 'Business not found' };
   }
 
   return {
@@ -146,8 +157,11 @@ export async function resolveBusinessById(
       phone: admin.business_phone ?? '',
       description: admin.business_description ?? '',
       is_open: admin.is_approved ?? true,
+      queue_length: liveCount,
+      wait_time: waitStr,
+      rating: null,
       source: 'admins',
-    },
+    } as any,
     error: null,
   };
 }
@@ -160,13 +174,26 @@ export async function fetchBusinessById(
   businessId: string
 ): Promise<{ data: BusinessDetail | null; error: string | null }> {
   const { data, error } = await supabase
-    .from('Business')
-    .select('id, name, category, latitude, longitude, queue_length, wait_time, rating, is_open')
+    .from('businesses')
+    .select('*')
     .eq('id', businessId)
     .single();
 
   if (error) return { data: null, error: error.message };
-  return { data: data as BusinessDetail, error: null };
+
+  // Normalise column names
+  const normalised: BusinessDetail = {
+    ...(data as any),
+    name:         data.name          ?? data.business_name  ?? data.business_title ?? 'Unknown',
+    category:     data.category      ?? data.business_type  ?? data.type           ?? '',
+    is_open:      data.is_open       ?? data.isOpen         ?? true,
+    latitude:     data.latitude      ?? data.lat            ?? null,
+    longitude:    data.longitude     ?? data.lng            ?? data.lon            ?? null,
+    queue_length: data.queue_length  ?? data.queueLength    ?? null,
+    wait_time:    data.wait_time     ?? data.waitTime       ?? null,
+    rating:       data.rating        ?? null,
+  };
+  return { data: normalised, error: null };
 }
 
 /**
@@ -231,14 +258,15 @@ export async function joinBusinessQueue(
       waitMinutes = svc.estimated_duration * newPosition;
     }
   } else {
-    // Try Business table for wait_time string
+    // Try businesses table for wait_time string
     const { data: biz } = await supabase
-      .from('Business')
-      .select('wait_time')
+      .from('businesses')
+      .select('*')
       .eq('id', businessId)
       .maybeSingle();
-    if (biz?.wait_time) {
-      waitMinutes = parseInt(biz.wait_time.replace(/\D/g, '')) || waitMinutes;
+    const rawWait = biz?.wait_time ?? biz?.waitTime ?? null;
+    if (rawWait) {
+      waitMinutes = parseInt(String(rawWait).replace(/\D/g, '')) || waitMinutes;
     }
   }
 
@@ -284,7 +312,7 @@ export async function joinBusinessQueue(
 }
 
 /**
- * Fetch a single queue entry by its ID, joined with the business.
+ * Fetch a single queue entry by its ID, then resolve the business separately.
  */
 export async function fetchQueueEntry(
   entryId: string
@@ -295,25 +323,52 @@ export async function fetchQueueEntry(
       `id, business_id, customer_id, customer_name, customer_phone, customer_email,
        service_type, position, status, priority, notes,
        estimated_wait_time, joined_at, called_at, started_at, completed_at, cancelled_at,
-       created_at, updated_at,
-       business:Business(id, name, category, latitude, longitude, queue_length, wait_time, rating, is_open)`
+       created_at, updated_at`
     )
     .eq('id', entryId)
     .single();
 
   if (error) return { data: null, error: error.message };
 
-  const raw = data as any;
-  const normalized: QueueEntryRecord = {
-    ...raw,
-    business: Array.isArray(raw.business) ? raw.business[0] ?? undefined : raw.business,
-  };
+  const entry = data as QueueEntryRecord;
 
-  return { data: normalized, error: null };
+  // Resolve business info separately to avoid FK-join requirement
+  let businessData: BusinessDetail | undefined;
+  if (entry.business_id) {
+    const { data: biz } = await supabase
+      .from('Business')
+      .select('id, name, category, latitude, longitude, queue_length, wait_time, rating, is_open')
+      .eq('id', entry.business_id)
+      .maybeSingle();
+    if (biz) {
+      businessData = biz as BusinessDetail;
+    } else {
+      // Fallback: try admins table
+      const { data: admin } = await supabase
+        .from('admins')
+        .select('id, business_name, business_type, business_address')
+        .eq('id', entry.business_id)
+        .eq('role', 'business_owner')
+        .maybeSingle();
+      if (admin) {
+        businessData = {
+          id: admin.id,
+          name: admin.business_name ?? 'Business',
+          category: admin.business_type ?? '',
+          queue_length: entry.position,
+          wait_time: formatWait(entry.estimated_wait_time),
+          rating: 0,
+          is_open: true,
+        };
+      }
+    }
+  }
+
+  return { data: { ...entry, business: businessData }, error: null };
 }
 
 /**
- * Fetch all active queue entries for a user.
+ * Fetch all active queue entries for a user (separate business lookup to avoid FK-join).
  */
 export async function fetchUserActiveQueues(
   userId: string
@@ -322,8 +377,7 @@ export async function fetchUserActiveQueues(
     .from('queues')
     .select(
       `id, business_id, customer_id, customer_name, position, status,
-       estimated_wait_time, joined_at,
-       business:Business(id, name, category, queue_length, wait_time, rating, is_open)`
+       estimated_wait_time, joined_at`
     )
     .eq('customer_id', userId)
     .in('status', ['waiting', 'in_progress'])
@@ -331,16 +385,47 @@ export async function fetchUserActiveQueues(
 
   if (error) return { data: [], error: error.message };
 
-  const normalized = (data ?? []).map((raw: any) => ({
-    ...raw,
-    business: Array.isArray(raw.business) ? raw.business[0] ?? undefined : raw.business,
-  })) as QueueEntryRecord[];
+  const entries = (data ?? []) as QueueEntryRecord[];
 
+  // Collect unique business IDs and resolve them
+  const bizIds = [...new Set(entries.map((e) => e.business_id).filter(Boolean))];
+  const bizMap: Record<string, BusinessDetail> = {};
+  if (bizIds.length > 0) {
+    const { data: bizRows } = await supabase
+      .from('Business')
+      .select('id, name, category, queue_length, wait_time, rating, is_open')
+      .in('id', bizIds);
+    for (const b of bizRows ?? []) {
+      bizMap[b.id] = b as BusinessDetail;
+    }
+    // Fallback to admins for any not found
+    const missing = bizIds.filter((id) => !bizMap[id]);
+    if (missing.length > 0) {
+      const { data: adminRows } = await supabase
+        .from('admins')
+        .select('id, business_name, business_type')
+        .in('id', missing)
+        .eq('role', 'business_owner');
+      for (const a of adminRows ?? []) {
+        bizMap[a.id] = {
+          id: a.id,
+          name: a.business_name ?? 'Business',
+          category: a.business_type ?? '',
+          queue_length: 0,
+          wait_time: '',
+          rating: 0,
+          is_open: true,
+        };
+      }
+    }
+  }
+
+  const normalized = entries.map((e) => ({ ...e, business: bizMap[e.business_id] }));
   return { data: normalized, error: null };
 }
 
 /**
- * Fetch past (completed / cancelled) queue entries for a user.
+ * Fetch past (completed / cancelled) queue entries for a user (separate business lookup).
  */
 export async function fetchUserQueueHistory(
   userId: string
@@ -349,8 +434,7 @@ export async function fetchUserQueueHistory(
     .from('queues')
     .select(
       `id, business_id, customer_id, customer_name, position, status,
-       estimated_wait_time, joined_at, completed_at, cancelled_at,
-       business:Business(id, name, category, queue_length, wait_time, rating, is_open)`
+       estimated_wait_time, joined_at, completed_at, cancelled_at`
     )
     .eq('customer_id', userId)
     .in('status', ['completed', 'cancelled'])
@@ -359,11 +443,42 @@ export async function fetchUserQueueHistory(
 
   if (error) return { data: [], error: error.message };
 
-  const normalized = (data ?? []).map((raw: any) => ({
-    ...raw,
-    business: Array.isArray(raw.business) ? raw.business[0] ?? undefined : raw.business,
-  })) as QueueEntryRecord[];
+  const entries = (data ?? []) as QueueEntryRecord[];
 
+  // Collect unique business IDs and resolve them
+  const bizIds = [...new Set(entries.map((e) => e.business_id).filter(Boolean))];
+  const bizMap: Record<string, BusinessDetail> = {};
+  if (bizIds.length > 0) {
+    const { data: bizRows } = await supabase
+      .from('Business')
+      .select('id, name, category, queue_length, wait_time, rating, is_open')
+      .in('id', bizIds);
+    for (const b of bizRows ?? []) {
+      bizMap[b.id] = b as BusinessDetail;
+    }
+    // Fallback to admins for any not found
+    const missing = bizIds.filter((id) => !bizMap[id]);
+    if (missing.length > 0) {
+      const { data: adminRows } = await supabase
+        .from('admins')
+        .select('id, business_name, business_type')
+        .in('id', missing)
+        .eq('role', 'business_owner');
+      for (const a of adminRows ?? []) {
+        bizMap[a.id] = {
+          id: a.id,
+          name: a.business_name ?? 'Business',
+          category: a.business_type ?? '',
+          queue_length: 0,
+          wait_time: '',
+          rating: 0,
+          is_open: true,
+        };
+      }
+    }
+  }
+
+  const normalized = entries.map((e) => ({ ...e, business: bizMap[e.business_id] }));
   return { data: normalized, error: null };
 }
 

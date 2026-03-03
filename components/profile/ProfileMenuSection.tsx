@@ -2,13 +2,32 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Switch, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { Card, CardContent, Badge, Separator } from '@/components/ui';
-import { Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { Typography, Spacing } from '@/constants/theme';
+
+// Per-item icon color config — keyed by item id
+const ICON_COLORS: Record<string, { icon: string; bg: string }> = {
+  'edit-profile': { icon: '#3B82F6', bg: '#EFF6FF' },
+  'loyalty':      { icon: '#D97706', bg: '#FEF3C7' },
+  'payment':      { icon: '#16A34A', bg: '#F0FDF4' },
+  'settings':     { icon: '#6366F1', bg: '#EEF2FF' },
+  'help':         { icon: '#0EA5E9', bg: '#F0F9FF' },
+  'feedback':     { icon: '#A855F7', bg: '#FAF5FF' },
+};
+
+const ICON_COLORS_DARK: Record<string, { icon: string; bg: string }> = {
+  'edit-profile': { icon: '#60A5FA', bg: '#1E3A5F' },
+  'loyalty':      { icon: '#FBBF24', bg: '#3D2100' },
+  'payment':      { icon: '#4ADE80', bg: '#052E16' },
+  'settings':     { icon: '#818CF8', bg: '#1E1B4B' },
+  'help':         { icon: '#38BDF8', bg: '#082F49' },
+  'feedback':     { icon: '#C084FC', bg: '#2E1065' },
+};
 
 type MenuItem = {
   id: string;
   icon: string;
   label: string;
+  subtitle?: string;
   type: 'link' | 'toggle';
   badge?: string;
   value?: boolean | string;
@@ -23,74 +42,111 @@ interface ProfileMenuSectionProps {
 }
 
 export function ProfileMenuSection({ title, items, toggleStates, onToggle, onMenuPress }: ProfileMenuSectionProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const colorMap = isDark ? ICON_COLORS_DARK : ICON_COLORS;
 
   return (
     <View style={styles.section}>
       <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>{title}</Text>
-      <Card>
-        <CardContent style={styles.menuContent}>
-          {items.map((item, index) => (
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {items.map((item, index) => {
+          const ic = colorMap[item.id] ?? { icon: colors.mutedForeground, bg: colors.secondary };
+          return (
             <View key={item.id}>
-              {index > 0 && <Separator style={{ marginVertical: 0 }} />}
+              {index > 0 && <View style={[styles.sep, { backgroundColor: colors.border }]} />}
               <TouchableOpacity
-                style={styles.menuItem}
+                style={styles.row}
                 onPress={() => item.type === 'link' && onMenuPress(item.id)}
                 disabled={item.type === 'toggle'}
+                activeOpacity={0.65}
               >
-                <View style={[styles.menuIcon, { backgroundColor: colors.secondary }]}>
-                  <Ionicons name={item.icon as any} size={20} color={colors.foreground} />
+                {/* Icon */}
+                <View style={[styles.iconWrap, { backgroundColor: ic.bg }]}>
+                  <Ionicons name={item.icon as any} size={19} color={ic.icon} />
                 </View>
-                <Text style={[styles.menuLabel, { color: colors.foreground }]}>{item.label}</Text>
+
+                {/* Label block */}
+                <View style={styles.labelBlock}>
+                  <Text style={[styles.label, { color: colors.foreground }]}>{item.label}</Text>
+                  {!!item.subtitle && (
+                    <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{item.subtitle}</Text>
+                  )}
+                </View>
+
+                {/* Right side */}
                 {item.type === 'toggle' ? (
                   <Switch
                     value={toggleStates[item.id] ?? (typeof item.value === 'boolean' ? item.value : false)}
-                    onValueChange={(value) => onToggle(item.id, value)}
+                    onValueChange={(v) => onToggle(item.id, v)}
                     trackColor={{ false: colors.border, true: colors.primary }}
                     thumbColor={colors.primaryForeground}
                   />
                 ) : (
-                  <MenuItemRight item={item} />
+                  <View style={styles.rightRow}>
+                    {!!item.badge && (
+                      <View style={[styles.badgePill, { backgroundColor: ic.bg }]}>
+                        <Text style={[styles.badgeText, { color: ic.icon }]}>{item.badge}</Text>
+                      </View>
+                    )}
+                    {!item.badge && typeof item.value === 'string' && (
+                      <Text style={[styles.valueText, { color: colors.mutedForeground }]}>{item.value}</Text>
+                    )}
+                    <Ionicons name="chevron-forward" size={16} color={colors.mutedForeground} />
+                  </View>
                 )}
               </TouchableOpacity>
             </View>
-          ))}
-        </CardContent>
-      </Card>
-    </View>
-  );
-}
-
-function MenuItemRight({ item }: { item: MenuItem }) {
-  const { colors } = useTheme();
-
-  return (
-    <View style={styles.menuRight}>
-      {item.badge && (
-        <Badge variant="secondary" style={styles.menuBadge}>{item.badge}</Badge>
-      )}
-      {!item.badge && typeof item.value === 'string' && (
-        <Text style={[styles.menuValue, { color: colors.mutedForeground }]}>{item.value}</Text>
-      )}
-      <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />
+          );
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  section: { paddingHorizontal: Spacing[6], marginBottom: Spacing[6] },
+  section: { paddingHorizontal: Spacing[4], marginBottom: Spacing[4] },
   sectionTitle: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.semibold,
+    fontSize: 11,
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: Spacing[3],
+    letterSpacing: 0.8,
+    marginBottom: Spacing[2],
+    paddingLeft: Spacing[1],
   },
-  menuContent: { padding: 0 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing[3], paddingHorizontal: Spacing[4] },
-  menuIcon: { width: 36, height: 36, borderRadius: BorderRadius.DEFAULT, justifyContent: 'center', alignItems: 'center', marginRight: Spacing[3] },
-  menuLabel: { flex: 1, fontSize: Typography.fontSize.base },
-  menuRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing[2] },
-  menuBadge: { marginRight: Spacing[1] },
-  menuValue: { fontSize: Typography.fontSize.sm },
+  card: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sep: { height: StyleSheet.hairlineWidth, marginLeft: 68 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 13,
+    paddingHorizontal: Spacing[4],
+  },
+  iconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing[3],
+  },
+  labelBlock: { flex: 1 },
+  label:    { fontSize: Typography.fontSize.base, fontWeight: '500' },
+  subtitle: { fontSize: 12, marginTop: 1 },
+  rightRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing[2] },
+  badgePill: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  badgeText: { fontSize: 12, fontWeight: '700' },
+  valueText: { fontSize: Typography.fontSize.sm },
 });

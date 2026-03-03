@@ -39,20 +39,7 @@ export default function TabLayout() {
         },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: t('tabs.home'),
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'home' : 'home-outline'}
-              size={24}
-              color={color}
-            />
-          ),
-          headerTitle: 'BusinessHub Pro',
-        }}
-      />
+      {/* 1 — Queue */}
       <Tabs.Screen
         name="queue"
         options={{
@@ -66,6 +53,7 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/* 2 — Map */}
       <Tabs.Screen
         name="map"
         options={{
@@ -79,13 +67,22 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/* 3 — Home (center) */}
       <Tabs.Screen
-        name="scan"
+        name="index"
         options={{
-          title: t('tabs.scan'),
-          href: null, // hide from tab bar completely
+          title: t('tabs.home'),
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'home' : 'home-outline'}
+              size={26}
+              color={color}
+            />
+          ),
+          headerTitle: 'BusinessHub Pro',
         }}
       />
+      {/* 4 — Orders */}
       <Tabs.Screen
         name="orders"
         options={{
@@ -99,6 +96,7 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/* 5 — Profile */}
       <Tabs.Screen
         name="profile"
         options={{
@@ -110,6 +108,14 @@ export default function TabLayout() {
               color={color}
             />
           ),
+        }}
+      />
+      {/* Scan — hidden from tab bar */}
+      <Tabs.Screen
+        name="scan"
+        options={{
+          title: t('tabs.scan'),
+          href: null,
         }}
       />
     </Tabs>

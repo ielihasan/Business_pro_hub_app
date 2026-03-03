@@ -23,7 +23,7 @@ import {
   Progress,
 } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
-import { fetchBusinessById, BusinessDetail } from '@/lib/queue';
+import { fetchBusinessById, resolveBusinessById, BusinessDetail } from '@/lib/queue';
 import { useStore } from '@/store/useStore';
 
 const { width } = Dimensions.get('window');
@@ -41,11 +41,13 @@ export default function BusinessDetailScreen() {
   useEffect(() => {
     if (!id) return;
     (async () => {
-      const { data, error } = await fetchBusinessById(id);
+      // resolveBusinessById checks 'businesses' first, then 'admins'
+      const { data, error } = await resolveBusinessById(id);
       if (error || !data) {
         setFetchError(error ?? 'Business not found');
       } else {
-        setBusiness(data);
+        // Cast resolved data to BusinessDetail shape (it has all needed fields)
+        setBusiness(data as unknown as BusinessDetail);
       }
     })();
   }, [id]);
@@ -122,10 +124,17 @@ export default function BusinessDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
         <View style={[styles.hero, { backgroundColor: colors.secondary }]}>
+          {/* Back button */}
+          <TouchableOpacity
+            style={[styles.backButton, { backgroundColor: colors.background }]}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.foreground} />
+          </TouchableOpacity>
           <Avatar name={business.name} size="xl" style={styles.heroAvatar} />
           <View style={styles.heroActions}>
             <TouchableOpacity
@@ -324,6 +333,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+  },
+  backButton: {
+    position: 'absolute',
+    top: Spacing[4],
+    left: Spacing[4],
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   heroAvatar: {
     marginTop: Spacing[4],

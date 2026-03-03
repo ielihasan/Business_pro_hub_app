@@ -1,21 +1,19 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import {
   View,
   ScrollView,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   Text,
-  Animated,
-  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useNearbyBusinesses } from '@/hooks/useNearbyBusinesses';
-import { Spacing, Typography, BorderRadius } from '@/constants/theme';
+import { useStore } from '@/store/useStore';
+import { Spacing, Typography } from '@/constants/theme';
 import {
   SearchBar,
   ActiveQueueCard,
@@ -24,60 +22,23 @@ import {
   NearbyBusinesses,
 } from '@/components/home';
 
-// Mock active queue
-const activeQueue = {
-  id: 'q1',
-  businessName: 'Campus Coffee Shop',
-  position: 3,
-  estimatedWait: '8 min',
-  status: 'waiting' as const,
-};
-
-const FAB_ACTIONS = [
-  {
-    key: 'scan',
-    label: 'Scan QR Code',
-    icon: 'qr-code-outline' as const,
-    onPress: () => router.push('/(tabs)/scan'),
-  },
-  {
-    key: 'map',
-    label: 'Find Businesses',
-    icon: 'map-outline' as const,
-    onPress: () => router.push('/(tabs)/map'),
-  },
-];
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good Morning';
+  if (h < 17) return 'Good Afternoon';
+  return 'Good Evening';
+}
 
 export default function HomeScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const user = useStore((s) => s.user);
+  const activeQueues = useStore((s) => s.activeQueues);
+  const unreadCount = useStore((s) => s.unreadCount);
+
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [radiusKm, setRadiusKm] = useState(5);
-  const [fabOpen, setFabOpen] = useState(false);
-
-  // Animation values
-  const animation = useRef(new Animated.Value(0)).current;
-
-  const toggleFab = () => {
-    const toValue = fabOpen ? 0 : 1;
-    Animated.spring(animation, {
-      toValue,
-      useNativeDriver: true,
-      friction: 6,
-      tension: 80,
-    }).start();
-    setFabOpen(!fabOpen);
-  };
-
-  const closeFab = () => {
-    if (!fabOpen) return;
-    Animated.spring(animation, { toValue: 0, useNativeDriver: true, friction: 6 }).start();
-    setFabOpen(false);
-  };
-
-  // Rotate "+" to "×"
-  const rotation = animation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });
 
   const { businesses } = useNearbyBusinesses({
     radiusKm,
@@ -85,143 +46,174 @@ export default function HomeScreen() {
     query: searchQuery,
   });
 
+  const activeQueue = activeQueues[0] ?? null;
+
   const onRefresh = () => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 1500);
   };
 
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Backdrop — closes FAB when tapping outside */}
-      {fabOpen && (
-        <TouchableWithoutFeedback onPress={closeFab}>
-          <View style={styles.backdrop} />
-        </TouchableWithoutFeedback>
-      )}
+  const firstName = user?.name?.split(' ')[0] ?? 'there';
 
+  const avatarInitial = (user?.name ?? 'U')[0].toUpperCase();
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#0F0F1A' : '#F6F8FF' }]} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#6366F1"
+            colors={['#6366F1']}
+          />
         }
       >
-        <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
-        {activeQueue && <ActiveQueueCard queue={activeQueue} />}
-        <CategoryFilter selected={selectedCategory} onSelect={setSelectedCategory} />
-        <RadiusFilter selected={radiusKm} onSelect={setRadiusKm} />
-        <NearbyBusinesses businesses={businesses} />
-        <View style={{ height: Spacing[24] }} />
-      </ScrollView>
-
-      {/* Speed-dial FAB */}
-      <View style={styles.fabContainer} pointerEvents="box-none">
-        {/* Action items — slide up from FAB */}
-        {FAB_ACTIONS.map((action, index) => {
-          const translateY = animation.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, -(72 * (index + 1))],
-          });
-          const opacity = animation.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] });
-          const scale = animation.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
-
-          return (
-            <Animated.View
-              key={action.key}
-              style={[
-                styles.fabActionRow,
-                { transform: [{ translateY }, { scale }], opacity },
-              ]}
-              pointerEvents={fabOpen ? 'auto' : 'none'}
+        {/* ── Header ── */}
+        <View style={[styles.header, { backgroundColor: isDark ? '#0F0F1A' : '#F6F8FF' }]}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity
+              style={[styles.avatarCircle, { backgroundColor: isDark ? '#1E1E2E' : '#EEF2FF', borderColor: '#6366F1' }]}
+              onPress={() => router.push('/(tabs)/profile')}
             >
-              {/* Label */}
-              <View style={[styles.fabLabel, { backgroundColor: colors.foreground }]}>
-                <Text style={[styles.fabLabelText, { color: colors.background }]}>
-                  {action.label}
-                </Text>
+              {user?.avatar ? (
+                <Text style={styles.avatarText}>{avatarInitial}</Text>
+              ) : (
+                <Text style={[styles.avatarText, { color: '#6366F1' }]}>{avatarInitial}</Text>
+              )}
+            </TouchableOpacity>
+            <View>
+              <Text style={[styles.greetSmall, { color: colors.mutedForeground }]}>{getGreeting()} 👋</Text>
+              <Text style={[styles.greetName, { color: colors.foreground }]}>{firstName}</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[styles.bellBtn, { backgroundColor: isDark ? '#1E1E2E' : '#FFFFFF', borderColor: isDark ? '#2E2E40' : '#E2E8F0' }]}
+            onPress={() => router.push('/(tabs)/profile')}
+          >
+            <Ionicons name="notifications-outline" size={20} color={colors.foreground} />
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
               </View>
-              {/* Mini action button */}
-              <TouchableOpacity
-                style={[styles.fabMini, { backgroundColor: colors.primary }]}
-                onPress={() => { closeFab(); action.onPress(); }}
-                activeOpacity={0.85}
-              >
-                <Ionicons name={action.icon} size={20} color={colors.primaryForeground} />
-              </TouchableOpacity>
-            </Animated.View>
-          );
-        })}
+            )}
+          </TouchableOpacity>
+        </View>
 
-        {/* Main "+" button */}
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: colors.primary }]}
-          onPress={toggleFab}
-          activeOpacity={0.85}
-        >
-          <Animated.View style={{ transform: [{ rotate: rotation }] }}>
-            <Ionicons name="add" size={26} color={colors.primaryForeground} />
-          </Animated.View>
-        </TouchableOpacity>
-      </View>
+        {/* ── Search ── */}
+        <View style={styles.searchWrap}>
+          <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
+        </View>
+
+        {/* ── Active Queue ── */}
+        {activeQueue ? (
+          <ActiveQueueCard queue={activeQueue} />
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            style={[styles.noQueueBox, { backgroundColor: isDark ? '#1A1A2E' : '#FAFBFF', borderColor: isDark ? '#2E2E50' : '#E0E7FF' }]}
+            onPress={() => router.push('/(tabs)/scan')}
+          >
+            <View style={[styles.noQueueIcon, { backgroundColor: '#EEF2FF' }]}>
+              <Ionicons name="qr-code-outline" size={22} color="#6366F1" />
+            </View>
+            <View style={styles.noQueueText}>
+              <Text style={[styles.noQueueTitle, { color: colors.foreground }]}>No active queue</Text>
+              <Text style={[styles.noQueueSub, { color: colors.mutedForeground }]}>Scan a QR code to join a queue</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#6366F1" />
+          </TouchableOpacity>
+        )}
+
+        {/* ── Categories ── */}
+        <CategoryFilter selected={selectedCategory} onSelect={setSelectedCategory} />
+
+        {/* ── Radius ── */}
+        <RadiusFilter selected={radiusKm} onSelect={setRadiusKm} />
+
+        {/* ── Nearby Businesses ── */}
+        <NearbyBusinesses businesses={businesses} />
+
+        <View style={{ height: Spacing[20] }} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    zIndex: 10,
-  },
-  fabContainer: {
-    position: 'absolute',
-    left: 0,
-    right: Spacing[5],
-    bottom: Platform.OS === 'ios' ? 36 : 20,
-    alignItems: 'flex-end',
-    zIndex: 20,
-  },
-  fab: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  fabActionRow: {
-    position: 'absolute',
-    bottom: 0,
-    left: Spacing[4],
-    right: 0,
+
+  /* Header */
+  header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 8,
+    paddingHorizontal: Spacing[6],
+    paddingTop: Spacing[4],
+    paddingBottom: Spacing[3],
   },
-  fabMini: {
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing[3] },
+  avatarCircle: {
     width: 44,
     height: 44,
     borderRadius: 22,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: { fontSize: 18, fontWeight: '700', color: '#6366F1' },
+  greetSmall: { fontSize: Typography.fontSize.xs },
+  greetName: { fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.bold },
+  bellBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  fabLabel: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: BorderRadius.full,
+  badge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  fabLabelText: {
-    fontSize: 12,
-    fontWeight: Typography.fontWeight.medium,
+  badgeText: { fontSize: 9, color: '#fff', fontWeight: '700' },
+
+  /* Search */
+  searchWrap: { paddingTop: Spacing[2] },
+
+  /* No Queue nudge */
+  noQueueBox: {
+    marginHorizontal: Spacing[6],
+    marginBottom: Spacing[5],
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: Spacing[4],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing[3],
   },
+  noQueueIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noQueueText: { flex: 1 },
+  noQueueTitle: { fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.semibold },
+  noQueueSub: { fontSize: Typography.fontSize.xs, marginTop: 2 },
 });
+

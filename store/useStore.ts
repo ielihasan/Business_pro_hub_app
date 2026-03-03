@@ -135,6 +135,16 @@ interface AppState {
   locationEnabled: boolean;
   darkMode: boolean;
   theme?: 'light' | 'dark';
+  // Granular notification settings
+  soundEnabled: boolean;
+  vibrationEnabled: boolean;
+  queueNotificationsEnabled: boolean;
+  orderNotificationsEnabled: boolean;
+  promoNotificationsEnabled: boolean;
+  // Privacy
+  analyticsEnabled: boolean;
+  // Display
+  compactViewEnabled: boolean;
 
   // Auth Actions
   login: (data: LoginData) => Promise<{ success: boolean; error?: string }>;
@@ -150,6 +160,7 @@ interface AppState {
   updateProfile: (updates: { avatar_url?: string | null; full_name?: string }) => Promise<{ success: boolean; error?: any }>;
   updateFullProfile: (updates: { name: string; phone: string }) => Promise<{ success: boolean; error?: any }>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: any }>;
+  deleteAccount: () => Promise<{ success: boolean; error?: string }>;
 
   // Queue actions
   joinQueue: (queue: QueueEntry) => void;
@@ -182,6 +193,14 @@ interface AppState {
   toggleLocation: () => Promise<void>;
   toggleDarkMode: () => void;
   setTheme: (theme: 'light' | 'dark') => void;
+  toggleSound: () => void;
+  toggleVibration: () => void;
+  toggleQueueNotifications: () => void;
+  toggleOrderNotifications: () => void;
+  togglePromoNotifications: () => void;
+  toggleAnalytics: () => void;
+  toggleCompactView: () => void;
+  clearCache: () => void;
 }
 
 // Helper: map Supabase user to app User
@@ -219,6 +238,13 @@ export const useStore = create<AppState>()(
       locationEnabled: true,
       darkMode: false,
       theme: 'light',
+      soundEnabled: true,
+      vibrationEnabled: true,
+      queueNotificationsEnabled: true,
+      orderNotificationsEnabled: true,
+      promoNotificationsEnabled: false,
+      analyticsEnabled: true,
+      compactViewEnabled: false,
 
       // Auth Actions
       login: async (data: LoginData) => {
@@ -355,8 +381,8 @@ export const useStore = create<AppState>()(
           set({ isLoading: false });
           return { success: false, error: authError.message };
         }
-        const { error: dbError } = await supabase.from('User').update({ full_name: updates.name, phone_number: updates.phone, updated_at: new Date().toISOString() }).eq('id', get().user?.id);
-        if (dbError) console.error('Error updating User table:', dbError);
+        const { error: dbError } = await supabase.from('users').update({ full_name: updates.name, phone_number: updates.phone, updated_at: new Date().toISOString() }).eq('id', get().user?.id);
+        if (dbError) console.error('Error updating users table:', dbError);
         if (authData.user) {
           const profile = await getUserProfile(authData.user.id);
           const updatedUser = mapSupabaseUserToUser(authData.user, profile);
@@ -382,6 +408,32 @@ export const useStore = create<AppState>()(
         }
       },
 
+      deleteAccount: async () => {
+        const user = get().user;
+        if (!user) return { success: false, error: 'Not authenticated' };
+        set({ isLoading: true });
+        try {
+          // 1. Delete all user queues
+          await supabase.from('queues').delete().eq('customer_id', user.id);
+          // 2. Delete user profile row
+          await supabase.from('users').delete().eq('id', user.id);
+          // 3. Mark auth user metadata as deleted (visible to admin)
+          await supabase.auth.updateUser({ data: { account_deleted: true, deleted_at: new Date().toISOString() } });
+          // 4. Clear all local state
+          set({
+            isAuthenticated: false, user: null, session: null,
+            activeQueues: [], queueHistory: [], orders: [],
+            notifications: [], unreadCount: 0, isLoading: false,
+          });
+          // 5. Sign out of Supabase session
+          await supabase.auth.signOut();
+          return { success: true };
+        } catch (error: any) {
+          set({ isLoading: false });
+          return { success: false, error: error.message || 'Failed to delete account' };
+        }
+      },
+
       // Queue actions
       joinQueue: (queue) => set((state) => ({ activeQueues: [...state.activeQueues, queue] })),
       leaveQueue: (queueId) => set((state) => ({
@@ -391,8 +443,9 @@ export const useStore = create<AppState>()(
       updateQueuePosition: (queueId, position, estimatedWait) => {
         set((state) => ({ activeQueues: state.activeQueues.map(q => q.id === queueId ? { ...q, position, estimatedWait } : q) }));
         // Trigger position-based notifications
-        const { notificationsEnabled, addNotification, activeQueues, unreadCount } = get();
-        if (notificationsEnabled) {
+        const { notificationsEnabled, queueNotificationsEnabled, soundEnabled, vibrationEnabled, addNotification, activeQueues, unreadCount } = get();
+        const notifOpts = { sound: soundEnabled, vibrate: vibrationEnabled };
+        if (notificationsEnabled && queueNotificationsEnabled) {
           const queue = activeQueues.find(q => q.id === queueId);
           if (queue) {
             if (position === 1) {
@@ -406,7 +459,7 @@ export const useStore = create<AppState>()(
               };
               addNotification(notif);
               if (!runningInExpoGo) {
-                notifyYourTurnNow(queue.businessName);
+                notifyYourTurnNow(queue.businessName, notifOpts);
                 setBadgeCount(unreadCount + 1);
               }
             } else if (position <= 3) {
@@ -420,7 +473,7 @@ export const useStore = create<AppState>()(
               };
               addNotification(notif);
               if (!runningInExpoGo) {
-                notifyAlmostYourTurn(queue.businessName, position);
+                notifyAlmostYourTurn(queue.businessName, position, notifOpts);
                 setBadgeCount(unreadCount + 1);
               }
             }
@@ -465,8 +518,9 @@ export const useStore = create<AppState>()(
         }));
 
         // Trigger in-app + push notification
-        const { notificationsEnabled, addNotification, unreadCount } = get();
-        if (notificationsEnabled) {
+        const { notificationsEnabled, queueNotificationsEnabled, soundEnabled, vibrationEnabled, addNotification, unreadCount } = get();
+        const notifOpts = { sound: soundEnabled, vibrate: vibrationEnabled };
+        if (notificationsEnabled && queueNotificationsEnabled) {
           const notif = {
             id: `queue-joined-${entry.id}`,
             type: 'queue_update' as const,
@@ -477,15 +531,29 @@ export const useStore = create<AppState>()(
           };
           addNotification(notif);
           if (!runningInExpoGo) {
-            await notifyQueueJoined(entry.businessName, entry.position, entry.estimatedWait);
+            await notifyQueueJoined(entry.businessName, entry.position, entry.estimatedWait, notifOpts);
             await setBadgeCount(unreadCount + 1);
           }
         }
 
+        // Auto-create an order entry so it shows in the Orders tab
+        const orderEntry: Order = {
+          id: `order-${data.id}`,
+          businessId: businessId,
+          businessName: entry.businessName,
+          orderNumber: `TKT-${entry.ticketNumber}`,
+          status: 'pending',
+          items: serviceType ? [{ name: serviceType, quantity: 1, price: 0 }] : [],
+          total: 0,
+          createdAt: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
+          paymentMethod: 'Queue',
+        };
+        get().addOrder(orderEntry);
+
         // Increment total_visits in auth metadata + User table
         const currentVisits = (get().user?.totalVisits ?? 0) + 1;
         supabase.auth.updateUser({ data: { total_visits: currentVisits } });
-        supabase.from('User').update({ total_visits: currentVisits }).eq('id', user.id)
+        supabase.from('users').update({ total_visits: currentVisits }).eq('id', user.id)
           .then(({ error }) => { if (error) console.warn('total_visits update:', error.message); });
         set((state) => ({
           user: state.user ? { ...state.user, totalVisits: currentVisits } : null,
@@ -539,8 +607,9 @@ export const useStore = create<AppState>()(
       updateOrderStatus: (orderId, status) => {
         set((state) => ({ orders: state.orders.map(o => o.id === orderId ? { ...o, status } : o) }));
         if (status === 'ready') {
-          const { notificationsEnabled, addNotification, orders, unreadCount } = get();
-          if (notificationsEnabled) {
+          const { notificationsEnabled, orderNotificationsEnabled, soundEnabled, vibrationEnabled, addNotification, orders, unreadCount } = get();
+          const notifOpts = { sound: soundEnabled, vibrate: vibrationEnabled };
+          if (notificationsEnabled && orderNotificationsEnabled) {
             const order = orders.find(o => o.id === orderId);
             if (order) {
               const notif = {
@@ -553,7 +622,7 @@ export const useStore = create<AppState>()(
               };
               addNotification(notif);
               if (!runningInExpoGo) {
-                notifyOrderReady(order.businessName, order.orderNumber);
+                notifyOrderReady(order.businessName, order.orderNumber, notifOpts);
                 setBadgeCount(unreadCount + 1);
               }
             }
@@ -578,13 +647,13 @@ export const useStore = create<AppState>()(
             data: { loyalty_points: newPoints },
           });
 
-          // ── 2. Try to update User table loyalty_points (works after SQL migration) ──
+          // ── 2. Try to update users table loyalty_points (works after SQL migration) ──
           await supabase
-            .from('User')
+            .from('users')
             .update({ loyalty_points: newPoints, updated_at: new Date().toISOString() })
             .eq('id', user.id)
             .then(({ error }) => {
-              if (error) console.warn('User.loyalty_points update (run migration SQL to fix):', error.message);
+              if (error) console.warn('users.loyalty_points update (run migration SQL to fix):', error.message);
             });
 
           // ── 3. Try to insert Feedback record (works after SQL migration) ──
@@ -607,8 +676,9 @@ export const useStore = create<AppState>()(
           }));
 
           // ── 5. In-app notification ──
-          const { addNotification, notificationsEnabled, unreadCount } = get();
-          if (notificationsEnabled) {
+          const { addNotification, notificationsEnabled, promoNotificationsEnabled, soundEnabled, vibrationEnabled, unreadCount } = get();
+          const notifOpts = { sound: soundEnabled, vibrate: vibrationEnabled };
+          if (notificationsEnabled && promoNotificationsEnabled) {
             addNotification({
               id: `feedback-points-${Date.now()}`,
               type: 'loyalty',
@@ -618,7 +688,7 @@ export const useStore = create<AppState>()(
               createdAt: new Date().toISOString(),
             });
             if (!runningInExpoGo) {
-              await notifyLoyaltyPoints(POINTS_PER_FEEDBACK, newPoints);
+              await notifyLoyaltyPoints(POINTS_PER_FEEDBACK, newPoints, notifOpts);
               await setBadgeCount(unreadCount + 1);
             }
           }
@@ -631,7 +701,14 @@ export const useStore = create<AppState>()(
       },
 
       // Notifications
-      addNotification: (notification) => set((state) => ({ notifications: [notification, ...state.notifications], unreadCount: state.unreadCount + 1 })),
+      addNotification: (notification) => set((state) => {
+        // Deduplicate: skip if a notification with the same id already exists
+        if (state.notifications.some((n) => n.id === notification.id)) return state;
+        return {
+          notifications: [notification, ...state.notifications],
+          unreadCount: state.unreadCount + 1,
+        };
+      }),
       markNotificationRead: (notificationId) => set((state) => {
         const updated = { notifications: state.notifications.map(n => n.id === notificationId ? { ...n, read: true } : n), unreadCount: Math.max(0, state.unreadCount - 1) };
         setBadgeCount(updated.unreadCount);
@@ -692,11 +769,39 @@ export const useStore = create<AppState>()(
       },
       setTheme: (theme) => set({ theme, darkMode: theme === 'dark' }),
       toggleDarkMode: () => set((state) => { const newTheme = state.theme === 'dark' ? 'light' : 'dark'; return { theme: newTheme, darkMode: !state.darkMode }; }),
+      toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),
+      toggleVibration: () => set((s) => ({ vibrationEnabled: !s.vibrationEnabled })),
+      toggleQueueNotifications: () => set((s) => ({ queueNotificationsEnabled: !s.queueNotificationsEnabled })),
+      toggleOrderNotifications: () => set((s) => ({ orderNotificationsEnabled: !s.orderNotificationsEnabled })),
+      togglePromoNotifications: () => set((s) => ({ promoNotificationsEnabled: !s.promoNotificationsEnabled })),
+      toggleAnalytics: () => set((s) => ({ analyticsEnabled: !s.analyticsEnabled })),
+      toggleCompactView: () => set((s) => ({ compactViewEnabled: !s.compactViewEnabled })),
+      clearCache: () => {
+        set({ orders: [], queueHistory: [] });
+      },
     }),
+
     {
       name: 'business-hub-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ isAuthenticated: state.isAuthenticated, user: state.user, session: state.session, notificationsEnabled: state.notificationsEnabled, locationEnabled: state.locationEnabled, darkMode: state.darkMode, theme: state.theme, notifications: state.notifications, unreadCount: state.unreadCount }),
+      partialize: (state) => ({
+        isAuthenticated: state.isAuthenticated,
+        user: state.user,
+        session: state.session,
+        notificationsEnabled: state.notificationsEnabled,
+        locationEnabled: state.locationEnabled,
+        darkMode: state.darkMode,
+        theme: state.theme,
+        notifications: state.notifications,
+        unreadCount: state.unreadCount,
+        soundEnabled: state.soundEnabled,
+        vibrationEnabled: state.vibrationEnabled,
+        queueNotificationsEnabled: state.queueNotificationsEnabled,
+        orderNotificationsEnabled: state.orderNotificationsEnabled,
+        promoNotificationsEnabled: state.promoNotificationsEnabled,
+        analyticsEnabled: state.analyticsEnabled,
+        compactViewEnabled: state.compactViewEnabled,
+      }),
     }
   )
 );

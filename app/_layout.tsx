@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme, View, ActivityIndicator } from 'react-native';
+import { useColorScheme, View, ActivityIndicator, LogBox } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
 import { Colors } from '@/constants/theme';
@@ -10,21 +10,26 @@ import { supabase } from '@/lib/supabase';
 import '@/lib/i18n';
 
 // ─── Silence expo-notifications Expo Go SDK 53 warning ──────────────────────
-// expo-notifications prints this at native-module init time (before any of our
-// code runs) when the app is loaded inside Expo Go. It is purely informational
-// and cannot be prevented by guarding our own calls, so we filter it here.
+// expo-notifications logs this at native-module init time inside Expo Go.
+// It is purely informational – remote push is intentionally unsupported there.
+// We suppress it via both LogBox (UI overlay) and console overrides (Metro CLI).
+const IGNORED_NOTIFICATION_PATTERNS = [
+  'expo-notifications: Android Push notifications',
+  'expo-notifications: Push notifications',
+  'removed from Expo Go',
+];
+
+// Suppress the red/yellow LogBox overlay
+LogBox.ignoreLogs(IGNORED_NOTIFICATION_PATTERNS);
+
+// Suppress the Metro terminal output
 (function suppressExpoNotificationsExpoGoWarning() {
-  const IGNORED_PATTERNS = [
-    'expo-notifications: Android Push notifications',
-    'expo-notifications: Push notifications',
-    'removed from Expo Go',
-  ];
   const originalError = console.error.bind(console);
   console.error = (...args: any[]) => {
     const msg = args[0];
     if (
       typeof msg === 'string' &&
-      IGNORED_PATTERNS.some((p) => msg.includes(p))
+      IGNORED_NOTIFICATION_PATTERNS.some((p) => msg.includes(p))
     ) {
       return; // swallow silently
     }
@@ -35,7 +40,7 @@ import '@/lib/i18n';
     const msg = args[0];
     if (
       typeof msg === 'string' &&
-      IGNORED_PATTERNS.some((p) => msg.includes(p))
+      IGNORED_NOTIFICATION_PATTERNS.some((p) => msg.includes(p))
     ) {
       return;
     }

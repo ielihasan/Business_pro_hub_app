@@ -6,12 +6,12 @@ import { Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useTranslation } from 'react-i18next';
 
 const categories = [
-  { id: 'all', name: 'home.categories.all', icon: 'grid-outline' },
-  { id: 'food', name: 'home.categories.food', icon: 'restaurant-outline' },
-  { id: 'print', name: 'home.categories.print', icon: 'print-outline' },
-  { id: 'health', name: 'home.categories.health', icon: 'medical-outline' },
-  { id: 'repair', name: 'home.categories.repair', icon: 'construct-outline' },
-  { id: 'salon', name: 'home.categories.salon', icon: 'cut-outline' },
+  { id: 'all',    name: 'home.categories.all',    icon: 'grid',           color: '#6366F1', light: '#EEF2FF' },
+  { id: 'food',   name: 'home.categories.food',   icon: 'restaurant',     color: '#F97316', light: '#FFF7ED' },
+  { id: 'print',  name: 'home.categories.print',  icon: 'print',          color: '#3B82F6', light: '#EFF6FF' },
+  { id: 'health', name: 'home.categories.health', icon: 'medical',        color: '#EF4444', light: '#FEF2F2' },
+  { id: 'repair', name: 'home.categories.repair', icon: 'construct',      color: '#F59E0B', light: '#FFFBEB' },
+  { id: 'salon',  name: 'home.categories.salon',  icon: 'cut',            color: '#EC4899', light: '#FDF2F8' },
 ];
 
 interface CategoryFilterProps {
@@ -20,7 +20,7 @@ interface CategoryFilterProps {
 }
 
 export function CategoryFilter({ selected, onSelect }: CategoryFilterProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useTranslation();
 
   return (
@@ -28,33 +28,38 @@ export function CategoryFilter({ selected, onSelect }: CategoryFilterProps) {
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
         {t('home.categories.title')}
       </Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.container}>
-        {categories.map((category) => {
-          const isSelected = selected === category.id;
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.container}
+      >
+        {categories.map((cat) => {
+          const isSelected = selected === cat.id;
           return (
             <TouchableOpacity
-              key={category.id}
+              key={cat.id}
+              onPress={() => onSelect(cat.id)}
+              activeOpacity={0.8}
               style={[
                 styles.chip,
                 {
-                  backgroundColor: isSelected ? colors.primary : colors.secondary,
-                  borderColor: colors.border,
+                  backgroundColor: isSelected
+                    ? cat.color
+                    : isDark ? '#1E1E2E' : cat.light,
+                  borderColor: isSelected ? cat.color : isDark ? '#2E2E40' : cat.light,
+                  shadowColor: isSelected ? cat.color : 'transparent',
                 },
               ]}
-              onPress={() => onSelect(category.id)}
             >
-              <Ionicons
-                name={category.icon as any}
-                size={18}
-                color={isSelected ? colors.primaryForeground : colors.foreground}
-              />
-              <Text
-                style={[
-                  styles.chipText,
-                  { color: isSelected ? colors.primaryForeground : colors.foreground },
-                ]}
-              >
-                {t(category.name)}
+              <View style={[styles.iconWrap, { backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : cat.light }]}>
+                <Ionicons
+                  name={(cat.icon + '-outline') as any}
+                  size={15}
+                  color={isSelected ? '#fff' : cat.color}
+                />
+              </View>
+              <Text style={[styles.chipText, { color: isSelected ? '#fff' : cat.color }]}>
+                {t(cat.name)}
               </Text>
             </TouchableOpacity>
           );
@@ -65,21 +70,35 @@ export function CategoryFilter({ selected, onSelect }: CategoryFilterProps) {
 }
 
 const styles = StyleSheet.create({
-  section: { paddingHorizontal: Spacing[6], marginBottom: Spacing[6] },
+  section: { paddingLeft: Spacing[6], marginBottom: Spacing[5] },
   sectionTitle: {
-    fontSize: Typography.fontSize.lg,
+    fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
-    marginBottom: Spacing[4],
+    marginBottom: Spacing[3],
+    paddingRight: Spacing[6],
   },
   container: { paddingRight: Spacing[6], gap: Spacing[2] },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing[4],
-    paddingVertical: Spacing[2.5],
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    gap: Spacing[2],
+    paddingRight: Spacing[4],
+    paddingVertical: Spacing[2],
+    paddingLeft: Spacing[2],
+    borderRadius: 40,
+    borderWidth: 1.5,
+    gap: Spacing[1.5],
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  chipText: { fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.medium },
+  iconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipText: { fontSize: Typography.fontSize.sm, fontWeight: '600' },
 });
+

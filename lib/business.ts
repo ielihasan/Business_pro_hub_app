@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { haversineDistance, getBoundingBox } from './geoutils';
+import { haversineDistance } from './geoutils';
 
 export type BusinessRecord = {
   id: string;
@@ -14,8 +14,8 @@ export type BusinessRecord = {
 };
 
 export async function fetchBusinesses(opts: {
-  latitude: number;
-  longitude: number;
+  latitude?: number | null;
+  longitude?: number | null;
   radiusKm?: number;
   category?: string;
   query?: string;
@@ -28,59 +28,112 @@ export async function fetchBusinesses(opts: {
     radiusKm = 5,
     category,
     query: searchQuery,
-    limit = 100
+    limit = 200
   } = opts;
 
-  // Get bounding box
-  const bbox = getBoundingBox(latitude, longitude, radiusKm);
+  const hasLocation = typeof latitude === 'number' && typeof longitude === 'number';
 
-  // Supabase query builder
-  const dbQuery = supabase
-    .from('Business')
-    .select('id, name, category, latitude, longitude, queue_length, wait_time, rating, is_open')
-    .gte('latitude', bbox.minLat)
-    .lte('latitude', bbox.maxLat)
-    .gte('longitude', bbox.minLon)
-    .lte('longitude', bbox.maxLon)
-    .limit(limit);
+  // ── Fetch from both tables in parallel ──────────────────────────────────────
+  const [bizResult, adminsResult] = await Promise.all([
+    supabase.from('businesses').select('*').limit(limit),
+    supabase
+      .from('admins')
+      .select('id, business_name, business_type, business_address, business_phone, business_description, is_approved, latitude, longitude')
+      .eq('role', 'business_owner')
+      .limit(limit),
+  ]);
 
-  const { data, error } = await dbQuery;
+  // Debug — remove once confirmed working
+  console.log('[fetchBusinesses] businesses count:', bizResult.data?.length, 'admins count:', adminsResult.data?.length);
+  if (bizResult.data && bizResult.data.length > 0) {
+    console.log('[fetchBusinesses] businesses columns:', Object.keys(bizResult.data[0]).join(', '));
+  }
 
-  if (error) throw error;
+  if (bizResult.error) {
+    console.error('[fetchBusinesses] businesses error:', JSON.stringify(bizResult.error));
+  }
 
-  const items = (data ?? []).map((b) => {
-    const lat = b.latitude ?? 0;
-    const lon = b.longitude ?? 0;
-
-    const distanceKm = haversineDistance(
-      latitude,
-      longitude,
-      lat,
-      lon
-    );
-
-    return { ...b, distanceKm };
+  // Normalise businesses table rows
+  const fromBusinesses: Array<BusinessRecord & { distanceKm: number | null }> = (bizResult.data ?? []).map((b: any) => {
+    const name: string          = b.name         ?? b.business_name  ?? b.business_title ?? '';
+    const category: string      = b.category     ?? b.business_type  ?? b.type          ?? '';
+    const isOpen: boolean       = b.is_open      ?? b.isOpen         ?? true;
+    const lat: number | null    = b.latitude     ?? b.lat            ?? null;
+    const lon: number | null    = b.longitude    ?? b.lng            ?? b.lon           ?? null;
+    return {
+      ...b,
+      id: b.id,
+      name, category,
+      is_open: isOpen,
+      latitude: lat, longitude: lon,
+      queue_length: b.queue_length ?? b.queueLength ?? null,
+      wait_time:    b.wait_time   ?? b.waitTime     ?? null,
+      rating:       b.rating      ?? null,
+      distanceKm: (hasLocation && lat !== null && lon !== null)
+        ? haversineDistance(latitude as number, longitude as number, lat, lon)
+        : null,
+    };
   });
 
-  let filtered = items;
+  // Normalise admins table rows (business_owner registrations)
+  const fromAdmins: Array<BusinessRecord & { distanceKm: number | null }> = (adminsResult.data ?? []).map((a: any) => {
+    const lat: number | null = a.latitude  ?? null;
+    const lon: number | null = a.longitude ?? null;
+    return {
+      id:           a.id,
+      name:         a.business_name        ?? 'Unnamed Business',
+      category:     a.business_type        ?? '',
+      is_open:      a.is_approved          ?? true,
+      latitude:     lat,
+      longitude:    lon,
+      queue_length: null,
+      wait_time:    null,
+      rating:       null,
+      // Extra fields surfaced for the detail page
+      address:      a.business_address     ?? null,
+      phone:        a.business_phone       ?? null,
+      description:  a.business_description ?? null,
+      distanceKm: (hasLocation && lat !== null && lon !== null)
+        ? haversineDistance(latitude as number, longitude as number, lat, lon)
+        : null,
+    };
+  });
 
+  // Merge — deduplicate by id
+  const seen = new Set<string>();
+  const allItems: Array<BusinessRecord & { distanceKm: number | null }> = [];
+  for (const b of [...fromBusinesses, ...fromAdmins]) {
+    if (!seen.has(b.id)) { seen.add(b.id); allItems.push(b); }
+  }
+
+  // JS-side radius filter — businesses with no coordinates are always included
+  let filtered = hasLocation
+    ? allItems.filter((b) => b.distanceKm === null || b.distanceKm <= radiusKm)
+    : allItems;
+
+  // DB-side bounding box removed — JS-side radius applied above
+  // Category filter
+
+  // DB-side bounding box removed — JS-side radius applied above
+  // Category filter
   if (category && category !== 'all') {
     filtered = filtered.filter((b) =>
-      (b.category || '')
-        .toLowerCase()
-        .includes(category.toLowerCase())
+      b.category.toLowerCase().includes(category.toLowerCase())
     );
   }
 
+  // Text search
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
     filtered = filtered.filter((b) =>
-      (b.name || '').toLowerCase().includes(q) ||
-      (b.category || '').toLowerCase().includes(q)
+      b.name.toLowerCase().includes(q) ||
+      b.category.toLowerCase().includes(q)
     );
   }
 
-  filtered.sort((a, b) => a.distanceKm - b.distanceKm);
+  if (hasLocation) {
+    filtered.sort((a, b) => a.distanceKm - b.distanceKm);
+  }
 
   return filtered;
 }
@@ -90,10 +143,10 @@ export function subscribeToBusinesses(
 ) {
   try {
     const channel = supabase
-      .channel('public:Business')
+      .channel('public:businesses')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'Business' },
+        { event: '*', schema: 'public', table: 'businesses' },
         (payload) => {
           onChange(payload);
         }
@@ -124,7 +177,7 @@ export async function createBusiness(record: {
   is_open?: boolean | null;
 }) {
   const { data, error } = await supabase
-    .from('Business')
+    .from('businesses')
     .insert(record)
     .select()
     .limit(1);

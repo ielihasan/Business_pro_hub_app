@@ -4,71 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { Spacing } from '@/constants/theme';
 import { OrderCard, EmptyOrdersState, OrderFilterTabs } from '@/components/orders';
-
-// Mock data for orders
-const orders = [
-  {
-    id: 'o1',
-    businessId: '1',
-    businessName: 'Campus Coffee Shop',
-    orderNumber: 'ORD-2024-001',
-    status: 'ready',
-    items: [
-      { name: 'Cappuccino', quantity: 1, price: 450 },
-      { name: 'Croissant', quantity: 2, price: 300 },
-    ],
-    total: 1050,
-    createdAt: 'Today, 10:45 AM',
-    paymentMethod: 'JazzCash',
-  },
-  {
-    id: 'o2',
-    businessId: '2',
-    businessName: 'UniPrint Station',
-    orderNumber: 'ORD-2024-002',
-    status: 'in_progress',
-    items: [
-      { name: 'Color Prints (A4)', quantity: 25, price: 625 },
-      { name: 'Binding', quantity: 1, price: 150 },
-    ],
-    total: 775,
-    createdAt: 'Today, 9:30 AM',
-    paymentMethod: 'Cash',
-  },
-  {
-    id: 'o3',
-    businessId: '1',
-    businessName: 'Campus Coffee Shop',
-    orderNumber: 'ORD-2024-003',
-    status: 'completed',
-    items: [
-      { name: 'Latte', quantity: 2, price: 800 },
-      { name: 'Sandwich', quantity: 1, price: 350 },
-    ],
-    total: 1150,
-    createdAt: 'Yesterday, 3:15 PM',
-    paymentMethod: 'Card',
-  },
-  {
-    id: 'o4',
-    businessId: '3',
-    businessName: 'Quick Fix Mobile',
-    orderNumber: 'ORD-2024-004',
-    status: 'completed',
-    items: [
-      { name: 'Screen Protector', quantity: 1, price: 500 },
-      { name: 'Phone Case', quantity: 1, price: 800 },
-    ],
-    total: 1300,
-    createdAt: '2 days ago',
-    paymentMethod: 'EasyPaisa',
-  },
-];
+import { useStore } from '@/store/useStore';
 
 export default function OrdersScreen() {
   const { colors } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+
+  const orders = useStore((s) => s.orders);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -81,7 +24,7 @@ export default function OrdersScreen() {
       if (filter === 'completed') return ['completed', 'cancelled'].includes(order.status);
       return true;
     });
-  }, [filter]);
+  }, [filter, orders]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>

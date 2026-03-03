@@ -11,13 +11,24 @@ interface SearchBarProps {
 }
 
 export function SearchBar({ value, onChangeText }: SearchBarProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useTranslation();
 
   return (
     <View style={styles.container}>
-      <View style={[styles.searchBar, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-        <Ionicons name="search-outline" size={20} color={colors.mutedForeground} />
+      <View
+        style={[
+          styles.searchBar,
+          {
+            backgroundColor: isDark ? '#1E1E2E' : '#F4F6FB',
+            borderColor: isDark ? '#2E2E40' : '#E2E8F0',
+            shadowColor: '#000',
+          },
+        ]}
+      >
+        <View style={[styles.searchIconWrap, { backgroundColor: isDark ? '#2E2E40' : '#EEF2FF' }]}>
+          <Ionicons name="search-outline" size={17} color="#6366F1" />
+        </View>
         <TextInput
           style={[styles.searchInput, { color: colors.foreground }]}
           placeholder={t('common.search_placeholder')}
@@ -25,10 +36,12 @@ export function SearchBar({ value, onChangeText }: SearchBarProps) {
           value={value}
           onChangeText={onChangeText}
         />
+        {value.length > 0 && (
+          <TouchableOpacity onPress={() => onChangeText('')} style={styles.clearBtn}>
+            <Ionicons name="close-circle" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        )}
       </View>
-      <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.primary }]}>
-        <Ionicons name="options-outline" size={20} color={colors.primaryForeground} />
-      </TouchableOpacity>
     </View>
   );
 }
@@ -37,29 +50,36 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     paddingHorizontal: Spacing[6],
-    paddingVertical: Spacing[4],
+    paddingBottom: Spacing[4],
     gap: Spacing[3],
   },
   searchBar: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing[4],
-    height: 48,
-    borderRadius: BorderRadius.DEFAULT,
-    borderWidth: 1,
+    paddingHorizontal: Spacing[3],
+    paddingVertical: Spacing[3],
+    borderRadius: 16,
+    borderWidth: 1.5,
     gap: Spacing[2],
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  searchIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchInput: {
     flex: 1,
     fontSize: Typography.fontSize.base,
-    height: '100%',
+    paddingVertical: 0,
   },
-  filterButton: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.DEFAULT,
-    justifyContent: 'center',
-    alignItems: 'center',
+  clearBtn: {
+    padding: 2,
   },
 });

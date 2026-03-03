@@ -35,7 +35,7 @@ export async function signInWithGoogle(idToken: string): Promise<AuthResponse> {
 
     // Create or update user profile
     if (data.user) {
-      const { error: profileError } = await supabase.from('User').upsert({
+      const { error: profileError } = await supabase.from('users').upsert({
         id: data.user.id,
         email: data.user.email,
         full_name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || 'User',
@@ -113,7 +113,7 @@ export async function signInWithApple(): Promise<AuthResponse> {
         ? `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim()
         : data.user.user_metadata?.full_name || 'User';
 
-      const { error: profileError } = await supabase.from('User').upsert({
+      const { error: profileError } = await supabase.from('users').upsert({
         id: data.user.id,
         email: data.user.email || credential.email,
         full_name: fullName,

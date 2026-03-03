@@ -68,9 +68,9 @@ export async function registerUser(data: RegisterData): Promise<AuthResponse> {
       };
     }
 
-    // Step 2: Insert into User table (customers table)
+    // Step 2: Insert into users table (customers table)
     // Use upsert to handle cases where the user profile already exists
-    const { error: insertError } = await supabase.from('User').upsert({
+    const { error: insertError } = await supabase.from('users').upsert({
       id: authData.user.id,
       full_name: data.fullName,
       email: data.email,
@@ -193,12 +193,12 @@ export async function getCurrentUser(): Promise<User | null> {
 }
 
 /**
- * Get user profile from User table
+ * Get user profile from users table
  */
 export async function getUserProfile(userId: string) {
   try {
     const { data, error } = await supabase
-      .from('User')
+      .from('users')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
@@ -216,7 +216,7 @@ export async function getUserProfile(userId: string) {
 }
 
 /**
- * Update user profile in User table
+ * Update user profile in users table
  */
 export async function updateUserProfile(
   userId: string,
@@ -228,7 +228,7 @@ export async function updateUserProfile(
 ) {
   try {
     const { data, error } = await supabase
-      .from('User')
+      .from('users')
       .update(updates)
       .eq('id', userId)
       .select()

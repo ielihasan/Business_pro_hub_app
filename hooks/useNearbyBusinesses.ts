@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
 import { fetchBusinesses, subscribeToBusinesses, BusinessRecord } from '@/lib/business';
 import { useStore } from '@/store/useStore';
@@ -15,38 +15,51 @@ export function useNearbyBusinesses({ radiusKm, category, query }: UseNearbyBusi
   const locationEnabled = useStore((s) => s.locationEnabled);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [businesses, setBusinesses] = useState<BusinessWithDistance[]>([]);
+  const locationRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
-  // Initial load + realtime subscription
-  useEffect(() => {
-    if (!locationEnabled) {
-      setUserLocation(null);
-      setBusinesses([]);
-      return;
+  // Always fetch businesses — with location if available, without if not
+  const loadBusinesses = async (loc: { latitude: number; longitude: number } | null) => {
+    try {
+      const opts = loc
+        ? { latitude: loc.latitude, longitude: loc.longitude, radiusKm, category, query }
+        : { category, query };
+      console.log('[useNearbyBusinesses] fetching with opts:', JSON.stringify(opts));
+      const bs = await fetchBusinesses(opts);
+      console.log('[useNearbyBusinesses] received:', bs.length, 'businesses');
+      setBusinesses(bs);
+    } catch (err) {
+      console.warn('[useNearbyBusinesses] fetch error:', err);
     }
+  };
 
+  // Initial load: try to get location, then fetch
+  useEffect(() => {
     let unsub: (() => Promise<void>) | null = null;
 
     (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;
+      let loc: { latitude: number; longitude: number } | null = null;
 
-        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        const { latitude, longitude } = pos.coords;
-        setUserLocation({ latitude, longitude });
-
-        const bs = await fetchBusinesses({ latitude, longitude, radiusKm, category, query });
-        setBusinesses(bs);
-
-        unsub = subscribeToBusinesses(() => {
-          (async () => {
-            const fresh = await fetchBusinesses({ latitude, longitude, radiusKm, category, query });
-            setBusinesses(fresh);
-          })();
-        });
-      } catch (err) {
-        console.warn('Location / fetch error', err);
+      if (locationEnabled) {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+            setUserLocation(loc);
+            locationRef.current = loc;
+          }
+        } catch {
+          // location failed — still continue with locationless fetch
+        }
       }
+
+      // Always load businesses regardless of location result
+      await loadBusinesses(loc);
+
+      // Set up realtime subscription
+      unsub = subscribeToBusinesses(() => {
+        loadBusinesses(locationRef.current);
+      });
     })();
 
     return () => {
@@ -57,23 +70,9 @@ export function useNearbyBusinesses({ radiusKm, category, query }: UseNearbyBusi
 
   // Refetch when filters change
   useEffect(() => {
-    if (!userLocation) return;
-
-    (async () => {
-      try {
-        const bs = await fetchBusinesses({
-          latitude: userLocation.latitude,
-          longitude: userLocation.longitude,
-          radiusKm,
-          category,
-          query,
-        });
-        setBusinesses(bs);
-      } catch (err) {
-        console.warn('Refetch failed', err);
-      }
-    })();
-  }, [category, query, userLocation, radiusKm]);
+    loadBusinesses(locationRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, query, radiusKm]);
 
   return { userLocation, businesses };
 }

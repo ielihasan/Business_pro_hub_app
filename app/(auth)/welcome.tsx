@@ -1,198 +1,182 @@
-import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  StatusBar,
+  Dimensions,
+  ScrollView,
+} from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { Button } from '@/components/ui';
-import { Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
-const features = [
-  {
-    icon: 'qr-code-outline' as const,
-    title: 'Quick Queue Join',
-    description: 'Scan QR codes to instantly join queues at your favorite businesses',
-  },
-  {
-    icon: 'time-outline' as const,
-    title: 'Real-Time Tracking',
-    description: 'Track your position and get accurate wait time estimates',
-  },
-  {
-    icon: 'notifications-outline' as const,
-    title: 'Smart Notifications',
-    description: 'Never miss your turn with timely push notifications',
-  },
-  {
-    icon: 'star-outline' as const,
-    title: 'Earn Rewards',
-    description: 'Collect loyalty points and unlock exclusive rewards',
-  },
+const BUBBLES: Array<{ icon: string; color: string; bg: string; top: number; left: number; size: number }> = [
+  { icon: 'qr-code',       color: '#fff', bg: '#6366F1', top: 16,  left: 24,          size: 50 },
+  { icon: 'storefront',    color: '#fff', bg: '#0EA5E9', top: 62,  left: width * 0.6, size: 44 },
+  { icon: 'time',          color: '#fff', bg: '#10B981', top: 114, left: 48,          size: 40 },
+  { icon: 'notifications', color: '#fff', bg: '#F59E0B', top: 90,  left: width * 0.4, size: 36 },
+  { icon: 'star',          color: '#fff', bg: '#EC4899', top: 150, left: width * 0.66,size: 42 },
+  { icon: 'card',          color: '#fff', bg: '#8B5CF6', top: 154, left: 10,          size: 36 },
+  { icon: 'people',        color: '#fff', bg: '#14B8A6', top: 34,  left: width * 0.36,size: 42 },
+];
+
+const FEATURES = [
+  { icon: 'qr-code-outline',       color: '#6366F1', bg: '#EEF2FF', label: 'Scan & Join',     desc: 'Instantly join any queue by scanning a business QR code.' },
+  { icon: 'timer-outline',         color: '#10B981', bg: '#F0FDF4', label: 'Live Wait Times', desc: 'Real-time position & accurate wait time estimates.' },
+  { icon: 'notifications-outline', color: '#F59E0B', bg: '#FFFBEB', label: 'Smart Alerts',    desc: "Get notified the moment it's your turn." },
+  { icon: 'star-outline',          color: '#EC4899', bg: '#FDF2F8', label: 'Earn Rewards',    desc: 'Collect points and unlock exclusive business deals.' },
 ];
 
 export default function WelcomeScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Logo & Header */}
-        <View style={styles.header}>
-          <View style={[styles.logo, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.logoText, { color: colors.primaryForeground }]}>
-              BH
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll} bounces={false}>
+
+        {/* ── Hero ── */}
+        <View style={[styles.hero, { backgroundColor: isDark ? '#0F0F1A' : '#F0F1FF' }]}>
+          <View style={[styles.blob1, { backgroundColor: isDark ? '#6366F130' : '#6366F11A' }]} />
+          <View style={[styles.blob2, { backgroundColor: isDark ? '#10B98130' : '#10B98115' }]} />
+
+          {BUBBLES.map((b, i) => (
+            <View
+              key={i}
+              style={[styles.bubble, { width: b.size, height: b.size, borderRadius: b.size / 2,
+                backgroundColor: b.bg, top: b.top, left: b.left, shadowColor: b.bg }]}
+            >
+              <Ionicons name={b.icon as any} size={b.size * 0.44} color={b.color} />
+            </View>
+          ))}
+
+          <SafeAreaView edges={['top']} style={styles.heroBottom}>
+            <View style={[styles.appPill, { backgroundColor: colors.primary }]}>
+              <Ionicons name="grid" size={14} color={colors.primaryForeground} />
+              <Text style={[styles.appPillText, { color: colors.primaryForeground }]}>BusinessHub Pro</Text>
+            </View>
+            <Text style={[styles.heroTitle, { color: isDark ? '#EDEDFF' : '#1A1A3A' }]}>
+              Beat the Queue.{"\n"}Not the Clock.
             </Text>
-          </View>
-          <Text style={[styles.title, { color: colors.foreground }]}>
-            BusinessHub Pro
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-            Smart queue management for modern customers
-          </Text>
+            <Text style={[styles.heroSub, { color: isDark ? '#ABABCC' : '#5C5C8A' }]}>
+              Smart queue management — join, track & get rewarded.
+            </Text>
+          </SafeAreaView>
         </View>
 
-        {/* Features */}
-        <View style={styles.features}>
-          {features.map((feature, index) => (
-            <View
-              key={index}
-              style={[
-                styles.featureCard,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <View style={[styles.featureIcon, { backgroundColor: colors.secondary }]}>
-                <Ionicons
-                  name={feature.icon}
-                  size={24}
-                  color={colors.foreground}
-                />
-              </View>
-              <View style={styles.featureContent}>
-                <Text style={[styles.featureTitle, { color: colors.foreground }]}>
-                  {feature.title}
-                </Text>
-                <Text style={[styles.featureDescription, { color: colors.mutedForeground }]}>
-                  {feature.description}
-                </Text>
-              </View>
+        {/* ── Stats ── */}
+        <View style={[styles.statsRow, { backgroundColor: colors.card, borderTopColor: colors.border, borderBottomColor: colors.border }]}>
+          {([['50K+','Users'],['1,200+','Businesses'],['4.9★','Rating']] as const).map(([val, lbl], i) => (
+            <View key={i} style={[styles.stat, i < 2 && { borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.border }]}>
+              <Text style={[styles.statVal, { color: colors.foreground }]}>{val}</Text>
+              <Text style={[styles.statLbl, { color: colors.mutedForeground }]}>{lbl}</Text>
             </View>
           ))}
         </View>
 
-        {/* CTA Buttons */}
-        <View style={styles.actions}>
-          <Button
-            onPress={() => router.push('/(auth)/register')}
-            style={styles.primaryButton}
-          >
-            Get Started
-          </Button>
-          <Button
-            variant="outline"
-            onPress={() => router.push('/(auth)/login')}
-            style={styles.secondaryButton}
-          >
-            I already have an account
-          </Button>
+        {/* ── Features ── */}
+        <View style={styles.featWrap}>
+          <Text style={[styles.secLabel, { color: colors.mutedForeground }]}>EVERYTHING YOU NEED</Text>
+          <View style={styles.grid}>
+            {FEATURES.map((f, i) => (
+              <View key={i} style={[styles.tile, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[styles.tileIcon, { backgroundColor: isDark ? colors.secondary : f.bg }]}>
+                  <Ionicons name={f.icon as any} size={22} color={f.color} />
+                </View>
+                <Text style={[styles.tileLabel, { color: colors.foreground }]}>{f.label}</Text>
+                <Text style={[styles.tileDesc, { color: colors.mutedForeground }]}>{f.desc}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
-        {/* Footer */}
-        <Text style={[styles.footer, { color: colors.mutedForeground }]}>
-          By continuing, you agree to our Terms of Service and Privacy Policy
-        </Text>
+        {/* ── CTA ── */}
+        <View style={styles.ctaWrap}>
+          <TouchableOpacity
+            style={[styles.btnPrimary, { backgroundColor: colors.primary }]}
+            onPress={() => router.push('/(auth)/register')}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.btnPrimaryTxt, { color: colors.primaryForeground }]}>Get Started — It's Free</Text>
+            <Ionicons name="arrow-forward" size={18} color={colors.primaryForeground} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.btnSecondary, { borderColor: colors.border, backgroundColor: colors.card }]}
+            onPress={() => router.push('/(auth)/login')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.btnSecondaryTxt, { color: colors.foreground }]}>I already have an account</Text>
+          </TouchableOpacity>
+
+          <Text style={[styles.legal, { color: colors.mutedForeground }]}>
+            By continuing, you agree to our{' '}
+            <Text style={{ fontWeight: '600' }}>Terms of Service</Text>
+            {' '}and{' '}
+            <Text style={{ fontWeight: '600' }}>Privacy Policy</Text>
+          </Text>
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: Spacing[6],
-    paddingTop: Spacing[8],
-    paddingBottom: Spacing[6],
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: Spacing[8],
-  },
-  logo: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
+  root:   { flex: 1 },
+  scroll: { flexGrow: 1 },
+
+  hero: { height: height * 0.43, overflow: 'hidden', position: 'relative' },
+  blob1: { position: 'absolute', width: 260, height: 260, borderRadius: 130, top: -80, left: -60 },
+  blob2: { position: 'absolute', width: 200, height: 200, borderRadius: 100, bottom: -40, right: -40 },
+  bubble: {
+    position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing[4],
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  logoText: {
-    fontSize: 32,
-    fontWeight: Typography.fontWeight.bold,
+  heroBottom: { position: 'absolute', bottom: 22, left: 22, right: 22 },
+  appPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5,
+    borderRadius: 20, marginBottom: 10,
   },
-  title: {
-    fontSize: Typography.fontSize['2xl'],
-    fontWeight: Typography.fontWeight.bold,
-    marginBottom: Spacing[2],
+  appPillText: { fontSize: 12, fontWeight: '700' },
+  heroTitle: { fontSize: 28, fontWeight: '800', letterSpacing: -0.6, lineHeight: 34, marginBottom: 7 },
+  heroSub:   { fontSize: 13, lineHeight: 19 },
+
+  statsRow: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
+  stat:     { flex: 1, alignItems: 'center', paddingVertical: 13 },
+  statVal:  { fontSize: 17, fontWeight: '800' },
+  statLbl:  { fontSize: 11, marginTop: 1 },
+
+  featWrap: { paddingHorizontal: Spacing[4], paddingTop: Spacing[5] },
+  secLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 12, paddingLeft: 2 },
+  grid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  tile: {
+    width: (width - Spacing[4] * 2 - 12) / 2,
+    borderRadius: 16, borderWidth: StyleSheet.hairlineWidth,
+    padding: 16, shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
-  subtitle: {
-    fontSize: Typography.fontSize.base,
-    textAlign: 'center',
-    maxWidth: width * 0.8,
+  tileIcon:  { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  tileLabel: { fontSize: 13, fontWeight: '700', marginBottom: 4 },
+  tileDesc:  { fontSize: 12, lineHeight: 17 },
+
+  ctaWrap: { paddingHorizontal: Spacing[4], paddingTop: Spacing[5], paddingBottom: Spacing[8], gap: 12 },
+  btnPrimary: {
+    height: 54, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    shadowColor: '#6366F1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 5,
   },
-  features: {
-    gap: Spacing[3],
-    marginBottom: Spacing[8],
-  },
-  featureCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing[4],
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-  },
-  featureIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.DEFAULT,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing[4],
-  },
-  featureContent: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-    marginBottom: Spacing[1],
-  },
-  featureDescription: {
-    fontSize: Typography.fontSize.sm,
-    lineHeight: Typography.fontSize.sm * Typography.lineHeight.relaxed,
-  },
-  actions: {
-    gap: Spacing[3],
-    marginBottom: Spacing[6],
-  },
-  primaryButton: {
-    width: '100%',
-  },
-  secondaryButton: {
-    width: '100%',
-  },
-  footer: {
-    fontSize: Typography.fontSize.xs,
-    textAlign: 'center',
-    lineHeight: Typography.fontSize.xs * Typography.lineHeight.relaxed,
-  },
+  btnPrimaryTxt:   { fontSize: 16, fontWeight: '700' },
+  btnSecondary:    { height: 54, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+  btnSecondaryTxt: { fontSize: 15, fontWeight: '600' },
+  legal:           { fontSize: 11, textAlign: 'center', lineHeight: 16 },
 });

@@ -129,10 +129,15 @@ export interface LocalNotificationPayload {
   data?: Record<string, any>;
   channelId?: string;
   badgeCount?: number;
+  /** Whether to play notification sound (default: true) */
+  sound?: boolean;
+  /** Whether to vibrate on Android (default: true) */
+  vibrate?: boolean;
 }
 
 /**
- * Schedule an immediate local push notification
+ * Schedule an immediate local push notification.
+ * Pass sound=false or vibrate=false to honour per-user setting toggles.
  */
 export async function sendLocalNotification(payload: LocalNotificationPayload): Promise<string | null> {
   try {
@@ -141,17 +146,20 @@ export async function sendLocalNotification(payload: LocalNotificationPayload): 
     const hasPermission = await checkNotificationPermissions();
     if (!hasPermission) return null;
 
+    const soundValue = payload.sound === false ? undefined : 'default';
+    const vibrateValue = payload.vibrate === false ? undefined : [0, 250, 250, 250];
+
     const id = await ExpoNotifications.scheduleNotificationAsync({
       content: {
         title: payload.title,
         body: payload.body,
         data: payload.data ?? {},
-        sound: 'default',
+        sound: soundValue,
         badge: payload.badgeCount,
         ...(Platform.OS === 'android' && {
           channelId: payload.channelId ?? 'default',
           priority: 'high',
-          vibrate: [0, 250, 250, 250],
+          ...(vibrateValue ? { vibrate: vibrateValue } : {}),
           color: '#1A1A1A',
         }),
       },
@@ -187,71 +195,78 @@ export async function setBadgeCount(count: number): Promise<void> {
 // ─── Notification generators for each event type ──────────────────────────
 
 /** Called when user joins a queue */
-export async function notifyQueueJoined(businessName: string, position: number, estimatedWait: string) {
+export async function notifyQueueJoined(businessName: string, position: number, estimatedWait: string, opts?: { sound?: boolean; vibrate?: boolean }) {
   await sendLocalNotification({
     title: '🎫 Queue Joined!',
     body: `You're #${position} in line at ${businessName}. Est. wait: ${estimatedWait}`,
     data: { type: 'queue_update', businessName },
     channelId: 'queue_updates',
+    ...opts,
   });
 }
 
 /** Called when queue position gets close (≤ 3) */
-export async function notifyAlmostYourTurn(businessName: string, position: number) {
+export async function notifyAlmostYourTurn(businessName: string, position: number, opts?: { sound?: boolean; vibrate?: boolean }) {
   await sendLocalNotification({
     title: '⏰ Almost Your Turn!',
     body: `You're #${position} at ${businessName}. Get ready!`,
     data: { type: 'queue_update', businessName },
     channelId: 'queue_updates',
+    ...opts,
   });
 }
 
 /** Called when it's the user's turn */
-export async function notifyYourTurnNow(businessName: string) {
+export async function notifyYourTurnNow(businessName: string, opts?: { sound?: boolean; vibrate?: boolean }) {
   await sendLocalNotification({
     title: "🔔 It's Your Turn!",
     body: `Please proceed to ${businessName} now.`,
     data: { type: 'queue_update', businessName },
     channelId: 'queue_updates',
+    ...opts,
   });
 }
 
 /** Called when an order status changes to ready */
-export async function notifyOrderReady(businessName: string, orderNumber: string) {
+export async function notifyOrderReady(businessName: string, orderNumber: string, opts?: { sound?: boolean; vibrate?: boolean }) {
   await sendLocalNotification({
     title: '✅ Order Ready!',
     body: `Order #${orderNumber} from ${businessName} is ready for pickup!`,
     data: { type: 'order_ready', businessName, orderNumber },
     channelId: 'order_updates',
+    ...opts,
   });
 }
 
 /** Called when loyalty points are earned */
-export async function notifyLoyaltyPoints(points: number, totalPoints: number) {
+export async function notifyLoyaltyPoints(points: number, totalPoints: number, opts?: { sound?: boolean; vibrate?: boolean }) {
   await sendLocalNotification({
     title: '⭐ Loyalty Points Earned!',
     body: `You earned ${points} points! Total: ${totalPoints} pts. Keep visiting to unlock rewards.`,
     data: { type: 'loyalty', points },
     channelId: 'promotions',
+    ...opts,
   });
 }
 
 /** Called on first login / welcome */
-export async function notifyWelcome(name: string) {
+export async function notifyWelcome(name: string, opts?: { sound?: boolean; vibrate?: boolean }) {
   await sendLocalNotification({
     title: '👋 Welcome to BusinessHub Pro!',
     body: `Hi ${name}! Scan QR codes to join queues and track your orders in real-time.`,
     data: { type: 'promo' },
     channelId: 'promotions',
+    ...opts,
   });
 }
 
 /** Promo / generic notification */
-export async function notifyPromo(title: string, message: string) {
+export async function notifyPromo(title: string, message: string, opts?: { sound?: boolean; vibrate?: boolean }) {
   await sendLocalNotification({
     title,
     body: message,
     data: { type: 'promo' },
     channelId: 'promotions',
+    ...opts,
   });
 }

@@ -1,56 +1,155 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { Avatar } from '@/components/ui';
-import { Typography, Spacing } from '@/constants/theme';
+import { Typography, Spacing, BorderRadius } from '@/constants/theme';
 
 interface ProfileHeaderProps {
   name: string;
   email: string;
+  phone?: string;
   avatarUri?: string | null;
   isUploading: boolean;
+  loyaltyPoints?: number;
   onAvatarPress: () => void;
 }
 
-export function ProfileHeader({ name, email, avatarUri, isUploading, onAvatarPress }: ProfileHeaderProps) {
-  const { colors } = useTheme();
+function getMemberTier(pts: number): { label: string; color: string; bg: string; icon: string } {
+  if (pts >= 1000) return { label: 'Gold Member',   color: '#D97706', bg: '#FEF3C7', icon: 'trophy'        };
+  if (pts >= 500)  return { label: 'Silver Member', color: '#6B7280', bg: '#F3F4F6', icon: 'ribbon-outline' };
+  if (pts >= 100)  return { label: 'Bronze Member', color: '#92400E', bg: '#FEF3C7', icon: 'medal-outline'  };
+  return                   { label: 'Member',        color: '#3B82F6', bg: '#EFF6FF', icon: 'person-circle-outline' };
+}
+
+export function ProfileHeader({ name, email, phone, avatarUri, isUploading, loyaltyPoints = 0, onAvatarPress }: ProfileHeaderProps) {
+  const { colors, isDark } = useTheme();
+  const tier = getMemberTier(loyaltyPoints);
 
   return (
-    <View style={styles.header}>
-      <TouchableOpacity style={styles.avatarContainer} onPress={onAvatarPress} disabled={isUploading}>
-        <Avatar
-          source={avatarUri ? { uri: avatarUri } : undefined}
-          name={name}
-          size="xl"
-        />
-        <View style={[styles.editBadge, { backgroundColor: colors.primary }]}>
-          {isUploading ? (
-            <ActivityIndicator size="small" color={colors.primaryForeground} />
-          ) : (
-            <Ionicons name="image" size={14} color={colors.primaryForeground} />
-          )}
-        </View>
-      </TouchableOpacity>
-      <Text style={[styles.userName, { color: colors.foreground }]}>{name}</Text>
-      <Text style={[styles.userEmail, { color: colors.mutedForeground }]}>{email}</Text>
+    <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Decorative top strip */}
+      <View style={[styles.heroStrip, { backgroundColor: isDark ? '#1e1e1e' : '#F8F8F8' }]} />
+
+      {/* Avatar row */}
+      <View style={styles.avatarRow}>
+        <TouchableOpacity
+          style={[styles.avatarRing, { borderColor: isDark ? colors.border : '#E5E7EB', backgroundColor: colors.background }]}
+          onPress={onAvatarPress}
+          disabled={isUploading}
+          activeOpacity={0.85}
+        >
+          <Avatar
+            source={avatarUri ? { uri: avatarUri } : undefined}
+            name={name}
+            size="xl"
+          />
+          <View style={[styles.cameraBadge, { backgroundColor: colors.primary, borderColor: colors.background }]}>
+            {isUploading
+              ? <ActivityIndicator size="small" color={colors.primaryForeground} />
+              : <Ionicons name="camera" size={13} color={colors.primaryForeground} />}
+          </View>
+        </TouchableOpacity>
+
+        {/* Edit profile pill — top-right */}
+        <TouchableOpacity
+          style={[styles.editPill, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+          onPress={() => router.push('/profile/edit')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="pencil" size={13} color={colors.mutedForeground} />
+          <Text style={[styles.editPillText, { color: colors.mutedForeground }]}>Edit</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Name & email */}
+      <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={1}>{name}</Text>
+      <Text style={[styles.userEmail, { color: colors.mutedForeground }]} numberOfLines={1}>{email}</Text>
+      {!!phone && (
+        <Text style={[styles.userPhone, { color: colors.mutedForeground }]} numberOfLines={1}>{phone}</Text>
+      )}
+
+      {/* Membership tier badge */}
+      <View style={[styles.tierBadge, { backgroundColor: isDark ? colors.secondary : tier.bg }]}>
+        <Ionicons name={tier.icon as any} size={13} color={tier.color} />
+        <Text style={[styles.tierText, { color: tier.color }]}>{tier.label}</Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { alignItems: 'center', paddingVertical: Spacing[6], paddingHorizontal: Spacing[6] },
-  avatarContainer: { position: 'relative', marginBottom: Spacing[4] },
-  editBadge: {
+  heroCard: {
+    marginHorizontal: Spacing[4],
+    marginBottom: Spacing[4],
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    alignItems: 'center',
+    paddingBottom: Spacing[5],
+  },
+  heroStrip: { width: '100%', height: 52 },
+
+  avatarRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    marginTop: -36,
+    paddingHorizontal: Spacing[4],
+    marginBottom: Spacing[3],
+  },
+  avatarRing: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  cameraBadge: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    bottom: 2,
+    right: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  userName: { fontSize: Typography.fontSize.xl, fontWeight: Typography.fontWeight.bold, marginBottom: Spacing[1] },
-  userEmail: { fontSize: Typography.fontSize.sm },
+  editPill: {
+    position: 'absolute',
+    right: 0,
+    bottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  editPillText: { fontSize: 12, fontWeight: '600' },
+
+  userName:  { fontSize: Typography.fontSize.xl, fontWeight: '700', letterSpacing: -0.3, marginBottom: 2 },
+  userEmail: { fontSize: Typography.fontSize.sm, marginBottom: 2 },
+  userPhone: { fontSize: 12, marginBottom: 4 },
+
+  tierBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: Spacing[3],
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  tierText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.2 },
 });
