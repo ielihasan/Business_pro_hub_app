@@ -5,12 +5,13 @@ import { supabase } from './supabase';
 import { AuthResponse } from './auth';
 
 // Initialize Google OAuth
-const googleClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
+const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '';
+const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
 
 export const useGoogleAuth = () => {
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
-    clientId: googleClientId,
-    redirectUri: 'businesshubpro://oauth/google/callback',
+    androidClientId,
+    webClientId,
   });
 
   return { googleRequest, googleResponse, googlePromptAsync };
@@ -33,7 +34,8 @@ export async function signInWithGoogle(idToken: string): Promise<AuthResponse> {
       };
     }
 
-    // Create or update user profile
+    // Create or update user profile (upsert by ID so we never corrupt an
+    // existing email/password user's row by overwriting their primary key)
     if (data.user) {
       const { error: profileError } = await supabase.from('users').upsert({
         id: data.user.id,
@@ -41,7 +43,7 @@ export async function signInWithGoogle(idToken: string): Promise<AuthResponse> {
         full_name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || 'User',
         avatar_url: data.user.user_metadata?.avatar_url,
       }, {
-        onConflict: 'email',
+        onConflict: 'id',
         ignoreDuplicates: false,
       });
 

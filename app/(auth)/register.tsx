@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,17 +12,19 @@ import {
   ActivityIndicator,
   StatusBar,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { makeRedirectUri } from 'expo-auth-session';
 import { useTheme } from '@/hooks/useTheme';
 import { Input } from '@/components/ui';
 import { Spacing, BorderRadius } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
-import { signInWithGoogle, signInWithApple } from '@/lib/oauth';
+import { signInWithApple } from '@/lib/oauth';
+import { supabase } from '@/lib/supabase';
+import { oauthState } from '@/lib/oauthState';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -44,20 +46,12 @@ export default function RegisterScreen() {
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [registeredEmail, setRegisteredEmail]     = useState('');
   const [socialLoading, setSocialLoading]         = useState<'google' | 'apple' | null>(null);
+  // Tracks whether Google has pre-filled name + email
+  const [googlePrefilled, setGooglePrefilled]     = useState(false);
+  // Stores the Google session tokens so we can restore them on form submit
+  const [googleTokens, setGoogleTokens]           = useState<{ access_token: string; refresh_token: string } | null>(null);
 
   const { register, isLoading, authError, clearAuthError } = useStore();
-
-  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
-    clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
-    redirectUri: 'businesshubpro://oauth/google/callback',
-  });
-
-  useEffect(() => {
-    if (googleResponse?.type === 'success') {
-      const { id_token } = googleResponse.params;
-      if (id_token) handleGoogleSignUp(id_token);
-    }
-  }, [googleResponse]);
 
   const updateField = (field: string, value: string) => {
     setFormData(p => ({ ...p, [field]: value }));
@@ -71,28 +65,157 @@ export default function RegisterScreen() {
     else if (!/\S+@\S+\.\S+/.test(formData.email)) e.email = 'Enter a valid email';
     if (!formData.phone) e.phone = 'Phone number is required';
     else if (!/^[0-9+\-\s()]{10,}$/.test(formData.phone)) e.phone = 'Enter a valid phone number';
-    if (!formData.password) e.password = 'Password is required';
-    else if (formData.password.length < 8) e.password = 'Minimum 8 characters';
-    if (!formData.confirmPassword) e.confirmPassword = 'Please confirm your password';
-    else if (formData.password !== formData.confirmPassword) e.confirmPassword = 'Passwords do not match';
+    // No password required when signing up via Google
+    if (!googlePrefilled) {
+      if (!formData.password) e.password = 'Password is required';
+      else if (formData.password.length < 8) e.password = 'Minimum 8 characters';
+      if (!formData.confirmPassword) e.confirmPassword = 'Please confirm your password';
+      else if (formData.password !== formData.confirmPassword) e.confirmPassword = 'Passwords do not match';
+    }
     if (!agreedToTerms) e.terms = 'You must agree to continue';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const handleGoogleSignUp = async (idToken: string) => {
+  // When auth/callback.tsx routes back to this screen (Android path), it stores
+  // prefill data in oauthState before navigating. useFocusEffect picks them up.
+  useFocusEffect(
+    useCallback(() => {
+      // ── 1. Already-registered error (Android path) ─────────────────────────
+      const alreadyRegistered = oauthState.pendingAlreadyRegistered;
+      if (alreadyRegistered) {
+        oauthState.pendingAlreadyRegistered = null; // consume
+        Alert.alert(
+          'Already Registered',
+          'This Google account is already registered. Please go to the login page and sign in with Google.',
+          [
+            { text: 'Go to Login', onPress: () => router.replace('/(auth)/login') },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+        return;
+      }
+
+      // ── 2. Google prefill (Android path) ──────────────────────────────────
+      const prefill = oauthState.pendingGooglePrefill;
+      if (prefill) {
+        oauthState.pendingGooglePrefill = null; // consume
+        oauthState.pendingGoogleTokens  = null; // clean up (no longer used)
+        setFormData(prev => ({
+          ...prev,
+          fullName: prefill.name  || prev.fullName,
+          email:    prefill.email || prev.email,
+        }));
+        setGooglePrefilled(true);
+        setSocialLoading(null);
+        Alert.alert(
+          '\u2705 Google Details Filled',
+          'Name and email have been filled from your Google account.\n\nJust add your phone number to finish.',
+          [{ text: 'Got it' }]
+        );
+      }
+    }, [])
+  );
+
+  // Triggers Google OAuth via Supabase; pre-fills name + email on success
+  const handleGooglePress = async () => {
     setSocialLoading('google');
     try {
-      const result = await signInWithGoogle(idToken);
-      if (result.success) router.replace('/(tabs)');
-      else Alert.alert('Google Sign-Up Failed', result.error || 'Please try again.');
-    } catch (e: any) { Alert.alert('Error', e.message || 'Unexpected error.'); }
-    finally { setSocialLoading(null); }
-  };
+      const redirectUri = makeRedirectUri({ scheme: 'businesshubpro', path: 'auth/callback' });
 
-  const handleGooglePress = async () => {
-    try { await googlePromptAsync(); }
-    catch { Alert.alert('Error', 'Failed to initiate Google sign-up.'); }
+      // Mark source so auth/callback.tsx (Android) knows this came from register
+      oauthState.oauthSource = 'register';
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: redirectUri, skipBrowserRedirect: true },
+      });
+
+      if (error || !data.url) {
+        setSocialLoading(null);
+        Alert.alert('Error', error?.message || 'Failed to start Google sign-up.');
+        return;
+      }
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+
+      if (result.type === 'success') {
+        // ── iOS path ─────────────────────────────────────────────────────────
+        // Safari View Controller returns the URL directly; Expo Router never
+        // sees it, so we handle it right here.
+        const url = result.url;
+        const [beforeHash, hashPart = ''] = url.split('#');
+        const queryPart = beforeHash.includes('?') ? beforeHash.split('?')[1] : '';
+        const hp = new URLSearchParams(hashPart);
+        const qp = new URLSearchParams(queryPart);
+        const at   = hp.get('access_token')  || qp.get('access_token');
+        const rt   = hp.get('refresh_token') || qp.get('refresh_token') || '';
+        const code = qp.get('code');
+
+        let user = null;
+        if (at) {
+          const { data: sd } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
+          user = sd.session?.user ?? null;
+        } else if (code) {
+          const { data: sd } = await supabase.auth.exchangeCodeForSession(code);
+          user = sd.session?.user ?? null;
+        }
+
+        if (user) {
+          // ── iOS: check if this Google account is already registered ───────
+          const { data: existingProfile } = await supabase
+            .from('users')
+            .select('phone_number')
+            .eq('email', user.email || '')
+            .maybeSingle();
+
+          if (existingProfile?.phone_number) {
+            // Already registered — sign out and show error
+            await supabase.auth.signOut();
+            setSocialLoading(null);
+            Alert.alert(
+              'Already Registered',
+              'This Google account is already registered. Please go to the login page and sign in with Google.',
+              [
+                { text: 'Go to Login', onPress: () => router.replace('/(auth)/login') },
+                { text: 'Cancel', style: 'cancel' },
+              ]
+            );
+            return;
+          }
+
+          const meta       = user.user_metadata || {};
+          const googleName = meta.full_name || meta.name ||
+                             `${meta.given_name || ''} ${meta.family_name || ''}`.trim() || '';
+          // Do NOT sign out — the session must stay alive so handleRegister
+          // can call getSession() when the form is submitted.
+          setFormData(prev => ({
+            ...prev,
+            fullName: googleName   || prev.fullName,
+            email:    user!.email ?? prev.email,
+          }));
+          setGooglePrefilled(true);
+          Alert.alert(
+            '\u2705 Google Details Filled',
+            'Name and email have been filled from your Google account.\n\nJust add your phone number to finish.',
+            [{ text: 'Got it' }]
+          );
+        } else {
+          Alert.alert('Error', 'Could not retrieve Google details. Please try again.');
+        }
+        setSocialLoading(null);
+      } else {
+        // ── Android path ──────────────────────────────────────────────────────
+        // The OS intercepts the deep link and Expo Router routes it to
+        // auth/callback.tsx. That screen stores the prefill in oauthState and
+        // keeps the session alive, then calls router.replace('/(auth)/register').
+        // useFocusEffect above picks up oauthState.pendingGooglePrefill.
+        setSocialLoading(null);
+      }
+    } catch (err: any) {
+      setSocialLoading(null);
+      Alert.alert('Error', err.message || 'Google sign-up failed. Please try again.');
+    }
   };
 
   const handleAppleSignUp = async () => {
@@ -108,6 +231,44 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     clearAuthError();
     if (!validateForm()) return;
+
+    // ── Google signup path ───────────────────────────────────────────────────
+    // Save the phone number, then sign out so the user must sign in via Google
+    // on the login page (consistent flow: register → login → home).
+    if (googlePrefilled) {
+      setSocialLoading('google');
+      try {
+        const { data: { session: liveSession } } = await supabase.auth.getSession();
+        if (!liveSession) throw new Error('Google session expired. Please tap \'Fill with Google\' again.');
+
+        // Save / update profile row with phone number
+        await supabase.from('users').upsert({
+          id:           liveSession.user.id,
+          email:        liveSession.user.email,
+          full_name:    formData.fullName,
+          phone_number: formData.phone,
+        }, { onConflict: 'id', ignoreDuplicates: false });
+
+        // Sign out so the user goes through the login flow
+        await supabase.auth.signOut();
+        setSocialLoading(null);
+        router.replace({ pathname: '/(auth)/login', params: { prefillEmail: formData.email } });
+      } catch (err: any) {
+        setSocialLoading(null);
+        // Session expired — reset so user can try Google OAuth again
+        setGooglePrefilled(false);
+        setGoogleTokens(null);
+        setFormData(prev => ({ ...prev, fullName: '', email: '' }));
+        Alert.alert(
+          'Session Expired',
+          err.message || 'Please tap \'Fill with Google\' again to restart.',
+          [{ text: 'OK' }]
+        );
+      }
+      return;
+    }
+
+    // ── Email / password signup path ─────────────────────────────────────────
     const result = await register({
       email: formData.email,
       password: formData.password,
@@ -115,9 +276,8 @@ export default function RegisterScreen() {
       phone: formData.phone,
     });
     if (result.success) {
-      const { session } = useStore.getState();
-      if (session) router.replace('/(tabs)');
-      else { setRegisteredEmail(formData.email); setShowVerificationModal(true); }
+      setRegisteredEmail(formData.email);
+      setShowVerificationModal(true);
     } else {
       if (result.error?.includes('already registered')) {
         Alert.alert('Email Already Registered', 'This email is already in use. Please sign in or use another email.', [
@@ -190,14 +350,42 @@ export default function RegisterScreen() {
               </View>
             )}
 
-            <Input label="Full Name" placeholder="John Doe" value={formData.fullName}
-              onChangeText={(v) => updateField('fullName', v)} autoCapitalize="words"
-              autoComplete="name" leftIcon="person-outline" error={errors.fullName} editable={!busy} />
+            {/* Google pre-fill banner */}
+            {googlePrefilled && (
+              <View style={[styles.googleBanner, { backgroundColor: '#34A85315', borderColor: '#34A85350' }]}>
+                <Ionicons name="logo-google" size={15} color="#34A853" />
+                <Text style={[styles.googleBannerText, { color: '#34A853' }]}>
+                  Signed in with Google. Just add your phone number below.
+                </Text>
+              </View>
+            )}
 
+            {/* Full Name – read-only when Google-prefilled */}
+            <View>
+              {googlePrefilled && (
+                <View style={styles.googleFieldBadge}>
+                  <Ionicons name="logo-google" size={11} color="#EA4335" />
+                  <Text style={styles.googleFieldBadgeText}>Verified by Google</Text>
+                </View>
+              )}
+              <Input label="Full Name" placeholder="John Doe" value={formData.fullName}
+                onChangeText={(v) => updateField('fullName', v)} autoCapitalize="words"
+                autoComplete="name" leftIcon="person-outline" error={errors.fullName}
+                editable={!busy && !googlePrefilled} />
+            </View>
+
+            {/* Email – read-only when Google-prefilled */}
             <View style={{ marginTop: Spacing[3] }}>
+              {googlePrefilled && (
+                <View style={styles.googleFieldBadge}>
+                  <Ionicons name="logo-google" size={11} color="#EA4335" />
+                  <Text style={styles.googleFieldBadgeText}>Verified by Google</Text>
+                </View>
+              )}
               <Input label="Email" placeholder="you@example.com" value={formData.email}
                 onChangeText={(v) => updateField('email', v)} keyboardType="email-address"
-                autoCapitalize="none" autoComplete="email" leftIcon="mail-outline" error={errors.email} editable={!busy} />
+                autoCapitalize="none" autoComplete="email" leftIcon="mail-outline" error={errors.email}
+                editable={!busy && !googlePrefilled} />
             </View>
 
             <View style={{ marginTop: Spacing[3] }}>
@@ -206,18 +394,23 @@ export default function RegisterScreen() {
                 autoComplete="tel" leftIcon="call-outline" error={errors.phone} editable={!busy} />
             </View>
 
-            <View style={{ marginTop: Spacing[3] }}>
-              <Input label="Password" placeholder="Min. 8 characters" value={formData.password}
-                onChangeText={(v) => updateField('password', v)} secureTextEntry autoCapitalize="none"
-                autoComplete="new-password" leftIcon="lock-closed-outline" error={errors.password}
-                hint="Must be at least 8 characters" editable={!busy} />
-            </View>
+            {/* Password fields — hidden for Google sign-up (auth handled by Google) */}
+            {!googlePrefilled && (
+              <>
+                <View style={{ marginTop: Spacing[3] }}>
+                  <Input label="Password" placeholder="Min. 8 characters" value={formData.password}
+                    onChangeText={(v) => updateField('password', v)} secureTextEntry autoCapitalize="none"
+                    autoComplete="new-password" leftIcon="lock-closed-outline" error={errors.password}
+                    hint="Must be at least 8 characters" editable={!busy} />
+                </View>
 
-            <View style={{ marginTop: Spacing[3] }}>
-              <Input label="Confirm Password" placeholder="Re-enter your password" value={formData.confirmPassword}
-                onChangeText={(v) => updateField('confirmPassword', v)} secureTextEntry autoCapitalize="none"
-                leftIcon="lock-closed-outline" error={errors.confirmPassword} editable={!busy} />
-            </View>
+                <View style={{ marginTop: Spacing[3] }}>
+                  <Input label="Confirm Password" placeholder="Re-enter your password" value={formData.confirmPassword}
+                    onChangeText={(v) => updateField('confirmPassword', v)} secureTextEntry autoCapitalize="none"
+                    leftIcon="lock-closed-outline" error={errors.confirmPassword} editable={!busy} />
+                </View>
+              </>
+            )}
 
             {/* Terms checkbox */}
             <TouchableOpacity
@@ -267,21 +460,32 @@ export default function RegisterScreen() {
             {/* Divider */}
             <View style={styles.divider}>
               <View style={[styles.divLine, { backgroundColor: colors.border }]} />
-              <Text style={[styles.divLabel, { color: colors.mutedForeground }]}>or sign up with</Text>
+              <Text style={[styles.divLabel, { color: colors.mutedForeground }]}>
+                {googlePrefilled ? 'filled with Google' : 'or sign up with'}
+              </Text>
               <View style={[styles.divLine, { backgroundColor: colors.border }]} />
             </View>
 
             {/* Social buttons */}
             <View style={styles.socialRow}>
               <TouchableOpacity
-                style={[styles.socialBtn, { backgroundColor: colors.secondary, borderColor: colors.border }, busy && { opacity: 0.5 }]}
-                onPress={handleGooglePress}
-                disabled={busy}
+                style={[
+                  styles.socialBtn,
+                  {
+                    backgroundColor: googlePrefilled ? '#34A85310' : colors.secondary,
+                    borderColor: googlePrefilled ? '#34A853' : colors.border,
+                  },
+                  busy && { opacity: 0.5 },
+                ]}
+                onPress={googlePrefilled ? undefined : handleGooglePress}
+                disabled={busy || googlePrefilled}
                 activeOpacity={0.75}
               >
                 {socialLoading === 'google'
                   ? <ActivityIndicator color={colors.foreground} size="small" />
-                  : <><Ionicons name="logo-google" size={19} color="#EA4335" /><Text style={[styles.socialLabel, { color: colors.foreground }]}>Google</Text></>
+                  : googlePrefilled
+                    ? <><Ionicons name="checkmark-circle" size={19} color="#34A853" /><Text style={[styles.socialLabel, { color: '#34A853' }]}>Filled ✓</Text></>
+                    : <><Ionicons name="logo-google" size={19} color="#EA4335" /><Text style={[styles.socialLabel, { color: colors.foreground }]}>Fill with Google</Text></>
                 }
               </TouchableOpacity>
               {Platform.OS === 'ios' && (
@@ -336,7 +540,7 @@ export default function RegisterScreen() {
             </View>
             <TouchableOpacity
               style={[styles.modalBtn, { backgroundColor: colors.primary }]}
-              onPress={() => { setShowVerificationModal(false); router.replace('/(auth)/login'); }}
+              onPress={() => { setShowVerificationModal(false); router.replace({ pathname: '/(auth)/login', params: { prefillEmail: registeredEmail } }); }}
             >
               <Text style={[styles.modalBtnText, { color: colors.primaryForeground }]}>Go to Sign In</Text>
             </TouchableOpacity>
@@ -408,6 +612,18 @@ const styles = StyleSheet.create({
   },
   socialLabel: { fontSize: 14, fontWeight: '600' },
 
+  googleBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    padding: 10, borderRadius: 10, borderWidth: 1, marginBottom: Spacing[4],
+  },
+  googleBannerText: { flex: 1, fontSize: 13, fontWeight: '500' },
+
+  googleFieldBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    marginBottom: 4,
+  },
+  googleFieldBadgeText: { fontSize: 11, color: '#EA4335', fontWeight: '600' },
+
   switchRow:  { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing[4] },
   switchText: { fontSize: 14 },
   switchLink: { fontSize: 14, fontWeight: '700' },
@@ -427,6 +643,3 @@ const styles = StyleSheet.create({
   modalBtn:      { width: '100%', height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginTop: Spacing[2] },
   modalBtnText:  { fontSize: 15, fontWeight: '700' },
 });
-
-WebBrowser.maybeCompleteAuthSession();
-

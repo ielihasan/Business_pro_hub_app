@@ -66,7 +66,13 @@ export default function SettingsScreen() {
     deleteAccount,
     isLoading,
     user,
+    session,
   } = useStore();
+
+  // Google-only accounts have no password — hide the Change Password option
+  const isGoogleUser =
+    session?.user?.app_metadata?.provider === 'google' ||
+    (session?.user?.identities ?? []).some((id: any) => id.provider === 'google');
 
   // ── Language ──────────────────────────────────────────────────────────────
   const handleSelectLanguage = async (code: string) => {
@@ -198,9 +204,9 @@ export default function SettingsScreen() {
       title: 'Account & Security',
       subtitle: 'Manage your login and security preferences',
       rows: [
-        { id: 'change-password', icon: 'lock-closed-outline', iconBg: '#3B82F6', label: 'Change Password', description: 'Update your account password', type: 'link' },
-        { id: '2fa', icon: 'shield-checkmark-outline', iconBg: '#8B5CF6', label: 'Two-Factor Authentication', description: 'Extra layer of sign-in security', type: 'link' },
-        { id: 'delete-account', icon: 'trash-outline', iconBg: '#EF4444', label: 'Delete Account', description: 'Permanently remove all your data', type: 'action', destructive: true },
+        ...(!isGoogleUser ? [{ id: 'change-password', icon: 'lock-closed-outline', iconBg: '#3B82F6', label: 'Change Password', description: 'Update your account password', type: 'link' as RowType }] : []),
+        { id: '2fa', icon: 'shield-checkmark-outline', iconBg: '#8B5CF6', label: 'Two-Factor Authentication', description: 'Extra layer of sign-in security', type: 'link' as RowType },
+        { id: 'delete-account', icon: 'trash-outline', iconBg: '#EF4444', label: 'Delete Account', description: 'Permanently remove all your data', type: 'action' as RowType, destructive: true },
       ],
     },
     {

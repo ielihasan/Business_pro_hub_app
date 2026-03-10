@@ -9,11 +9,15 @@ import { supabase } from './supabase';
  * Generates a unique, fraud-resistant transaction ID.
  * Format: TXN-{USER_PREFIX}-{TIMESTAMP_BASE36}-{RANDOM4}
  * e.g. TXN-AB12CD34-LX9KM2Z-F7Q2
+ *
+ * Uses crypto.getRandomValues for a cryptographically strong random suffix.
  */
 export function generateTransactionId(userId: string): string {
   const userPrefix = userId.replace(/-/g, '').substring(0, 8).toUpperCase();
   const timestamp  = Date.now().toString(36).toUpperCase();
-  const random     = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const randomBytes = new Uint8Array(3);
+  crypto.getRandomValues(randomBytes);
+  const random = Array.from(randomBytes, b => b.toString(16).padStart(2, '0')).join('').toUpperCase().substring(0, 6);
   return `TXN-${userPrefix}-${timestamp}-${random}`;
 }
 

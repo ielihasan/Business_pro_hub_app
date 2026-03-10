@@ -43,12 +43,6 @@ export async function fetchBusinesses(opts: {
       .limit(limit),
   ]);
 
-  // Debug — remove once confirmed working
-  console.log('[fetchBusinesses] businesses count:', bizResult.data?.length, 'admins count:', adminsResult.data?.length);
-  if (bizResult.data && bizResult.data.length > 0) {
-    console.log('[fetchBusinesses] businesses columns:', Object.keys(bizResult.data[0]).join(', '));
-  }
-
   if (bizResult.error) {
     console.error('[fetchBusinesses] businesses error:', JSON.stringify(bizResult.error));
   }

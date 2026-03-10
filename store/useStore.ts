@@ -305,12 +305,11 @@ export const useStore = create<AppState>()(
         const result = await registerUser(data);
 
         if (result.success && result.user) {
+          // Sign out to prevent auto-login — user must go through the login flow
           if (result.session) {
-            const user = mapSupabaseUserToUser(result.user, { full_name: data.fullName, phone_number: data.phone });
-            set({ isAuthenticated: true, user, session: result.session, isLoading: false, authError: null });
-          } else {
-            set({ isAuthenticated: false, user: null, session: null, isLoading: false, authError: null });
+            await supabase.auth.signOut();
           }
+          set({ isAuthenticated: false, user: null, session: null, isLoading: false, authError: null });
           return { success: true };
         }
 
@@ -382,7 +381,11 @@ export const useStore = create<AppState>()(
           return { success: false, error: authError.message };
         }
         const { error: dbError } = await supabase.from('users').update({ full_name: updates.name, phone_number: updates.phone, updated_at: new Date().toISOString() }).eq('id', get().user?.id);
-        if (dbError) console.error('Error updating users table:', dbError);
+        if (dbError) {
+          console.error('Error updating users table:', dbError);
+          set({ isLoading: false });
+          return { success: false, error: dbError.message };
+        }
         if (authData.user) {
           const profile = await getUserProfile(authData.user.id);
           const updatedUser = mapSupabaseUserToUser(authData.user, profile);
@@ -395,11 +398,20 @@ export const useStore = create<AppState>()(
         set({ isLoading: true });
         try {
           const sessionUser = get().user;
-          if (!sessionUser?.email) return { success: false, error: 'User email not found' };
+          if (!sessionUser?.email) {
+            set({ isLoading: false });
+            return { success: false, error: 'User email not found' };
+          }
           const { error: signInError } = await supabase.auth.signInWithPassword({ email: sessionUser.email, password: currentPassword });
-          if (signInError) return { success: false, error: 'Current password is incorrect' };
+          if (signInError) {
+            set({ isLoading: false });
+            return { success: false, error: 'Current password is incorrect' };
+          }
           const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-          if (updateError) return { success: false, error: updateError.message };
+          if (updateError) {
+            set({ isLoading: false });
+            return { success: false, error: updateError.message };
+          }
           set({ isLoading: false });
           return { success: true };
         } catch (error: any) {
@@ -417,16 +429,19 @@ export const useStore = create<AppState>()(
           await supabase.from('queues').delete().eq('customer_id', user.id);
           // 2. Delete user profile row
           await supabase.from('users').delete().eq('id', user.id);
-          // 3. Mark auth user metadata as deleted (visible to admin)
-          await supabase.auth.updateUser({ data: { account_deleted: true, deleted_at: new Date().toISOString() } });
+          // 3. Sign out FIRST so the auth-state listener fires before we clear
+          //    local state, preventing any race between SIGNED_OUT and the clear.
+          await supabase.auth.signOut();
           // 4. Clear all local state
           set({
             isAuthenticated: false, user: null, session: null,
             activeQueues: [], queueHistory: [], orders: [],
             notifications: [], unreadCount: 0, isLoading: false,
           });
-          // 5. Sign out of Supabase session
-          await supabase.auth.signOut();
+          // NOTE: The Supabase *auth* user record (in auth.users) can only be
+          // deleted via the admin API (service-role key). That requires a
+          // Supabase Edge Function. Until one is deployed, the auth row stays
+          // but the user's profile data and session are fully removed.
           return { success: true };
         } catch (error: any) {
           set({ isLoading: false });
@@ -639,24 +654,49 @@ export const useStore = create<AppState>()(
         if (!user) return { success: false, error: 'You must be logged in to submit feedback.' };
 
         const POINTS_PER_FEEDBACK = 50;
-        const newPoints = (user.loyaltyPoints ?? 0) + POINTS_PER_FEEDBACK;
 
         try {
-          // ── 1. Save to auth.users metadata (always works, no SQL migration needed) ──
-          await supabase.auth.updateUser({
-            data: { loyalty_points: newPoints },
+          // ── 1. Atomically increment points on the server via RPC ─────────────
+          // The RPC does: UPDATE users SET loyalty_points = loyalty_points + p_points
+          //               WHERE id = auth.uid() RETURNING loyalty_points
+          // SECURITY DEFINER ensures it runs as superuser but enforces auth.uid() match,
+          // preventing any client from manipulating another user's balance.
+          //
+          // Required SQL (run once in Supabase SQL editor):
+          // CREATE OR REPLACE FUNCTION award_loyalty_points(p_user_id uuid, p_points int)
+          // RETURNS int LANGUAGE plpgsql SECURITY DEFINER AS $$
+          // DECLARE new_pts int;
+          // BEGIN
+          //   IF auth.uid() <> p_user_id THEN RAISE EXCEPTION 'Unauthorized'; END IF;
+          //   UPDATE users SET loyalty_points = coalesce(loyalty_points,0) + p_points,
+          //                    updated_at = now()
+          //   WHERE id = p_user_id RETURNING loyalty_points INTO new_pts;
+          //   RETURN new_pts;
+          // END; $$;
+          const { data: newPoints, error: rpcError } = await supabase.rpc('award_loyalty_points', {
+            p_user_id: user.id,
+            p_points: POINTS_PER_FEEDBACK,
           });
 
-          // ── 2. Try to update users table loyalty_points (works after SQL migration) ──
-          await supabase
-            .from('users')
-            .update({ loyalty_points: newPoints, updated_at: new Date().toISOString() })
-            .eq('id', user.id)
-            .then(({ error }) => {
-              if (error) console.warn('users.loyalty_points update (run migration SQL to fix):', error.message);
-            });
+          // Fall back to local calculation only if the RPC is not yet deployed
+          const resolvedPoints = (rpcError || newPoints == null)
+            ? (user.loyaltyPoints ?? 0) + POINTS_PER_FEEDBACK
+            : (newPoints as number);
 
-          // ── 3. Try to insert Feedback record (works after SQL migration) ──
+          if (rpcError) {
+            console.warn('award_loyalty_points RPC not available (deploy the SQL migration):', rpcError.message);
+            // Fallback: update auth metadata and users table directly
+            await supabase.auth.updateUser({ data: { loyalty_points: resolvedPoints } });
+            await supabase
+              .from('users')
+              .update({ loyalty_points: resolvedPoints, updated_at: new Date().toISOString() })
+              .eq('id', user.id);
+          } else {
+            // Keep auth metadata in sync with the server-computed value
+            await supabase.auth.updateUser({ data: { loyalty_points: resolvedPoints } });
+          }
+
+          // ── 2. Try to insert Feedback record ──────────────────────────────────
           await supabase.from('Feedback').insert({
             user_id: user.id,
             user_name: user.name,
@@ -670,12 +710,12 @@ export const useStore = create<AppState>()(
             if (error) console.warn('Feedback insert (run migration SQL to fix):', error.message);
           });
 
-          // ── 4. Always update local store immediately ──
+          // ── 3. Update local store ──────────────────────────────────────────────
           set((state) => ({
-            user: state.user ? { ...state.user, loyaltyPoints: newPoints } : null,
+            user: state.user ? { ...state.user, loyaltyPoints: resolvedPoints } : null,
           }));
 
-          // ── 5. In-app notification ──
+          // ── 4. In-app notification ──────────────────────────────────────────────
           const { addNotification, notificationsEnabled, promoNotificationsEnabled, soundEnabled, vibrationEnabled, unreadCount } = get();
           const notifOpts = { sound: soundEnabled, vibrate: vibrationEnabled };
           if (notificationsEnabled && promoNotificationsEnabled) {
@@ -683,12 +723,12 @@ export const useStore = create<AppState>()(
               id: `feedback-points-${Date.now()}`,
               type: 'loyalty',
               title: '⭐ Loyalty Points Earned!',
-              message: `Thanks for your feedback! You earned +${POINTS_PER_FEEDBACK} points. Total: ${newPoints} pts.`,
+              message: `Thanks for your feedback! You earned +${POINTS_PER_FEEDBACK} points. Total: ${resolvedPoints} pts.`,
               read: false,
               createdAt: new Date().toISOString(),
             });
             if (!runningInExpoGo) {
-              await notifyLoyaltyPoints(POINTS_PER_FEEDBACK, newPoints, notifOpts);
+              await notifyLoyaltyPoints(POINTS_PER_FEEDBACK, resolvedPoints, notifOpts);
               await setBadgeCount(unreadCount + 1);
             }
           }

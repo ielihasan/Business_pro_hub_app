@@ -76,7 +76,7 @@ export async function registerUser(data: RegisterData): Promise<AuthResponse> {
       email: data.email,
       phone_number: data.phone,
     }, {
-      onConflict: 'email',
+      onConflict: 'id',
       ignoreDuplicates: false,
     });
 
@@ -115,7 +115,7 @@ export async function loginUser(data: LoginData): Promise<AuthResponse> {
       let errorMessage = error.message;
 
       if (error.message === 'Invalid login credentials') {
-        errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+        errorMessage = 'GOOGLE_ONLY_ACCOUNT';
       } else if (error.message === 'Email not confirmed') {
         errorMessage = 'Please verify your email address before logging in. Check your inbox for a confirmation link.';
       }

@@ -30,7 +30,6 @@ try {
   ExpoNotifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
-      shouldShowAlert: true,
       shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: true,

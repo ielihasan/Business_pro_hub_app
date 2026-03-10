@@ -12,10 +12,12 @@ export default function OrdersScreen() {
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
 
   const orders = useStore((s) => s.orders);
+  const syncQueuesFromSupabase = useStore((s) => s.syncQueuesFromSupabase);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1500);
+    await syncQueuesFromSupabase();
+    setRefreshing(false);
   };
 
   const filteredOrders = useMemo(() => {

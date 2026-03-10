@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle, Animated } from 'react-native';
+import { View, StyleSheet, ViewStyle } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { useTheme } from '@/hooks/useTheme';
-import { BorderRadius, Spacing } from '@/constants/theme';
+import { BorderRadius } from '@/constants/theme';
 
 interface ProgressProps {
   value: number; // 0 to 100
@@ -69,39 +70,33 @@ export function CircularProgress({
   const strokeDashoffset = circumference - (clampedValue / 100) * circumference;
 
   return (
-    <View style={[styles.circularContainer, { width: size, height: size }, style]}>
-      {/* Background circle */}
-      <View
-        style={[
-          styles.circularBackground,
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            borderWidth: strokeWidth,
-            borderColor: colors.secondary,
-          },
-        ]}
-      />
-      {/* Progress indicator - simplified without SVG */}
-      <View
-        style={[
-          styles.circularProgress,
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            borderWidth: strokeWidth,
-            borderColor: colors.primary,
-            borderTopColor: 'transparent',
-            borderRightColor: clampedValue > 25 ? colors.primary : 'transparent',
-            borderBottomColor: clampedValue > 50 ? colors.primary : 'transparent',
-            borderLeftColor: clampedValue > 75 ? colors.primary : 'transparent',
-            transform: [{ rotate: '-90deg' }],
-          },
-        ]}
-      />
-      {children && <View style={styles.circularContent}>{children}</View>}
+    <View style={[{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }, style]}>
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+        {/* Track */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={colors.secondary}
+          strokeWidth={strokeWidth}
+        />
+        {/* Progress arc */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={colors.primary}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          rotation="-90"
+          origin={`${size / 2}, ${size / 2}`}
+        />
+      </Svg>
+      {children}
     </View>
   );
 }
@@ -115,21 +110,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 0,
-  },
-  circularContainer: {
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  circularBackground: {
-    position: 'absolute',
-  },
-  circularProgress: {
-    position: 'absolute',
-  },
-  circularContent: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });

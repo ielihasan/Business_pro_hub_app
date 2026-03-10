@@ -82,6 +82,7 @@ export type RootStackParamList = {
   '(auth)/login': undefined;
   '(auth)/register': undefined;
   '(auth)/forgot-password': undefined;
+  '(auth)/reset-password': undefined;
   '(tabs)': undefined;
   'business/[id]': { id: string };
   'queue/[id]': { id: string };

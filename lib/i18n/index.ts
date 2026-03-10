@@ -38,23 +38,22 @@ const LANGUAGE_DETECTOR = {
             if (storedLanguage) {
                 return callback(storedLanguage);
             }
-        } catch (error) {
-            console.log('Error reading language', error);
+        } catch {
+            // ignore read errors, fall through to locale detection
         }
 
         // Fallback if locale detection returns null or undefined
         const locale = Localization.getLocales()[0];
         const bestLanguage = locale?.languageCode ?? 'en';
 
-        console.log('Best language:', bestLanguage);
         callback(LANG_CODES.includes(bestLanguage) ? bestLanguage : 'en');
     },
     init: () => { },
     cacheUserLanguage: async (language: string) => {
         try {
             await AsyncStorage.setItem('user-language', language);
-        } catch (error) {
-            console.log('Error setting language', error);
+        } catch {
+            // ignore write errors
         }
     },
 };

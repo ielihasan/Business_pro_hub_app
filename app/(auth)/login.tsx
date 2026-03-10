@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -13,17 +13,18 @@ import {
   StatusBar,
   Dimensions,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { makeRedirectUri } from 'expo-auth-session';
 import { useTheme } from '@/hooks/useTheme';
 import { Input } from '@/components/ui';
 import { Spacing, BorderRadius } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
-import { signInWithGoogle, signInWithApple } from '@/lib/oauth';
+import { signInWithApple } from '@/lib/oauth';
+import { supabase } from '@/lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -39,25 +40,16 @@ const CHIPS = [
 
 export default function LoginScreen() {
   const { colors, isDark } = useTheme();
-  const [email, setEmail]       = useState('');
+  const { prefillEmail } = useLocalSearchParams<{ prefillEmail?: string }>();
+  const [email, setEmail]       = useState(prefillEmail ?? '');
   const [password, setPassword] = useState('');
   const [errors, setErrors]     = useState<{ email?: string; password?: string }>({});
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [socialLoading, setSocialLoading]     = useState<'google' | 'apple' | null>(null);
 
-  const { login, isLoading, authError, clearAuthError } = useStore();
+  const { login, initializeAuth, isLoading, authError, clearAuthError } = useStore();
 
-  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
-    clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
-    redirectUri: 'businesshubpro://oauth/google/callback',
-  });
 
-  useEffect(() => {
-    if (googleResponse?.type === 'success') {
-      const { id_token } = googleResponse.params;
-      if (id_token) handleGoogleSignIn(id_token);
-    }
-  }, [googleResponse]);
 
   const handleLogin = async () => {
     clearAuthError();
@@ -73,25 +65,95 @@ export default function LoginScreen() {
     else {
       if (result.error?.includes('verify your email') || result.error?.includes('Email not confirmed'))
         setShowVerifyModal(true);
+      else if (result.error === 'GOOGLE_ONLY_ACCOUNT')
+        Alert.alert(
+          'Sign-In Failed',
+          'Wrong password — or if you signed up with Google, please use the "Sign in with Google" button below instead.',
+          [{ text: 'OK' }]
+        );
       else
         Alert.alert('Login Failed', result.error || 'Invalid email or password.', [{ text: 'OK' }]);
     }
   };
 
-  const handleGoogleSignIn = async (idToken: string) => {
+  const handleGooglePress = async () => {
     setSocialLoading('google');
     try {
-      const result = await signInWithGoogle(idToken);
-      if (result.success) router.replace('/(tabs)');
-      else Alert.alert('Google Sign-In Failed', result.error || 'Please try again.');
-    } catch (e: any) { Alert.alert('Error', e.message || 'Unexpected error.'); }
-    finally { setSocialLoading(null); }
-  };
+      const redirectUri = makeRedirectUri({ scheme: 'businesshubpro', path: 'auth/callback' });
 
-  const handleGooglePress = async () => {
-    try {
-      await googlePromptAsync();
-    } catch { Alert.alert('Error', 'Failed to initiate Google sign-in.'); }
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: redirectUri, skipBrowserRedirect: true },
+      });
+
+      if (error || !data.url) {
+        setSocialLoading(null);
+        Alert.alert('Error', error?.message || 'Failed to start Google sign-in.');
+        return;
+      }
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+
+      if (result.type === 'success') {
+        // ── iOS path ────────────────────────────────────────────────────────
+        // Safari View Controller returns the URL before Expo Router can route
+        // it, so we handle the session + profile check directly here.
+        const url = result.url;
+        const [beforeHash, hashPart = ''] = url.split('#');
+        const queryPart = beforeHash.includes('?') ? beforeHash.split('?')[1] : '';
+        const hp = new URLSearchParams(hashPart);
+        const qp = new URLSearchParams(queryPart);
+        const at   = hp.get('access_token')  || qp.get('access_token');
+        const rt   = hp.get('refresh_token') || qp.get('refresh_token') || '';
+        const code = qp.get('code');
+
+        if (at) {
+          const { error: se } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
+          if (se) { setSocialLoading(null); Alert.alert('Sign-In Failed', se.message); return; }
+        } else if (code) {
+          const { error: ce } = await supabase.auth.exchangeCodeForSession(code);
+          if (ce) { setSocialLoading(null); Alert.alert('Sign-In Failed', ce.message); return; }
+        } else {
+          setSocialLoading(null);
+          Alert.alert('Sign-In Failed', 'Could not retrieve session. Please try again.');
+          return;
+        }
+
+        // Profile check
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { setSocialLoading(null); return; }
+
+        const { data: profile } = await supabase
+          .from('users').select('phone_number')
+          .eq('email', session.user.email).maybeSingle();
+
+        setSocialLoading(null);
+        if (!profile?.phone_number) {
+          await supabase.auth.signOut();
+          Alert.alert(
+            'Account Not Found',
+            'No registered account found for this Google email.\n\nPlease sign up first.',
+            [
+              { text: 'Sign Up Now', onPress: () => router.push('/(auth)/register') },
+              { text: 'Cancel', style: 'cancel' },
+            ]
+          );
+        } else {
+          await initializeAuth();
+          router.replace('/(tabs)');
+        }
+      } else {
+        // ── Android path ─────────────────────────────────────────────────────
+        // The OS intercepts the deep link and Expo Router routes it to
+        // auth/callback.tsx. That screen handles the profile check and navigates
+        // to /(tabs) or /(auth)/register automatically.
+        // Just clear the spinner here — navigation is handled externally.
+        setSocialLoading(null);
+      }
+    } catch (err: any) {
+      setSocialLoading(null);
+      Alert.alert('Error', err.message || 'Google sign-in failed.');
+    }
   };
 
   const handleAppleSignIn = async () => {

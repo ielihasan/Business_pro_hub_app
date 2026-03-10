@@ -40,7 +40,7 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [radiusKm, setRadiusKm] = useState(5);
 
-  const { businesses } = useNearbyBusinesses({
+  const { businesses, refresh: refreshBusinesses } = useNearbyBusinesses({
     radiusKm,
     category: selectedCategory,
     query: searchQuery,
@@ -48,9 +48,15 @@ export default function HomeScreen() {
 
   const activeQueue = activeQueues[0] ?? null;
 
-  const onRefresh = () => {
+  const syncQueuesFromSupabase = useStore((s) => s.syncQueuesFromSupabase);
+
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1500);
+    await Promise.all([
+      refreshBusinesses(),
+      syncQueuesFromSupabase(),
+    ]);
+    setRefreshing(false);
   };
 
   const firstName = user?.name?.split(' ')[0] ?? 'there';

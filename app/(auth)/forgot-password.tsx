@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button, Input, Card, CardContent } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { supabase } from '@/lib/supabase';
 
 export default function ForgotPasswordScreen() {
   const { colors } = useTheme();
@@ -35,18 +37,30 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     setError('');
 
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'businesshubpro://auth/callback',
+    });
+
+    setLoading(false);
+
+    if (resetError) {
+      setError(resetError.message);
+    } else {
       setSent(true);
-    }, 1500);
+    }
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-    }, 1500);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'businesshubpro://auth/callback',
+    });
+    setLoading(false);
+    if (resetError) {
+      Alert.alert('Error', resetError.message);
+    } else {
+      Alert.alert('Sent', 'A new reset link has been sent to your email.');
+    }
   };
 
   if (sent) {

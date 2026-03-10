@@ -15,6 +15,8 @@ export default function MapScreen() {
   const { locationEnabled, toggleLocation } = useStore();
   const [region, setRegion] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [businesses, setBusinesses] = useState<Array<BusinessRecord & { distanceKm: number }>>([]);
   const [radiusKm, setRadiusKm] = useState(5);
   const [adding, setAdding] = useState(false);
@@ -29,34 +31,62 @@ export default function MapScreen() {
       return;
     }
     setLoading(true);
+    setLocationError(null);
+    let unsubscribe: (() => Promise<void>) | null = null;
+
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
+          setLocationError('permission');
           setLoading(false);
           return;
         }
-        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+
+        // Try balanced accuracy first, fall back to last known position
+        let pos: Location.LocationObject | null = null;
+        try {
+          pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        } catch {
+          pos = await Location.getLastKnownPositionAsync();
+        }
+
+        if (!pos) {
+          // No GPS fix — show map at a world-level default so map still renders.
+          // A small banner below will tell the user GPS is off.
+          setLocationError('unavailable');
+          setRegion({ latitude: 30.3753, longitude: 69.3451, latitudeDelta: 40, longitudeDelta: 40 });
+          setLoading(false);
+          return;
+        }
+
         const { latitude, longitude } = pos.coords;
         setRegion({ latitude, longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 });
         const bs = await fetchBusinesses({ latitude, longitude, radiusKm });
         setBusinesses(bs);
 
-        subscribeToBusinesses(async () => {
+        unsubscribe = subscribeToBusinesses(async () => {
           const fresh = await fetchBusinesses({ latitude, longitude, radiusKm });
           setBusinesses(fresh);
         });
       } catch (err) {
         console.warn('Map load error', err);
+        setLocationError('unavailable');
       } finally {
         setLoading(false);
       }
     })();
-  }, [radiusKm, locationEnabled]);
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [radiusKm, locationEnabled, retryKey]);
 
   const handleRefresh = useCallback(() => {
     setLoading(true);
-    setTimeout(() => setLoading(false), 500);
+    setLocationError(null);
+    setRegion(null);
+    setRetryKey(k => k + 1);
   }, []);
 
   const handleSaveBusiness = useCallback(async () => {
@@ -119,19 +149,48 @@ export default function MapScreen() {
   }
 
   if (!region) {
-    return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <Ionicons name="location-outline" size={48} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
-        <Text style={[styles.disabledTitle, { color: colors.foreground }]}>Location Access Required</Text>
-        <Text style={[styles.disabledDesc, { color: colors.mutedForeground }]}>
-          Please allow location permission in your device settings.
-        </Text>
-      </View>
-    );
+    // Still loading or permission denied — show spinner or permission message
+    if (locationError === 'permission') {
+      return (
+        <View style={[styles.center, { backgroundColor: colors.background }]}>
+          <View style={[styles.disabledIconBg, { backgroundColor: isDark ? '#1C1C1E' : '#F3F4F6' }]}>
+            <Ionicons name="location-outline" size={48} color={colors.mutedForeground} />
+          </View>
+          <Text style={[styles.disabledTitle, { color: colors.foreground }]}>Location Access Required</Text>
+          <Text style={[styles.disabledDesc, { color: colors.mutedForeground }]}>
+            Please allow location permission in your device settings, then tap Retry.
+          </Text>
+          <TouchableOpacity
+            style={[styles.enableBtn, { backgroundColor: colors.primary }]}
+            onPress={() => { setLocationError(null); setLoading(true); setRegion(null); setRetryKey(k => k + 1); }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="refresh-outline" size={18} color="#fff" />
+            <Text style={styles.enableBtnText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    // Fallthrough — still waiting
+    return null;
   }
+
+  // Show map. If GPS was unavailable, show a dismissible banner at the top.
+  const showGpsBanner = locationError === 'unavailable';
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {showGpsBanner && (
+        <View style={[styles.gpsBanner, { backgroundColor: isDark ? '#2C1810' : '#FEF3C7' }]}>
+          <Ionicons name="navigate-circle-outline" size={16} color={isDark ? '#FCD34D' : '#D97706'} />
+          <Text style={[styles.gpsBannerText, { color: isDark ? '#FCD34D' : '#92400E' }]}>
+            GPS unavailable — enable Location Services for your position
+          </Text>
+          <TouchableOpacity onPress={() => { setLocationError(null); setRetryKey(k => k + 1); }}>
+            <Ionicons name="refresh-outline" size={16} color={isDark ? '#FCD34D' : '#D97706'} />
+          </TouchableOpacity>
+        </View>
+      )}
       <MapView provider={PROVIDER_GOOGLE} style={styles.map} region={region} showsUserLocation>
         <Circle
           center={{ latitude: region.latitude, longitude: region.longitude }}
@@ -176,6 +235,15 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { width, height },
+  gpsBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    zIndex: 10,
+  },
+  gpsBannerText: { flex: 1, fontSize: 12, fontWeight: '500' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
   disabledIconBg: {
     width: 96, height: 96, borderRadius: 48,

@@ -5,6 +5,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Card, CardContent, Badge, Avatar, Separator } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useTranslation } from 'react-i18next';
+import { router } from 'expo-router';
 
 interface OrderItem {
   name: string;
@@ -45,15 +46,24 @@ const formatPrice = (price: number) => `Rs. ${price.toLocaleString()}`;
 
 interface OrderCardProps {
   order: Order;
+  onPress?: () => void;
 }
 
-export function OrderCard({ order }: OrderCardProps) {
+export function OrderCard({ order, onPress }: OrderCardProps) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const statusConfig = getStatusConfig(order.status);
 
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+    } else {
+      router.push(`/business/${order.businessId}`);
+    }
+  };
+
   return (
-    <TouchableOpacity>
+    <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
       <Card style={styles.card}>
         <CardContent style={styles.content}>
           {/* Header */}

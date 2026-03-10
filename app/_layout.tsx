@@ -1,66 +1,34 @@
-import { useEffect } from 'react';
+import '@/lib/suppressWarnings'; // MUST be first — patches console before native modules fire
+import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme, View, ActivityIndicator, LogBox } from 'react-native';
+import { useColorScheme, View, ActivityIndicator } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
 import { Colors } from '@/constants/theme';
 import { useStore, setupAuthListener } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
+import { oauthState } from '@/lib/oauthState';
 import '@/lib/i18n';
-
-// ─── Silence expo-notifications Expo Go SDK 53 warning ──────────────────────
-// expo-notifications logs this at native-module init time inside Expo Go.
-// It is purely informational – remote push is intentionally unsupported there.
-// We suppress it via both LogBox (UI overlay) and console overrides (Metro CLI).
-const IGNORED_NOTIFICATION_PATTERNS = [
-  'expo-notifications: Android Push notifications',
-  'expo-notifications: Push notifications',
-  'removed from Expo Go',
-];
-
-// Suppress the red/yellow LogBox overlay
-LogBox.ignoreLogs(IGNORED_NOTIFICATION_PATTERNS);
-
-// Suppress the Metro terminal output
-(function suppressExpoNotificationsExpoGoWarning() {
-  const originalError = console.error.bind(console);
-  console.error = (...args: any[]) => {
-    const msg = args[0];
-    if (
-      typeof msg === 'string' &&
-      IGNORED_NOTIFICATION_PATTERNS.some((p) => msg.includes(p))
-    ) {
-      return; // swallow silently
-    }
-    originalError(...args);
-  };
-  const originalWarn = console.warn.bind(console);
-  console.warn = (...args: any[]) => {
-    const msg = args[0];
-    if (
-      typeof msg === 'string' &&
-      IGNORED_NOTIFICATION_PATTERNS.some((p) => msg.includes(p))
-    ) {
-      return;
-    }
-    originalWarn(...args);
-  };
-})();
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const { theme, initializeAuth, isLoading } = useStore();
+  const { theme, initializeAuth } = useStore();
   const resolvedTheme = theme ?? (colorScheme === 'dark' ? 'dark' : 'light');
   const colors = Colors[resolvedTheme];
+  // appReady gates the spinner only for the one-time startup auth check.
+  // Using isLoading from the store would unmount the nav stack whenever
+  // any store action (profile save, password change, etc.) sets isLoading:true.
+  const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
     // Initialize authentication on app start
     const initAuth = async () => {
       await initializeAuth();
+      setAppReady(true);
       // Hide splash screen after auth is initialized
       SplashScreen.hideAsync();
     };
@@ -70,7 +38,11 @@ export default function RootLayout() {
     // Setup auth state listener for real-time auth changes
     const { data: { subscription } } = setupAuthListener();
 
-    // Handle deep links for email verification
+    // Handle deep links for email verification / OAuth callbacks.
+    // IMPORTANT: do NOT call initializeAuth() here — it sets isLoading:true which
+    // unmounts the entire navigation Stack and causes index.tsx to re-run its
+    // routing effect (sending the user to /(tabs) even during registration).
+    // setupAuthListener already reacts to SIGNED_IN without touching isLoading.
     const handleDeepLink = async (event: { url: string }) => {
       const url = event.url;
 
@@ -80,15 +52,21 @@ export default function RootLayout() {
         const params = new URLSearchParams(url.split('#')[1] || url.split('?')[1]);
         const accessToken = params.get('access_token');
         const refreshToken = params.get('refresh_token');
+        const linkType = params.get('type');
+
+        // Mark password-recovery links BEFORE the async setSession so
+        // auth/callback.tsx can read the flag after its 400 ms wait.
+        if (linkType === 'recovery') {
+          oauthState.isPasswordRecovery = true;
+        }
 
         if (accessToken && refreshToken) {
           try {
+            // Establish the Supabase session; setupAuthListener handles store update.
             await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
             });
-            // Re-initialize auth to update state
-            await initializeAuth();
           } catch (error) {
             console.error('Error handling deep link auth:', error);
           }
@@ -113,8 +91,8 @@ export default function RootLayout() {
     };
   }, []);
 
-  // Show loading indicator while initializing auth
-  if (isLoading) {
+  // Show loading indicator while initializing auth for the first time
+  if (!appReady) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={colors.primary} />
