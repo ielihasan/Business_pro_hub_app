@@ -1,8 +1,22 @@
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
+import { useStore } from '@/store/useStore';
 
 export default function AuthLayout() {
   const { colors } = useTheme();
+  const { isAuthenticated, isLoading } = useStore();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace('/(tabs)');
+    }
+  }, [isAuthenticated, isLoading]);
+
+  if (!isLoading && isAuthenticated) {
+    return null;
+  }
 
   return (
     <Stack

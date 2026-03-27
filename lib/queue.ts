@@ -39,6 +39,10 @@ export interface QueueEntryRecord {
   customer_phone?: string;
   customer_email?: string;
   service_type?: string;
+  quantity?: number;
+  unit_price?: number;
+  total_price?: number;
+  total_amount?: number;
   position: number;
   status: 'waiting' | 'in_progress' | 'completed' | 'cancelled';
   priority?: string;
@@ -222,7 +226,15 @@ export async function fetchServiceById(
 export async function joinBusinessQueue(
   businessId: string,
   userId: string,
-  opts?: { customerName?: string; customerPhone?: string; customerEmail?: string; serviceType?: string }
+  opts?: {
+    customerName?: string;
+    customerPhone?: string;
+    customerEmail?: string;
+    serviceType?: string;
+    quantity?: number;
+    unitPrice?: number;
+    totalAmount?: number;
+  }
 ): Promise<{ data: QueueEntryRecord | null; error: string | null }> {
   // 1. Prevent duplicate active entry for same user + business
   const { data: existing } = await supabase
@@ -289,6 +301,44 @@ export async function joinBusinessQueue(
     .single();
 
   if (insertError) return { data: null, error: insertError.message };
+
+  // 4b. Best-effort pricing persistence into queues table.
+  // If these columns are not present in some environments, we gracefully
+  // fallback to storing pricing metadata in `notes`.
+  const quantity = opts?.quantity ?? 1;
+  const unitPrice = opts?.unitPrice ?? 0;
+  const totalAmount = opts?.totalAmount ?? unitPrice * quantity;
+
+  const pricingUpdate: Record<string, any> = {};
+  if (Number.isFinite(quantity)) pricingUpdate.quantity = quantity;
+  if (Number.isFinite(unitPrice)) pricingUpdate.unit_price = unitPrice;
+  if (Number.isFinite(totalAmount)) pricingUpdate.total_price = totalAmount;
+
+  if (Object.keys(pricingUpdate).length > 0) {
+    const { error: pricingError } = await supabase
+      .from('queues')
+      .update(pricingUpdate)
+      .eq('id', entry.id);
+
+    if (pricingError) {
+      console.warn('Queues pricing columns update failed, falling back to notes:', pricingError.message);
+
+      const pricingMeta = JSON.stringify({ quantity, unit_price: unitPrice, total_price: totalAmount });
+      const fallbackNotes = entry.notes
+        ? `${entry.notes}\npricing_meta:${pricingMeta}`
+        : `pricing_meta:${pricingMeta}`;
+
+      await supabase
+        .from('queues')
+        .update({ notes: fallbackNotes })
+        .eq('id', entry.id);
+    } else {
+      (entry as any).quantity = quantity;
+      (entry as any).unit_price = unitPrice;
+      (entry as any).total_price = totalAmount;
+      (entry as any).total_amount = totalAmount;
+    }
+  }
 
   // 5. Resolve business name for the embedded stub
   const { data: resolvedBiz } = await resolveBusinessById(businessId);

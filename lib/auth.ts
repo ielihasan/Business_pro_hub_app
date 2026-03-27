@@ -20,15 +20,127 @@ export interface LoginData {
   password: string;
 }
 
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+/**
+ * Ensure the authenticated Supabase user is mirrored in public.users.
+ * Useful for OAuth + email-confirmation flows where initial signup may not
+ * have a writable session for table insert.
+ */
+export async function syncAuthUserToUsersTable(
+  authUser: User,
+  overrides?: { fullName?: string; phone?: string }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const metadata = (authUser.user_metadata as any) || {};
+
+    const payload = {
+      id: authUser.id,
+      email: normalizeEmail(authUser.email || ''),
+      full_name: overrides?.fullName ?? metadata.full_name ?? null,
+      phone_number: overrides?.phone ?? metadata.phone_number ?? null,
+      avatar_url: metadata.avatar_url ?? null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from('users')
+      .upsert(payload, { onConflict: 'id', ignoreDuplicates: false });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('syncAuthUserToUsersTable error:', error);
+    return { success: false, error: 'Could not sync user profile.' };
+  }
+}
+
+/**
+ * Resend signup verification email
+ */
+export async function resendVerificationEmail(email: string): Promise<AuthResponse> {
+  try {
+    const normalizedEmail = normalizeEmail(email);
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: normalizedEmail,
+      options: {
+        emailRedirectTo: 'businesshubpro://auth/callback',
+      },
+    });
+
+    if (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Resend verification email error:', error);
+    return {
+      success: false,
+      error: 'Could not resend verification email. Please try again.',
+    };
+  }
+}
+
+/**
+ * Send verification link after Google register-complete step.
+ * Uses OTP magic-link as primary method because Google users are already
+ * confirmed and signup-resend may silently no-op.
+ */
+export async function sendGoogleVerificationEmail(email: string): Promise<AuthResponse> {
+  try {
+    const normalizedEmail = normalizeEmail(email);
+
+    // Primary: magic-link email for existing user (no duplicate user creation).
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email: normalizedEmail,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: 'businesshubpro://auth/callback',
+      },
+    });
+
+    if (!otpError) {
+      return { success: true };
+    }
+
+    // Fallback: try signup resend in case project has OTP disabled.
+    const resendResult = await resendVerificationEmail(normalizedEmail);
+    if (resendResult.success) {
+      return { success: true };
+    }
+
+    return {
+      success: false,
+      error: otpError.message || resendResult.error || 'Could not send verification link.',
+    };
+  } catch (error) {
+    console.error('sendGoogleVerificationEmail error:', error);
+    return {
+      success: false,
+      error: 'Could not send verification link. Please try again.',
+    };
+  }
+}
+
 /**
  * Register a new user with email and password
  * Creates both auth user and User table entry
  */
 export async function registerUser(data: RegisterData): Promise<AuthResponse> {
   try {
+    const normalizedEmail = normalizeEmail(data.email);
+
     // Step 1: Sign up with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: data.email,
+      email: normalizedEmail,
       password: data.password,
       options: {
         data: {
@@ -44,7 +156,10 @@ export async function registerUser(data: RegisterData): Promise<AuthResponse> {
       let errorMessage = authError.message;
       if (authError.message.includes('User already registered') ||
           authError.message.includes('already been registered')) {
-        errorMessage = 'This email is already registered. Please sign in or use a different email.';
+        const resend = await resendVerificationEmail(normalizedEmail);
+        errorMessage = resend.success
+          ? 'EMAIL_EXISTS_VERIFICATION_RESENT'
+          : 'This email is already registered. Please sign in or use a different email.';
       }
       return {
         success: false,
@@ -68,22 +183,16 @@ export async function registerUser(data: RegisterData): Promise<AuthResponse> {
       };
     }
 
-    // Step 2: Insert into users table (customers table)
-    // Use upsert to handle cases where the user profile already exists
-    const { error: insertError } = await supabase.from('users').upsert({
-      id: authData.user.id,
-      full_name: data.fullName,
-      email: data.email,
-      phone_number: data.phone,
-    }, {
-      onConflict: 'id',
-      ignoreDuplicates: false,
+    // Step 2: Best-effort profile sync.
+    // If email confirmation is enabled, session can be null here, so RLS may
+    // block insert. We retry this sync on login/auth-init as well.
+    const syncResult = await syncAuthUserToUsersTable(authData.user, {
+      fullName: data.fullName,
+      phone: data.phone,
     });
 
-    if (insertError) {
-      console.error('Error creating user profile:', insertError);
-      // Don't fail registration if profile creation fails
-      // The user can update their profile later
+    if (!syncResult.success) {
+      console.warn('Initial user profile sync failed:', syncResult.error);
     }
 
     return {
@@ -105,8 +214,9 @@ export async function registerUser(data: RegisterData): Promise<AuthResponse> {
  */
 export async function loginUser(data: LoginData): Promise<AuthResponse> {
   try {
+    const normalizedEmail = normalizeEmail(data.email);
     const { data: authData, error } = await supabase.auth.signInWithPassword({
-      email: data.email,
+      email: normalizedEmail,
       password: data.password,
     });
 
@@ -115,7 +225,7 @@ export async function loginUser(data: LoginData): Promise<AuthResponse> {
       let errorMessage = error.message;
 
       if (error.message === 'Invalid login credentials') {
-        errorMessage = 'GOOGLE_ONLY_ACCOUNT';
+        errorMessage = 'Invalid email or password. Please check your credentials and try again.';
       } else if (error.message === 'Email not confirmed') {
         errorMessage = 'Please verify your email address before logging in. Check your inbox for a confirmation link.';
       }
@@ -250,15 +360,24 @@ export async function updateUserProfile(
  */
 export async function resetPassword(email: string): Promise<AuthResponse> {
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'businesshubpro://reset-password',
+    const normalizedEmail = normalizeEmail(email);
+
+    const primary = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: 'businesshubpro://auth/callback',
     });
 
-    if (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
+    if (primary.error) {
+      // Fallback for projects where only reset-password deep link is allow-listed.
+      const fallback = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: 'businesshubpro://reset-password',
+      });
+
+      if (fallback.error) {
+        return {
+          success: false,
+          error: fallback.error.message || primary.error.message,
+        };
+      }
     }
 
     return {

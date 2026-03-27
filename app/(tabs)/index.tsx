@@ -21,6 +21,7 @@ import {
   RadiusFilter,
   NearbyBusinesses,
 } from '@/components/home';
+import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -39,6 +40,7 @@ export default function HomeScreen() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [radiusKm, setRadiusKm] = useState(5);
+  const [notificationsPanelVisible, setNotificationsPanelVisible] = useState(false);
 
   const { businesses, refresh: refreshBusinesses } = useNearbyBusinesses({
     radiusKm,
@@ -96,7 +98,7 @@ export default function HomeScreen() {
           </View>
           <TouchableOpacity
             style={[styles.bellBtn, { backgroundColor: isDark ? '#1E1E2E' : '#FFFFFF', borderColor: isDark ? '#2E2E40' : '#E2E8F0' }]}
-            onPress={() => router.push('/(tabs)/profile')}
+            onPress={() => setNotificationsPanelVisible(true)}
           >
             <Ionicons name="notifications-outline" size={20} color={colors.foreground} />
             {unreadCount > 0 && (
@@ -143,6 +145,11 @@ export default function HomeScreen() {
 
         <View style={{ height: Spacing[20] }} />
       </ScrollView>
+
+      <NotificationsPanel
+        visible={notificationsPanelVisible}
+        onClose={() => setNotificationsPanelVisible(false)}
+      />
     </SafeAreaView>
   );
 }

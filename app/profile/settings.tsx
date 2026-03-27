@@ -144,25 +144,24 @@ export default function SettingsScreen() {
   };
 
   const handleRateApp = () => {
-    const url = Platform.OS === 'ios'
-      ? 'https://apps.apple.com/app/id000000'
-      : 'https://play.google.com/store/apps/details?id=com.businesshubpro';
-    Linking.openURL(url).catch(() =>
-      Alert.alert('Not Available', 'App store page is not available yet.')
-    );
+    const androidPrimary = 'market://details?id=com.businesshubpro.app';
+    const androidFallback = 'https://play.google.com/store/apps/details?id=com.businesshubpro.app';
+    const iosSearch = 'https://apps.apple.com/us/search?term=BusinessHub%20Pro';
+
+    if (Platform.OS === 'android') {
+      Linking.openURL(androidPrimary)
+        .catch(() => Linking.openURL(androidFallback))
+        .catch(() => Alert.alert('Open Store Failed', 'Could not open Play Store right now.'));
+      return;
+    }
+
+    Linking.openURL(iosSearch)
+      .catch(() => Alert.alert('Open Store Failed', 'Could not open App Store right now.'));
   };
 
   const handleReportBug = () => {
     Linking.openURL('mailto:support@businesshubpro.app?subject=Bug%20Report&body=Describe%20the%20issue%20here...')
       .catch(() => Alert.alert('Email', 'Please send your report to support@businesshubpro.app'));
-  };
-
-  const handle2FA = () => {
-    Alert.alert(
-      'Two-Factor Authentication',
-      'For extra security, 2FA sends a verification code to your email whenever you sign in from a new device. This feature is being rolled out — stay tuned!',
-      [{ text: 'Got It' }]
-    );
   };
 
   const handleContactSupport = () => {
@@ -173,7 +172,6 @@ export default function SettingsScreen() {
   const handleRow = (id: string) => {
     switch (id) {
       case 'change-password':   router.push('/profile/change-password'); break;
-      case '2fa':               handle2FA(); break;
       case 'delete-account':    handleDeleteAccount(); break;
       case 'language':          setLanguageModalVisible(true); break;
       case 'dark-mode':         toggleDarkMode(); break;
@@ -205,7 +203,6 @@ export default function SettingsScreen() {
       subtitle: 'Manage your login and security preferences',
       rows: [
         ...(!isGoogleUser ? [{ id: 'change-password', icon: 'lock-closed-outline', iconBg: '#3B82F6', label: 'Change Password', description: 'Update your account password', type: 'link' as RowType }] : []),
-        { id: '2fa', icon: 'shield-checkmark-outline', iconBg: '#8B5CF6', label: 'Two-Factor Authentication', description: 'Extra layer of sign-in security', type: 'link' as RowType },
         { id: 'delete-account', icon: 'trash-outline', iconBg: '#EF4444', label: 'Delete Account', description: 'Permanently remove all your data', type: 'action' as RowType, destructive: true },
       ],
     },

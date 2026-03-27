@@ -8,6 +8,8 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  Linking,
+  Share,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,11 +34,13 @@ export default function BusinessDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
   const [loading, setLoading] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [business, setBusiness] = useState<BusinessDetail | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const joinQueueInSupabase = useStore((s) => s.joinQueueInSupabase);
+  const toggleFavorite = useStore((s) => s.toggleFavorite);
+  const favoriteBusinesses = useStore((s) => s.favoriteBusinesses);
   const isAuthenticated = useStore((s) => s.isAuthenticated);
+  const isFavorite = !!(business?.id && favoriteBusinesses.includes(business.id));
 
   useEffect(() => {
     if (!id) return;
@@ -108,19 +112,64 @@ export default function BusinessDetailScreen() {
     );
   }
 
-  const handleShare = () => {
-    // Share functionality
-    Alert.alert('Share', 'Share functionality coming soon!');
+  const handleShare = async () => {
+    const message = `Check out ${business.name} on BusinessHub Pro.`;
+    const url = `businesshubpro://business/${business.id}`;
+    try {
+      await Share.share({
+        message: `${message}\n${url}`,
+        url,
+        title: business.name,
+      });
+    } catch {
+      Alert.alert('Share Failed', 'Could not open the share sheet on this device.');
+    }
   };
 
-  const handleCall = () => {
-    // Open phone dialer
-    Alert.alert('Call', `Calling ${business.phone}`);
+  const handleCall = async () => {
+    const phoneRaw = (business.phone ?? '').trim();
+    if (!phoneRaw) {
+      Alert.alert('No Phone Number', 'This business has not provided a phone number yet.');
+      return;
+    }
+
+    const phone = phoneRaw.replace(/\s+/g, '');
+    const telUrl = `tel:${phone}`;
+    const supported = await Linking.canOpenURL(telUrl);
+    if (!supported) {
+      Alert.alert('Call Not Supported', 'This device cannot place phone calls.');
+      return;
+    }
+    await Linking.openURL(telUrl);
   };
 
-  const handleDirections = () => {
-    // Open maps
-    Alert.alert('Directions', 'Opening maps for directions...');
+  const handleDirections = async () => {
+    const hasCoords = typeof business.latitude === 'number' && typeof business.longitude === 'number';
+
+    const mapUrl = hasCoords
+      ? `https://www.google.com/maps/dir/?api=1&destination=${business.latitude},${business.longitude}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business.address || business.name)}`;
+
+    const supported = await Linking.canOpenURL(mapUrl);
+    if (!supported) {
+      Alert.alert('Directions Unavailable', 'Could not open maps on this device.');
+      return;
+    }
+    await Linking.openURL(mapUrl);
+  };
+
+  const handleWebsite = async () => {
+    const website = ((business as any).website_url || (business as any).website || (business as any).url || '').trim();
+    const target = website
+      ? (website.startsWith('http://') || website.startsWith('https://') ? website : `https://${website}`)
+      : `https://www.google.com/search?q=${encodeURIComponent(business.name)}`;
+
+    const supported = await Linking.canOpenURL(target);
+    if (!supported) {
+      Alert.alert('Website Unavailable', 'Could not open website on this device.');
+      return;
+    }
+    await Linking.openURL(target);
   };
 
   return (
@@ -139,7 +188,7 @@ export default function BusinessDetailScreen() {
           <View style={styles.heroActions}>
             <TouchableOpacity
               style={[styles.heroButton, { backgroundColor: colors.background }]}
-              onPress={() => setIsFavorite(!isFavorite)}
+              onPress={() => business?.id && toggleFavorite(business.id)}
             >
               <Ionicons
                 name={isFavorite ? 'heart' : 'heart-outline'}
@@ -256,6 +305,7 @@ export default function BusinessDetailScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.quickAction, { backgroundColor: colors.secondary }]}
+                onPress={handleWebsite}
               >
                 <Ionicons name="globe-outline" size={22} color={colors.foreground} />
                 <Text style={[styles.quickActionText, { color: colors.foreground }]}>

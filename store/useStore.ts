@@ -9,6 +9,7 @@ import {
   logoutUser,
   getCurrentSession,
   getUserProfile,
+  syncAuthUserToUsersTable,
   onAuthStateChange,
   RegisterData,
   LoginData,
@@ -167,7 +168,11 @@ interface AppState {
   leaveQueue: (queueId: string) => void;
   updateQueuePosition: (queueId: string, position: number, estimatedWait: string) => void;
   completeQueue: (queueId: string) => void;
-  joinQueueInSupabase: (businessId: string, serviceType?: string) => Promise<{ success: boolean; queueEntryId?: string; error?: string }>;
+  joinQueueInSupabase: (
+    businessId: string,
+    serviceType?: string,
+    pricing?: { quantity?: number; unitPrice?: number; totalAmount?: number }
+  ) => Promise<{ success: boolean; queueEntryId?: string; error?: string }>;
   leaveQueueInSupabase: (entryId: string) => Promise<{ success: boolean; error?: string }>;
   syncQueuesFromSupabase: () => Promise<void>;
 
@@ -269,6 +274,11 @@ export const useStore = create<AppState>()(
             return { success: false, error: 'Please verify your email address before logging in. Check your inbox for a confirmation link.' };
           }
 
+          const syncResult = await syncAuthUserToUsersTable(result.user);
+          if (!syncResult.success) {
+            console.warn('users table sync on login failed:', syncResult.error);
+          }
+
           const profile = await getUserProfile(result.user.id);
           const user = mapSupabaseUserToUser(result.user, profile);
 
@@ -339,6 +349,11 @@ export const useStore = create<AppState>()(
         try {
           const session = await getCurrentSession();
           if (session?.user && (session.user.email_confirmed_at || session.user.confirmed_at)) {
+            const syncResult = await syncAuthUserToUsersTable(session.user);
+            if (!syncResult.success) {
+              console.warn('users table sync on auth init failed:', syncResult.error);
+            }
+
             const profile = await getUserProfile(session.user.id);
             const user = mapSupabaseUserToUser(session.user, profile);
             set({ isAuthenticated: true, user, session, isLoading: false });
@@ -425,23 +440,22 @@ export const useStore = create<AppState>()(
         if (!user) return { success: false, error: 'Not authenticated' };
         set({ isLoading: true });
         try {
-          // 1. Delete all user queues
-          await supabase.from('queues').delete().eq('customer_id', user.id);
-          // 2. Delete user profile row
-          await supabase.from('users').delete().eq('id', user.id);
-          // 3. Sign out FIRST so the auth-state listener fires before we clear
-          //    local state, preventing any race between SIGNED_OUT and the clear.
+          // Strict path: delete full account (auth + public data) in one RPC.
+          // This guarantees the same email can be used again only after true delete.
+          const { error: fullDeleteRpcError } = await supabase.rpc('delete_my_account');
+          if (fullDeleteRpcError) {
+            throw new Error(fullDeleteRpcError.message || 'Failed to delete account');
+          }
+
+          // Sign out and clear local state.
           await supabase.auth.signOut();
-          // 4. Clear all local state
+
           set({
             isAuthenticated: false, user: null, session: null,
             activeQueues: [], queueHistory: [], orders: [],
             notifications: [], unreadCount: 0, isLoading: false,
           });
-          // NOTE: The Supabase *auth* user record (in auth.users) can only be
-          // deleted via the admin API (service-role key). That requires a
-          // Supabase Edge Function. Until one is deployed, the auth row stays
-          // but the user's profile data and session are fully removed.
+
           return { success: true };
         } catch (error: any) {
           set({ isLoading: false });
@@ -502,7 +516,11 @@ export const useStore = create<AppState>()(
       }),
 
       // Supabase-backed queue actions
-      joinQueueInSupabase: async (businessId: string, serviceType?: string) => {
+      joinQueueInSupabase: async (
+        businessId: string,
+        serviceType?: string,
+        pricing?: { quantity?: number; unitPrice?: number; totalAmount?: number }
+      ) => {
         const user = get().user;
         if (!user) return { success: false, error: 'Not authenticated' };
         const { data, error } = await joinBusinessQueue(businessId, user.id, {
@@ -510,6 +528,9 @@ export const useStore = create<AppState>()(
           customerEmail: user.email,
           customerPhone: user.phone,
           serviceType,
+          quantity: pricing?.quantity,
+          unitPrice: pricing?.unitPrice,
+          totalAmount: pricing?.totalAmount,
         });
         if (error || !data) return { success: false, error: error ?? 'Failed to join queue' };
         const entry: QueueEntry = {
@@ -552,14 +573,18 @@ export const useStore = create<AppState>()(
         }
 
         // Auto-create an order entry so it shows in the Orders tab
+        const quantity = pricing?.quantity ?? 1;
+        const unitPrice = pricing?.unitPrice ?? 0;
+        const totalAmount = pricing?.totalAmount ?? unitPrice * quantity;
+
         const orderEntry: Order = {
           id: `order-${data.id}`,
           businessId: businessId,
           businessName: entry.businessName,
           orderNumber: `TKT-${entry.ticketNumber}`,
           status: 'pending',
-          items: serviceType ? [{ name: serviceType, quantity: 1, price: 0 }] : [],
-          total: 0,
+          items: serviceType ? [{ name: serviceType, quantity, price: unitPrice }] : [],
+          total: totalAmount,
           createdAt: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
           paymentMethod: 'Queue',
         };
@@ -850,6 +875,11 @@ export const setupAuthListener = () => {
   return onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session?.user) {
       if (session.user.email_confirmed_at || session.user.confirmed_at) {
+        const syncResult = await syncAuthUserToUsersTable(session.user);
+        if (!syncResult.success) {
+          console.warn('users table sync on auth listener failed:', syncResult.error);
+        }
+
         const profile = await getUserProfile(session.user.id);
         const user = mapSupabaseUserToUser(session.user, profile);
         useStore.setState({ isAuthenticated: true, user, session });

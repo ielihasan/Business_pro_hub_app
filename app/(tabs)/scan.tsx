@@ -13,35 +13,118 @@ import { useStore } from '@/store/useStore';
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Parse both QR URL formats and return businessId + optional serviceType.
- *
- * Supported formats:
- *   1. http(s)://<host>/join-queue/<businessId>?queue_type=<serviceId>
- *   2. businesshubpro://join/<businessId>
- */
-function parseQrData(raw: string): { businessId: string; serviceType?: string } | null {
-  const trimmed = raw.trim();
+type ParsedQrData = {
+  businessId: string;
+  serviceType?: string;
+  unitPrice?: number;
+  raw: string;
+  payload: Record<string, string>;
+};
 
-  // Format 1 – web URL
-  if (/^https?:\/\//i.test(trimmed)) {
+const BUSINESS_ID_KEYS = ['business_id', 'businessid', 'business', 'id'];
+const SERVICE_TYPE_KEYS = ['queue_type', 'service_type', 'service_id', 'serviceid', 'service'];
+const UNIT_PRICE_KEYS = ['unit_price', 'unitprice', 'price', 'amount'];
+
+function firstMatching(payload: Record<string, string>, keys: string[]): string | undefined {
+  const lowered = Object.fromEntries(
+    Object.entries(payload).map(([k, v]) => [k.toLowerCase(), v])
+  ) as Record<string, string>;
+  for (const key of keys) {
+    const value = lowered[key];
+    if (value) return value;
+  }
+  return undefined;
+}
+
+function parsePriceValue(value?: string): number | undefined {
+  if (!value) return undefined;
+  const numeric = Number(value.replace(/[^0-9.]/g, ''));
+  if (!Number.isFinite(numeric)) return undefined;
+  if (numeric < 0) return undefined;
+  return numeric;
+}
+
+function parseQrData(raw: string): ParsedQrData | null {
+  const trimmed = raw.trim();
+  const payload: Record<string, string> = {};
+  let businessId = '';
+  let serviceType: string | undefined;
+  let unitPrice: number | undefined;
+
+  // JSON payload support: {"business_id":"...","queue_type":"...",...}
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
     try {
-      const url = new URL(trimmed);
-      // pathname: /join-queue/<businessId>
-      const match = url.pathname.match(/\/join-queue\/([^/?#]+)/i);
-      if (!match) return null;
-      const businessId = match[1];
-      const serviceType = url.searchParams.get('queue_type') ?? undefined;
-      return { businessId, serviceType };
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object') {
+        for (const [k, v] of Object.entries(parsed)) {
+          if (v == null) continue;
+          payload[k] = String(v);
+        }
+      }
+      businessId = firstMatching(payload, BUSINESS_ID_KEYS) || '';
+      serviceType = firstMatching(payload, SERVICE_TYPE_KEYS);
+      unitPrice = parsePriceValue(firstMatching(payload, UNIT_PRICE_KEYS));
+      if (businessId) {
+        return { businessId, serviceType, unitPrice, raw: trimmed, payload };
+      }
     } catch {
-      return null;
+      // Continue to other parsers
     }
   }
 
-  // Format 2 – legacy deep-link
-  if (trimmed.startsWith('businesshubpro://join/')) {
-    const businessId = trimmed.replace('businesshubpro://join/', '').split('?')[0];
-    return businessId ? { businessId } : null;
+  // URL/deeplink support
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+    try {
+      const url = new URL(trimmed);
+
+      url.searchParams.forEach((value, key) => {
+        payload[key] = value;
+      });
+
+      const joinQueueMatch = url.pathname.match(/\/join-queue\/([^/?#]+)/i);
+      const joinMatch = url.pathname.match(/\/join\/([^/?#]+)/i);
+      const pathBusinessId = joinQueueMatch?.[1] || joinMatch?.[1];
+
+      businessId =
+        pathBusinessId ||
+        firstMatching(payload, BUSINESS_ID_KEYS) ||
+        '';
+
+      serviceType = firstMatching(payload, SERVICE_TYPE_KEYS);
+      unitPrice = parsePriceValue(firstMatching(payload, UNIT_PRICE_KEYS));
+
+      if (pathBusinessId) {
+        payload.business_id = payload.business_id || pathBusinessId;
+      }
+
+      if (businessId) {
+        return { businessId, serviceType, unitPrice, raw: trimmed, payload };
+      }
+    } catch {
+      // Continue to other parsers
+    }
+  }
+
+  // Plain query string payload support: business_id=...&queue_type=...
+  if (trimmed.includes('=')) {
+    const params = new URLSearchParams(trimmed);
+    params.forEach((value, key) => {
+      payload[key] = value;
+    });
+
+    businessId = firstMatching(payload, BUSINESS_ID_KEYS) || '';
+    serviceType = firstMatching(payload, SERVICE_TYPE_KEYS);
+    unitPrice = parsePriceValue(firstMatching(payload, UNIT_PRICE_KEYS));
+
+    if (businessId) {
+      return { businessId, serviceType, unitPrice, raw: trimmed, payload };
+    }
+  }
+
+  // Raw business-id-only fallback (UUID or plain string)
+  if (trimmed.length > 0 && !trimmed.includes(' ')) {
+    payload.business_id = trimmed;
+    return { businessId: trimmed, unitPrice, raw: trimmed, payload };
   }
 
   return null;
@@ -60,11 +143,25 @@ export default function ScanScreen() {
   const [joining, setJoining] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualBusinessId, setManualBusinessId] = useState('');
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+  const [pendingJoin, setPendingJoin] = useState<{
+    businessId: string;
+    businessName: string;
+    serviceType?: string;
+    serviceName?: string;
+    unitPrice: number;
+  } | null>(null);
   const joinQueueInSupabase = useStore((s) => s.joinQueueInSupabase);
   const isAuthenticated = useStore((s) => s.isAuthenticated);
 
   // Helper function to process business ID (used by both QR scan and manual entry)
-  const processBusinessId = async (businessId: string, serviceType?: string) => {
+  const processBusinessId = async (
+    businessId: string,
+    serviceType?: string,
+    qrPayload?: Record<string, string>,
+    qrUnitPrice?: number
+  ) => {
     // 1. Validate auth
     if (!isAuthenticated) {
       Alert.alert(
@@ -103,12 +200,21 @@ export default function ScanScreen() {
 
     const biz = bizResult.data;
     const svc = svcResult.data;
+    const unitPrice = qrUnitPrice ?? (typeof svc?.price === 'number' ? svc.price : 0) ?? 0;
 
     // 3. Build confirmation message
     const lines: string[] = [];
+    if (qrPayload && Object.keys(qrPayload).length > 0) {
+      lines.push('QR Data:');
+      for (const [key, value] of Object.entries(qrPayload)) {
+        lines.push(`- ${key}: ${value}`);
+      }
+      lines.push('');
+    }
     if (biz.category) lines.push(`Type: ${biz.category}`);
     if (biz.address) lines.push(`Location: ${biz.address}`);
     if (svc) lines.push(`Service: ${svc.name}`);
+    lines.push(`Unit Price: Rs. ${unitPrice.toLocaleString()}`);
     if (svc?.estimated_duration) lines.push(`Est. wait per person: ${svc.estimated_duration} min`);
     lines.push('\nWould you like to join the queue?');
 
@@ -119,26 +225,56 @@ export default function ScanScreen() {
         { text: 'Cancel', style: 'cancel', onPress: () => setScanned(false) },
         {
           text: 'Join Queue',
-          onPress: async () => {
-            setJoining(true);
-            const result = await joinQueueInSupabase(businessId, serviceType);
-            setJoining(false);
-
-            if (!result.success || !result.queueEntryId) {
-              Alert.alert(
-                'Could Not Join',
-                result.error ?? 'An error occurred while joining the queue.',
-                [{ text: 'OK', onPress: () => setScanned(false) }]
-              );
-              return;
-            }
-
-            setScanned(false);
-            router.push(`/queue/${result.queueEntryId}`);
+          onPress: () => {
+            setPendingJoin({
+              businessId,
+              businessName: biz.name,
+              serviceType,
+              serviceName: svc?.name,
+              unitPrice,
+            });
+            setQuantity(1);
+            setShowQuantityModal(true);
           },
         },
       ]
     );
+  };
+
+  const handleConfirmJoinWithQuantity = async () => {
+    if (!pendingJoin) return;
+
+    const qty = Math.max(1, quantity);
+    const totalAmount = pendingJoin.unitPrice * qty;
+
+    setShowQuantityModal(false);
+    setJoining(true);
+
+    const result = await joinQueueInSupabase(
+      pendingJoin.businessId,
+      pendingJoin.serviceType,
+      {
+        quantity: qty,
+        unitPrice: pendingJoin.unitPrice,
+        totalAmount,
+      }
+    );
+
+    setJoining(false);
+
+    if (!result.success || !result.queueEntryId) {
+      Alert.alert(
+        'Could Not Join',
+        result.error ?? 'An error occurred while joining the queue.',
+        [{ text: 'OK', onPress: () => setScanned(false) }]
+      );
+      setPendingJoin(null);
+      return;
+    }
+
+    setPendingJoin(null);
+    setScanned(false);
+    router.push(`/queue/${result.queueEntryId}`);
   };
 
   const handleBarCodeScanned = async ({ data }: { type: string; data: string }) => {
@@ -156,8 +292,8 @@ export default function ScanScreen() {
       return;
     }
 
-    const { businessId, serviceType } = parsed;
-    await processBusinessId(businessId, serviceType);
+    const { businessId, serviceType, unitPrice, payload } = parsed;
+    await processBusinessId(businessId, serviceType, payload, unitPrice);
   };
 
   // Manual entry function
@@ -283,6 +419,94 @@ export default function ScanScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Quantity + Total Modal */}
+      <Modal
+        visible={showQuantityModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowQuantityModal(false);
+          setPendingJoin(null);
+          setScanned(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.quantityModalContent, { backgroundColor: colors.background }]}> 
+            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Select Quantity</Text>
+            <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>
+              {pendingJoin?.businessName || 'Business'}
+            </Text>
+
+            {pendingJoin?.serviceName ? (
+              <View style={[styles.serviceChip, { backgroundColor: colors.secondary }]}> 
+                <Text style={[styles.serviceChipText, { color: colors.foreground }]}>
+                  {pendingJoin.serviceName}
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={styles.qtyStepperRow}>
+              <TouchableOpacity
+                style={[styles.stepperBtn, { backgroundColor: colors.secondary }]}
+                onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+              >
+                <Text style={[styles.stepperBtnText, { color: colors.foreground }]}>-</Text>
+              </TouchableOpacity>
+
+              <View style={[styles.qtyValueBox, { borderColor: colors.border, backgroundColor: colors.card }]}> 
+                <Text style={[styles.qtyValueText, { color: colors.foreground }]}>{quantity}</Text>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.stepperBtn, { backgroundColor: colors.secondary }]}
+                onPress={() => setQuantity((q) => Math.min(99, q + 1))}
+              >
+                <Text style={[styles.stepperBtnText, { color: colors.foreground }]}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.priceSummary, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+              <View style={styles.priceRow}>
+                <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>Unit Price</Text>
+                <Text style={[styles.priceValue, { color: colors.foreground }]}>
+                  Rs. {(pendingJoin?.unitPrice ?? 0).toLocaleString()}
+                </Text>
+              </View>
+              <View style={styles.priceRow}>
+                <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>Quantity</Text>
+                <Text style={[styles.priceValue, { color: colors.foreground }]}>{quantity}</Text>
+              </View>
+              <View style={[styles.priceRow, styles.priceRowTotal]}>
+                <Text style={[styles.totalLabel, { color: colors.primary }]}>Total Amount</Text>
+                <Text style={[styles.totalValue, { color: colors.primary }]}>
+                  Rs. {((pendingJoin?.unitPrice ?? 0) * quantity).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.muted }]}
+                onPress={() => {
+                  setShowQuantityModal(false);
+                  setPendingJoin(null);
+                  setScanned(false);
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.foreground }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                onPress={handleConfirmJoinWithQuantity}
+              >
+                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>Join Queue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -337,6 +561,15 @@ const styles = StyleSheet.create({
     padding: Spacing[6],
     gap: Spacing[4],
   },
+  quantityModalContent: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: BorderRadius.LG,
+    padding: Spacing[6],
+    gap: Spacing[4],
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
   modalTitle: {
     fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.bold,
@@ -360,6 +593,79 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing[3],
     marginTop: Spacing[2],
+  },
+  serviceChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing[3],
+    paddingVertical: Spacing[2],
+    borderRadius: 999,
+  },
+  serviceChipText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '600',
+  },
+  qtyStepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing[3],
+  },
+  stepperBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperBtnText: {
+    fontSize: 28,
+    fontWeight: '700',
+    lineHeight: 30,
+  },
+  qtyValueBox: {
+    minWidth: 96,
+    height: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing[4],
+  },
+  qtyValueText: {
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  priceSummary: {
+    borderWidth: 1,
+    borderRadius: BorderRadius.DEFAULT,
+    padding: Spacing[4],
+    gap: Spacing[2],
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  priceRowTotal: {
+    marginTop: Spacing[2],
+    paddingTop: Spacing[2],
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(127,127,127,0.35)',
+  },
+  priceLabel: {
+    fontSize: Typography.fontSize.sm,
+  },
+  priceValue: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: '600',
+  },
+  totalLabel: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: '700',
+  },
+  totalValue: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
   },
   modalButton: {
     flex: 1,

@@ -25,6 +25,7 @@ import { useStore } from '@/store/useStore';
 import { signInWithApple } from '@/lib/oauth';
 import { supabase } from '@/lib/supabase';
 import { oauthState } from '@/lib/oauthState';
+import { resendVerificationEmail, sendGoogleVerificationEmail } from '@/lib/auth';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -46,6 +47,7 @@ export default function RegisterScreen() {
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [registeredEmail, setRegisteredEmail]     = useState('');
   const [socialLoading, setSocialLoading]         = useState<'google' | 'apple' | null>(null);
+  const [resendLoading, setResendLoading]         = useState(false);
   // Tracks whether Google has pre-filled name + email
   const [googlePrefilled, setGooglePrefilled]     = useState(false);
   // Stores the Google session tokens so we can restore them on form submit
@@ -166,7 +168,7 @@ export default function RegisterScreen() {
           const { data: existingProfile } = await supabase
             .from('users')
             .select('phone_number')
-            .eq('email', user.email || '')
+            .eq('id', user.id)
             .maybeSingle();
 
           if (existingProfile?.phone_number) {
@@ -231,6 +233,7 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     clearAuthError();
     if (!validateForm()) return;
+    const normalizedEmail = formData.email.trim().toLowerCase();
 
     // ── Google signup path ───────────────────────────────────────────────────
     // Save the phone number, then sign out so the user must sign in via Google
@@ -241,6 +244,27 @@ export default function RegisterScreen() {
         const { data: { session: liveSession } } = await supabase.auth.getSession();
         if (!liveSession) throw new Error('Google session expired. Please tap \'Fill with Google\' again.');
 
+        // Strict duplicate guard: if phone already exists, this account is already registered.
+        const { data: existingProfile } = await supabase
+          .from('users')
+          .select('phone_number')
+          .eq('id', liveSession.user.id)
+          .maybeSingle();
+
+        if (existingProfile?.phone_number) {
+          await supabase.auth.signOut();
+          setSocialLoading(null);
+          Alert.alert(
+            'Already Registered',
+            'This Google account is already registered. Please sign in from the login screen.',
+            [
+              { text: 'Go to Login', onPress: () => router.replace({ pathname: '/(auth)/login', params: { prefillEmail: normalizedEmail } }) },
+              { text: 'Cancel', style: 'cancel' },
+            ]
+          );
+          return;
+        }
+
         // Save / update profile row with phone number
         await supabase.from('users').upsert({
           id:           liveSession.user.id,
@@ -249,10 +273,35 @@ export default function RegisterScreen() {
           phone_number: formData.phone,
         }, { onConflict: 'id', ignoreDuplicates: false });
 
-        // Sign out so the user goes through the login flow
+        // Keep auth metadata in sync for routing fallback safety.
+        await supabase.auth.updateUser({
+          data: {
+            full_name: formData.fullName,
+            phone_number: formData.phone,
+          },
+        });
+
+        // Registration details are complete now; avoid stale register source
+        // affecting later verification callback routing.
+        oauthState.oauthSource = null;
+
+        const verificationResult = await sendGoogleVerificationEmail(normalizedEmail);
+
+        // Sign out so only verified users can proceed via email link callback.
         await supabase.auth.signOut();
         setSocialLoading(null);
-        router.replace({ pathname: '/(auth)/login', params: { prefillEmail: formData.email } });
+
+        if (!verificationResult.success) {
+          Alert.alert(
+            'Verification Email Issue',
+            `Profile was created, but verification email could not be sent right now.\n\nReason: ${verificationResult.error || 'Unknown error'}\n\nPlease try again from login screen.`
+          );
+          router.replace({ pathname: '/(auth)/login', params: { prefillEmail: normalizedEmail } });
+          return;
+        }
+
+        setRegisteredEmail(normalizedEmail);
+        setShowVerificationModal(true);
       } catch (err: any) {
         setSocialLoading(null);
         // Session expired — reset so user can try Google OAuth again
@@ -270,23 +319,81 @@ export default function RegisterScreen() {
 
     // ── Email / password signup path ─────────────────────────────────────────
     const result = await register({
-      email: formData.email,
+      email: normalizedEmail,
       password: formData.password,
       fullName: formData.fullName,
       phone: formData.phone,
     });
     if (result.success) {
-      setRegisteredEmail(formData.email);
+      const targetEmail = normalizedEmail;
+      const resendResult = await resendVerificationEmail(targetEmail);
+
+      if (!resendResult.success) {
+        Alert.alert(
+          'Verification Email Issue',
+          `Your account was created, but we could not confirm email delivery right now.\n\nReason: ${resendResult.error || 'Unknown error'}\n\nPlease use the "Resend Verification Email" button on the next screen.`
+        );
+      }
+
+      setRegisteredEmail(targetEmail);
       setShowVerificationModal(true);
     } else {
+      if (result.error === 'EMAIL_EXISTS_VERIFICATION_RESENT') {
+        Alert.alert(
+          'Account Already Exists',
+          `This email is already registered, and we have sent a fresh verification email to ${normalizedEmail}. Please verify your email, then sign in.`
+        );
+        router.replace({ pathname: '/(auth)/login', params: { prefillEmail: normalizedEmail } });
+        return;
+      }
+
       if (result.error?.includes('already registered')) {
-        Alert.alert('Email Already Registered', 'This email is already in use. Please sign in or use another email.', [
+        Alert.alert('Email Already Registered', 'This email is already in use. If it is not verified yet, we can resend the verification email now.', [
+          {
+            text: 'Resend Verification',
+            onPress: async () => {
+              const targetEmail = formData.email.trim();
+              if (!targetEmail || !/\S+@\S+\.\S+/.test(targetEmail)) {
+                Alert.alert('Missing Email', 'Please enter a valid email first.');
+                return;
+              }
+              setResendLoading(true);
+              const resendResult = await resendVerificationEmail(targetEmail);
+              setResendLoading(false);
+              if (resendResult.success) {
+                Alert.alert('Verification Sent', `A new verification email has been sent to ${targetEmail}. Check inbox and spam folder.`);
+              } else {
+                Alert.alert('Resend Failed', resendResult.error || 'Could not resend verification email right now.');
+              }
+            },
+          },
           { text: 'Sign In', onPress: () => router.push('/(auth)/login') },
           { text: 'Try Again', style: 'cancel' },
         ]);
       } else {
         Alert.alert('Registration Failed', result.error || 'Something went wrong.', [{ text: 'OK' }]);
       }
+    }
+  };
+
+  const handleResendVerification = async () => {
+    const targetEmail = registeredEmail.trim();
+    if (!targetEmail || !/\S+@\S+\.\S+/.test(targetEmail)) {
+      Alert.alert('Missing Email', 'No valid email found to resend verification.');
+      return;
+    }
+
+    setResendLoading(true);
+    const result = await resendVerificationEmail(targetEmail);
+    setResendLoading(false);
+
+    if (result.success) {
+      Alert.alert(
+        'Verification Sent',
+        `A new verification email has been sent to ${targetEmail}. Please check inbox and spam folder.`
+      );
+    } else {
+      Alert.alert('Resend Failed', result.error || 'Could not resend verification email right now.');
     }
   };
 
@@ -539,6 +646,16 @@ export default function RegisterScreen() {
               ))}
             </View>
             <TouchableOpacity
+              style={[styles.modalSecondaryBtn, { borderColor: colors.primary }, resendLoading && { opacity: 0.7 }]}
+              onPress={handleResendVerification}
+              disabled={resendLoading}
+            >
+              {resendLoading
+                ? <ActivityIndicator color={colors.primary} />
+                : <Text style={[styles.modalSecondaryBtnText, { color: colors.primary }]}>Resend Verification Email</Text>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.modalBtn, { backgroundColor: colors.primary }]}
               onPress={() => { setShowVerificationModal(false); router.replace({ pathname: '/(auth)/login', params: { prefillEmail: registeredEmail } }); }}
             >
@@ -640,6 +757,16 @@ const styles = StyleSheet.create({
   tipsBox:       { width: '100%', borderRadius: 12, padding: Spacing[4], marginVertical: Spacing[3], gap: 8 },
   tipRow:        { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tipText:       { fontSize: 13, flex: 1 },
+  modalSecondaryBtn: {
+    width: '100%',
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing[3],
+  },
+  modalSecondaryBtnText: { fontSize: 14, fontWeight: '700' },
   modalBtn:      { width: '100%', height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginTop: Spacing[2] },
   modalBtnText:  { fontSize: 15, fontWeight: '700' },
 });

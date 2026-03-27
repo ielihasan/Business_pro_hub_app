@@ -1,9 +1,12 @@
 import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Platform, View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useStore } from '@/store/useStore';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -207,6 +210,17 @@ const styles = StyleSheet.create({
 
 export default function TabLayout() {
   const { t } = useTranslation();
+  const { isAuthenticated, isLoading } = useStore();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace('/(auth)/welcome');
+    }
+  }, [isAuthenticated, isLoading]);
+
+  if (!isLoading && !isAuthenticated) {
+    return null;
+  }
 
   return (
     <Tabs

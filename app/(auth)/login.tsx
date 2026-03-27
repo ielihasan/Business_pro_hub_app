@@ -25,6 +25,7 @@ import { Spacing, BorderRadius } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
 import { signInWithApple } from '@/lib/oauth';
 import { supabase } from '@/lib/supabase';
+import { resendVerificationEmail } from '@/lib/auth';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -46,6 +47,7 @@ export default function LoginScreen() {
   const [errors, setErrors]     = useState<{ email?: string; password?: string }>({});
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [socialLoading, setSocialLoading]     = useState<'google' | 'apple' | null>(null);
+  const [resendLoading, setResendLoading]     = useState(false);
 
   const { login, initializeAuth, isLoading, authError, clearAuthError } = useStore();
 
@@ -53,24 +55,20 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     clearAuthError();
+    const normalizedEmail = email.trim().toLowerCase();
     const errs: { email?: string; password?: string } = {};
-    if (!email) errs.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(email)) errs.email = 'Enter a valid email';
+    if (!normalizedEmail) errs.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(normalizedEmail)) errs.email = 'Enter a valid email';
     if (!password) errs.password = 'Password is required';
     else if (password.length < 6) errs.password = 'Minimum 6 characters';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
-    const result = await login({ email, password });
+    setEmail(normalizedEmail);
+    const result = await login({ email: normalizedEmail, password });
     if (result.success) router.replace('/(tabs)');
     else {
       if (result.error?.includes('verify your email') || result.error?.includes('Email not confirmed'))
         setShowVerifyModal(true);
-      else if (result.error === 'GOOGLE_ONLY_ACCOUNT')
-        Alert.alert(
-          'Sign-In Failed',
-          'Wrong password — or if you signed up with Google, please use the "Sign in with Google" button below instead.',
-          [{ text: 'OK' }]
-        );
       else
         Alert.alert('Login Failed', result.error || 'Invalid email or password.', [{ text: 'OK' }]);
     }
@@ -123,9 +121,23 @@ export default function LoginScreen() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) { setSocialLoading(null); return; }
 
-        const { data: profile } = await supabase
-          .from('users').select('phone_number')
-          .eq('email', session.user.email).maybeSingle();
+        let profile: { phone_number?: string | null } | null = null;
+
+        const { data: profileById } = await supabase
+          .from('users')
+          .select('phone_number')
+          .eq('id', session.user.id)
+          .maybeSingle();
+        profile = profileById;
+
+        if (!profile && session.user.email) {
+          const { data: profileByEmail } = await supabase
+            .from('users')
+            .select('phone_number')
+            .ilike('email', session.user.email)
+            .maybeSingle();
+          profile = profileByEmail;
+        }
 
         setSocialLoading(null);
         if (!profile?.phone_number) {
@@ -164,6 +176,27 @@ export default function LoginScreen() {
       else Alert.alert('Apple Sign-In Failed', result.error || 'Please try again.');
     } catch (e: any) { Alert.alert('Error', e.message || 'Unexpected error.'); }
     finally { setSocialLoading(null); }
+  };
+
+  const handleResendVerification = async () => {
+    const targetEmail = (email || prefillEmail || '').trim().toLowerCase();
+    if (!targetEmail || !/\S+@\S+\.\S+/.test(targetEmail)) {
+      Alert.alert('Missing Email', 'Please enter your email first, then tap Resend Verification.');
+      return;
+    }
+
+    setResendLoading(true);
+    const result = await resendVerificationEmail(targetEmail);
+    setResendLoading(false);
+
+    if (result.success) {
+      Alert.alert(
+        'Verification Sent',
+        `A new verification email has been sent to ${targetEmail}. Please check inbox and spam folder.`
+      );
+    } else {
+      Alert.alert('Resend Failed', result.error || 'Could not resend verification email right now.');
+    }
   };
 
   const busy = isLoading || socialLoading !== null;
@@ -338,6 +371,16 @@ export default function LoginScreen() {
               Please verify your email before signing in. Check your inbox for the verification link.
             </Text>
             <TouchableOpacity
+              style={[styles.modalSecondaryBtn, { borderColor: colors.primary }, resendLoading && { opacity: 0.7 }]}
+              onPress={handleResendVerification}
+              disabled={resendLoading}
+            >
+              {resendLoading
+                ? <ActivityIndicator color={colors.primary} />
+                : <Text style={[styles.modalSecondaryBtnText, { color: colors.primary }]}>Resend Verification Email</Text>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.modalBtn, { backgroundColor: colors.primary }]}
               onPress={() => setShowVerifyModal(false)}
             >
@@ -455,6 +498,16 @@ const styles = StyleSheet.create({
   },
   modalTitle:   { fontSize: 20, fontWeight: '800', marginBottom: Spacing[2], textAlign: 'center' },
   modalBody:    { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: Spacing[5] },
+  modalSecondaryBtn: {
+    width: '100%',
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing[3],
+  },
+  modalSecondaryBtnText: { fontSize: 14, fontWeight: '700' },
   modalBtn:     { width: '100%', height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   modalBtnText: { fontSize: 15, fontWeight: '700' },
 });

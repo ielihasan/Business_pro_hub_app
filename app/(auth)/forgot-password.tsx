@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Button, Input, Card, CardContent } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
-import { supabase } from '@/lib/supabase';
+import { resetPassword } from '@/lib/auth';
 
 export default function ForgotPasswordScreen() {
   const { colors } = useTheme();
@@ -29,7 +29,8 @@ export default function ForgotPasswordScreen() {
       setError('Email is required');
       return;
     }
-    if (!/\S+@\S+\.\S+/.test(email)) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/\S+@\S+\.\S+/.test(normalizedEmail)) {
       setError('Please enter a valid email');
       return;
     }
@@ -37,28 +38,33 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     setError('');
 
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'businesshubpro://auth/callback',
-    });
+    const result = await resetPassword(normalizedEmail);
 
     setLoading(false);
 
-    if (resetError) {
-      setError(resetError.message);
+    if (!result.success) {
+      setError(result.error || 'Could not send reset email right now.');
     } else {
+      setEmail(normalizedEmail);
       setSent(true);
     }
   };
 
   const handleResend = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !/\S+@\S+\.\S+/.test(normalizedEmail)) {
+      Alert.alert('Missing Email', 'Please enter a valid email first.');
+      return;
+    }
+
     setLoading(true);
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'businesshubpro://auth/callback',
-    });
+    const result = await resetPassword(normalizedEmail);
     setLoading(false);
-    if (resetError) {
-      Alert.alert('Error', resetError.message);
+
+    if (!result.success) {
+      Alert.alert('Error', result.error || 'Could not resend reset email right now.');
     } else {
+      setEmail(normalizedEmail);
       Alert.alert('Sent', 'A new reset link has been sent to your email.');
     }
   };

@@ -71,30 +71,51 @@ export default function AuthCallbackScreen() {
           return;
         }
 
+        // Email verification links (signup or magiclink) should land user in app,
+        // not back on register screen.
+        const callbackType = (params.type as string | undefined) || '';
+        if (callbackType === 'signup' || callbackType === 'magiclink') {
+          oauthState.oauthSource = null;
+          await initializeAuth();
+          router.replace('/(tabs)');
+          return;
+        }
+
         // ── Step 3: Smart routing — login flow vs register flow ─────────────
         // Check the users table for an existing profile with a phone number.
         // • Has phone  → existing user who already registered → go to tabs (LOGIN)
         // • No phone   → new Google user who needs to complete registration → go to register
-        const { data: profile } = await supabase
+        let profile: { phone_number?: string | null } | null = null;
+
+        // Prefer stable id-based lookup to avoid email case/normalization mismatches.
+        const { data: profileById } = await supabase
           .from('users')
           .select('phone_number')
-          .eq('email', session.user.email || '')
+          .eq('id', session.user.id)
           .maybeSingle();
+        profile = profileById;
 
-        const source = oauthState.oauthSource;
+        // Fallback by email for legacy rows where id mapping may be missing.
+        if (!profile && session.user.email) {
+          const { data: profileByEmail } = await supabase
+            .from('users')
+            .select('phone_number')
+            .ilike('email', session.user.email)
+            .maybeSingle();
+          profile = profileByEmail;
+        }
+
         oauthState.oauthSource = null; // consume
 
-        if (source === 'register' && profile?.phone_number) {
-          // ── ALREADY REGISTERED — came from register page ─────────────────
-          // Sign out and send back to register with an error flag.
-          await supabase.auth.signOut();
-          oauthState.pendingAlreadyRegistered = session.user.email || '';
-          router.replace('/(auth)/register');
-        } else if (profile?.phone_number) {
-          // ── LOGIN FLOW ───────────────────────────────────────────────────
+        // If profile is complete, always route to app home.
+        // This avoids loops where stale source='register' sends verified users back.
+        if (profile?.phone_number) {
           await initializeAuth();
           router.replace('/(tabs)');
-        } else {
+          return;
+        }
+
+        {
           // ── REGISTER FLOW ────────────────────────────────────────────────
           // Extract name + email from Google metadata
           const meta       = session.user.user_metadata || {};
