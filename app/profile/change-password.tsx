@@ -7,9 +7,9 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
+import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +29,7 @@ export default function ChangePasswordScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [errors, setErrors] = useState({ current: '', new: '', confirm: '' });
   const [saving, setSaving] = useState(false);
+  const [dialog, setDialog] = useState<DialogConfig | null>(null);
 
   // ── Password strength ─────────────────────────────────────────────────────
   const getStrength = (pwd: string): { label: string; color: string; width: string } => {
@@ -39,11 +40,11 @@ export default function ChangePasswordScreen() {
     if (/[0-9]/.test(pwd))                        score++;
     if (/[^A-Za-z0-9]/.test(pwd))                score++;
     const map = [
-      { label: 'Very Weak', color: '#EF4444', width: '25%' },
-      { label: 'Weak',      color: '#F97316', width: '40%' },
-      { label: 'Fair',      color: '#F59E0B', width: '60%' },
-      { label: 'Strong',    color: '#10B981', width: '85%' },
-      { label: 'Very Strong', color: '#059669', width: '100%' },
+      { label: 'Very Weak',  width: '25%'  },
+      { label: 'Weak',       width: '40%'  },
+      { label: 'Fair',       width: '60%'  },
+      { label: 'Strong',     width: '85%'  },
+      { label: 'Very Strong',width: '100%' },
     ];
     return map[score] ?? map[0];
   };
@@ -89,13 +90,21 @@ export default function ChangePasswordScreen() {
     setSaving(false);
 
     if (result.success) {
-      Alert.alert(
-        'Password Changed',
-        'Your password has been updated successfully.',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
+      setDialog({
+        title: 'Password Changed',
+        message: 'Your password has been updated successfully.',
+        icon: 'checkmark-circle',
+        iconVariant: 'success',
+        actions: [{ label: 'OK', onPress: () => { setDialog(null); router.back(); } }],
+      });
     } else {
-      Alert.alert('Error', result.error ?? 'Failed to change password.');
+      setDialog({
+        title: 'Error',
+        message: result.error ?? 'Failed to change password.',
+        icon: 'alert-circle-outline',
+        iconVariant: 'destructive',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
     }
   };
 
@@ -192,9 +201,9 @@ export default function ChangePasswordScreen() {
             {newPassword.length > 0 && (
               <View style={styles.strengthWrap}>
                 <View style={[styles.strengthBarBg, { backgroundColor: colors.border }]}>
-                  <View style={[styles.strengthBarFill, { width: strength.width as any, backgroundColor: strength.color }]} />
+                  <View style={[styles.strengthBarFill, { width: strength.width as any, backgroundColor: colors.foreground }]} />
                 </View>
-                <Text style={[styles.strengthLabel, { color: strength.color }]}>{strength.label}</Text>
+                <Text style={[styles.strengthLabel, { color: colors.mutedForeground }]}>{strength.label}</Text>
               </View>
             )}
 
@@ -224,9 +233,9 @@ export default function ChangePasswordScreen() {
                 <Ionicons
                   name={req.met ? 'checkmark-circle' : 'ellipse-outline'}
                   size={16}
-                  color={req.met ? '#10B981' : colors.mutedForeground}
+                  color={req.met ? colors.foreground : colors.mutedForeground}
                 />
-                <Text style={[styles.reqText, { color: req.met ? '#10B981' : colors.mutedForeground }]}>
+                <Text style={[styles.reqText, { color: req.met ? colors.foreground : colors.mutedForeground }]}>
                   {req.label}
                 </Text>
               </View>
@@ -255,6 +264,7 @@ export default function ChangePasswordScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+      {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
     </SafeAreaView>
   );
 }

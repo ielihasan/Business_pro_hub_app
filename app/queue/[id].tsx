@@ -5,10 +5,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Animated,
   ActivityIndicator,
 } from 'react-native';
+import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -60,6 +60,7 @@ export default function QueueDetailScreen() {
   const [loading, setLoading] = useState(false);
   const [queue, setQueue] = useState<QueueEntryRecord | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<DialogConfig | null>(null);
   const leaveQueueInSupabase = useStore((s) => s.leaveQueueInSupabase);
 
   // Load queue entry from Supabase
@@ -92,27 +93,36 @@ export default function QueueDetailScreen() {
 
   const handleLeaveQueue = () => {
     if (!queue) return;
-    Alert.alert(
-      'Leave Queue',
-      'Are you sure you want to leave this queue? You will lose your position.',
-      [
-        { text: 'Cancel', style: 'cancel' },
+    setDialog({
+      title: 'Leave Queue',
+      message: 'Are you sure you want to leave this queue? You will lose your position.',
+      icon: 'exit-outline',
+      iconVariant: 'destructive',
+      actions: [
+        { label: 'Cancel', onPress: () => setDialog(null) },
         {
-          text: 'Leave Queue',
-          style: 'destructive',
+          label: 'Leave Queue',
+          variant: 'destructive',
           onPress: async () => {
+            setDialog(null);
             setLoading(true);
             const result = await leaveQueueInSupabase(queue.id);
             setLoading(false);
             if (!result.success) {
-              Alert.alert('Error', result.error ?? 'Failed to leave queue.');
+              setDialog({
+                title: 'Error',
+                message: result.error ?? 'Failed to leave queue.',
+                icon: 'alert-circle-outline',
+                iconVariant: 'destructive',
+                actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+              });
               return;
             }
             router.replace('/(tabs)/queue');
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const handleViewBusiness = () => {
@@ -353,6 +363,7 @@ export default function QueueDetailScreen() {
           <View style={{ height: Spacing[6] }} />
         </View>
       </ScrollView>
+      {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
     </SafeAreaView>
   );
 }

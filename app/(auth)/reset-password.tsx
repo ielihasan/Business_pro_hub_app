@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
+import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +23,7 @@ export default function ResetPasswordScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState({ password: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
+  const [dialog, setDialog] = useState<DialogConfig | null>(null);
 
   const validate = () => {
     const newErrors = { password: '', confirmPassword: '' };
@@ -57,7 +58,13 @@ export default function ResetPasswordScreen() {
 
     if (error) {
       setLoading(false);
-      Alert.alert('Error', error.message);
+      setDialog({
+        title: 'Error',
+        message: error.message,
+        icon: 'alert-circle-outline',
+        iconVariant: 'destructive',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
       return;
     }
 
@@ -65,11 +72,13 @@ export default function ResetPasswordScreen() {
     await supabase.auth.signOut();
     setLoading(false);
 
-    Alert.alert(
-      'Password Updated',
-      'Your password has been reset successfully. Please sign in with your new password.',
-      [{ text: 'Go to Login', onPress: () => router.replace('/(auth)/login') }]
-    );
+    setDialog({
+      title: 'Password Updated',
+      message: 'Your password has been reset successfully. Please sign in with your new password.',
+      icon: 'checkmark-circle',
+      iconVariant: 'success',
+      actions: [{ label: 'Go to Login', onPress: () => { setDialog(null); router.replace('/(auth)/login'); } }],
+    });
   };
 
   return (
@@ -152,6 +161,7 @@ export default function ResetPasswordScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+      {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
     </SafeAreaView>
   );
 }

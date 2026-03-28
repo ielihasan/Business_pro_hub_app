@@ -59,6 +59,58 @@ export async function syncAuthUserToUsersTable(
 }
 
 /**
+ * Send (or resend) a 6-digit OTP code to the given email.
+ * type='signup'  → resend the signup confirmation OTP (unconfirmed users)
+ * type='email'   → send a signInWithOtp code (existing confirmed users, e.g. Google flow)
+ */
+export async function sendVerificationOtp(
+  email: string,
+  type: 'signup' | 'email' = 'signup',
+): Promise<AuthResponse> {
+  try {
+    const normalizedEmail = normalizeEmail(email);
+    if (type === 'signup') {
+      const { error } = await supabase.auth.resend({ type: 'signup', email: normalizedEmail });
+      if (error) return { success: false, error: error.message };
+    } else {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: normalizedEmail,
+        options: { shouldCreateUser: false },
+      });
+      if (error) return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('sendVerificationOtp error:', error);
+    return { success: false, error: 'Could not send verification code. Please try again.' };
+  }
+}
+
+/**
+ * Verify the 6-digit OTP code entered by the user.
+ * type='signup' for new registration confirmations (default).
+ * type='email'  for signInWithOtp codes (e.g. Google-completed registration).
+ */
+export async function verifyEmailOtp(
+  email: string,
+  token: string,
+  type: 'signup' | 'email' = 'signup',
+): Promise<AuthResponse> {
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: normalizeEmail(email),
+      token,
+      type,
+    });
+    if (error) return { success: false, error: error.message };
+    return { success: true, user: data.user, session: data.session };
+  } catch (error) {
+    console.error('verifyEmailOtp error:', error);
+    return { success: false, error: 'Verification failed. Please try again.' };
+  }
+}
+
+/**
  * Resend signup verification email
  */
 export async function resendVerificationEmail(email: string): Promise<AuthResponse> {
@@ -67,9 +119,6 @@ export async function resendVerificationEmail(email: string): Promise<AuthRespon
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email: normalizedEmail,
-      options: {
-        emailRedirectTo: 'businesshubpro://auth/callback',
-      },
     });
 
     if (error) {
@@ -139,6 +188,8 @@ export async function registerUser(data: RegisterData): Promise<AuthResponse> {
     const normalizedEmail = normalizeEmail(data.email);
 
     // Step 1: Sign up with Supabase Auth
+    // No emailRedirectTo — with "Email OTP" enabled in Supabase Auth settings,
+    // signUp sends a 6-digit code instead of a magic link.
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: normalizedEmail,
       password: data.password,
@@ -147,7 +198,6 @@ export async function registerUser(data: RegisterData): Promise<AuthResponse> {
           full_name: data.fullName,
           phone_number: data.phone,
         },
-        emailRedirectTo: 'businesshubpro://auth/callback',
       },
     });
 

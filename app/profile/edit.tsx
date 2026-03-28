@@ -6,10 +6,10 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
 import { router } from 'expo-router';
+import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +36,7 @@ export default function EditProfileScreen() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [dialog, setDialog] = useState<DialogConfig | null>(null);
 
   const validateProfile = () => {
     let isValid = true;
@@ -107,14 +108,30 @@ export default function EditProfileScreen() {
       });
 
       if (result.success) {
-        Alert.alert(t('common.success'), t('profile.edit.success'), [
-          { text: 'OK', onPress: handleBack }
-        ]);
+        setDialog({
+          title: t('common.success'),
+          message: t('profile.edit.success'),
+          icon: 'checkmark-circle',
+          iconVariant: 'success',
+          actions: [{ label: 'OK', onPress: () => { setDialog(null); handleBack(); } }],
+        });
       } else {
-        Alert.alert(t('common.error'), result.error || t('profile.edit.error'));
+        setDialog({
+          title: t('common.error'),
+          message: result.error || t('profile.edit.error'),
+          icon: 'alert-circle-outline',
+          iconVariant: 'destructive',
+          actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+        });
       }
     } catch (error) {
-      Alert.alert(t('common.error'), 'An unexpected error occurred');
+      setDialog({
+        title: t('common.error'),
+        message: 'An unexpected error occurred',
+        icon: 'alert-circle-outline',
+        iconVariant: 'destructive',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
     }
   };
 
@@ -125,22 +142,39 @@ export default function EditProfileScreen() {
       const result = await changePassword(currentPassword, newPassword);
 
       if (result.success) {
-        Alert.alert(t('common.success'), t('profile.password.success'), [
-          {
-            text: 'OK',
+        setDialog({
+          title: t('common.success'),
+          message: t('profile.password.success'),
+          icon: 'checkmark-circle',
+          iconVariant: 'success',
+          actions: [{
+            label: 'OK',
             onPress: () => {
+              setDialog(null);
               setShowPasswordSection(false);
               setCurrentPassword('');
               setNewPassword('');
               setConfirmPassword('');
-            }
-          }
-        ]);
+            },
+          }],
+        });
       } else {
-        Alert.alert(t('common.error'), result.error || t('profile.password.error_failed'));
+        setDialog({
+          title: t('common.error'),
+          message: result.error || t('profile.password.error_failed'),
+          icon: 'alert-circle-outline',
+          iconVariant: 'destructive',
+          actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+        });
       }
     } catch (error: any) {
-      Alert.alert(t('common.error'), error.message || 'An unexpected error occurred');
+      setDialog({
+        title: t('common.error'),
+        message: error.message || 'An unexpected error occurred',
+        icon: 'alert-circle-outline',
+        iconVariant: 'destructive',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
     }
   };
 
@@ -303,6 +337,7 @@ export default function EditProfileScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
     </SafeAreaView>
   );
 }

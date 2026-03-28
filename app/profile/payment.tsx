@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   Platform,
   KeyboardAvoidingView,
   Image,
@@ -18,6 +17,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@/hooks/useTheme';
+import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { Spacing, Typography, BorderRadius } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
 import {
@@ -38,7 +38,7 @@ type Step = 'select' | 'instructions' | 'upload' | 'done';
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function PaymentScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { user } = useStore();
 
   const [step, setStep]               = useState<Step>('select');
@@ -51,16 +51,25 @@ export default function PaymentScreen() {
   const [isSaving, setIsSaving]           = useState(false);
   const [isUploading, setIsUploading]     = useState(false);
   const [openingApp, setOpeningApp]       = useState(false);
+  const [dialog, setDialog] = useState<DialogConfig | null>(null);
 
   const method = selectedId ? PAYMENT_METHODS.find(m => m.id === selectedId)! : null;
 
   // ── Step 1: Select method + amount ─────────────────────────────────────────
   const handleProceed = async () => {
-    if (!selectedId) return Alert.alert('Select Method', 'Please choose a payment method.');
+    if (!selectedId) {
+      setDialog({ title: 'Select Method', message: 'Please choose a payment method.', icon: 'card-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
+      return;
+    }
     const parsed = parseFloat(amount);
-    if (!amount || isNaN(parsed) || parsed <= 0)
-      return Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0.');
-    if (!user?.id) return Alert.alert('Not logged in', 'Please log in first.');
+    if (!amount || isNaN(parsed) || parsed <= 0) {
+      setDialog({ title: 'Invalid Amount', message: 'Please enter a valid amount greater than 0.', icon: 'alert-circle-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
+      return;
+    }
+    if (!user?.id) {
+      setDialog({ title: 'Not Logged In', message: 'Please log in first.', icon: 'log-in-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
+      return;
+    }
 
     setIsSaving(true);
     const newTxnId = generateTransactionId(user.id);
@@ -86,29 +95,37 @@ export default function PaymentScreen() {
 
   const handleCopy = (text: string) => {
     Clipboard.setStringAsync(text);
-    Alert.alert('Copied!', 'Copied to clipboard.');
+    setDialog({ title: 'Copied!', message: 'Copied to clipboard.', icon: 'checkmark-circle', iconVariant: 'success', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
   };
 
   // ── Step 3: Upload receipt ──────────────────────────────────────────────────
   const handlePickImage = useCallback(async (source: 'gallery' | 'camera') => {
     const result = source === 'gallery' ? await pickReceiptImage() : await captureReceiptCamera();
     if (!result) {
-      Alert.alert('Permission Required', `Please allow ${source === 'gallery' ? 'photo library' : 'camera'} access in Settings.`);
+      setDialog({ title: 'Permission Required', message: `Please allow ${source === 'gallery' ? 'photo library' : 'camera'} access in Settings.`, icon: 'alert-circle-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
       return;
     }
     setReceipt(result);
   }, []);
 
   const handleSubmitReceipt = async () => {
-    if (!receipt)  return Alert.alert('No Receipt', 'Please upload your payment receipt first.');
-    if (!user?.id) return Alert.alert('Not logged in', 'Please log in first.');
-    if (method?.id !== 'bank' && !externalTxnId.trim())
-      return Alert.alert('Missing Transaction ID', `Please enter the ${method?.name} Transaction ID shown on your payment confirmation.`);
+    if (!receipt) {
+      setDialog({ title: 'No Receipt', message: 'Please upload your payment receipt first.', icon: 'image-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
+      return;
+    }
+    if (!user?.id) {
+      setDialog({ title: 'Not Logged In', message: 'Please log in first.', icon: 'log-in-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
+      return;
+    }
+    if (method?.id !== 'bank' && !externalTxnId.trim()) {
+      setDialog({ title: 'Missing Transaction ID', message: `Please enter the ${method?.name} Transaction ID shown on your payment confirmation.`, icon: 'alert-circle-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
+      return;
+    }
     setIsUploading(true);
     const { receiptUrl: url, error } = await uploadReceiptAndUpdateTransaction(receipt, txnId, user.id, externalTxnId.trim() || undefined);
     setIsUploading(false);
     if (error) {
-      Alert.alert('Upload Failed', `Could not upload receipt: ${error}\n\nNote your Transaction ID and contact support.`);
+      setDialog({ title: 'Upload Failed', message: `Could not upload receipt: ${error}\n\nNote your Transaction ID and contact support.`, icon: 'alert-circle-outline', iconVariant: 'destructive', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
       return;
     }
     setReceiptUrl(url ?? '');
@@ -156,14 +173,14 @@ export default function PaymentScreen() {
           return (
             <TouchableOpacity key={m.id} activeOpacity={0.8}
               style={[styles.methodCard, {
-                backgroundColor: active ? (isDark ? m.darkBgColor : m.bgColor) : colors.card,
-                borderColor: active ? m.color : colors.border,
-                borderWidth: active ? 2 : StyleSheet.hairlineWidth,
+                backgroundColor: active ? colors.secondary : colors.card,
+                borderColor: active ? colors.foreground : colors.border,
+                borderWidth: active ? 1.5 : StyleSheet.hairlineWidth,
               }]}
               onPress={() => setSelectedId(m.id)}
             >
-              <View style={[styles.methodIcon, { backgroundColor: m.color + '22' }]}>
-                <Ionicons name={m.icon as any} size={28} color={m.color} />
+              <View style={[styles.methodIcon, { backgroundColor: colors.secondary }]}>
+                <Ionicons name={m.icon as any} size={28} color={colors.foreground} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.methodName, { color: colors.foreground }]}>{m.name}</Text>
@@ -171,15 +188,15 @@ export default function PaymentScreen() {
                   {m.id === 'bank' ? 'IBFT / Bank Transfer' : 'Mobile Wallet'}
                 </Text>
               </View>
-              <View style={[styles.radioCircle, { borderColor: active ? m.color : colors.border, backgroundColor: active ? m.color : 'transparent' }]}>
-                {active && <Ionicons name="checkmark" size={14} color="#fff" />}
+              <View style={[styles.radioCircle, { borderColor: active ? colors.foreground : colors.border, backgroundColor: active ? colors.foreground : 'transparent' }]}>
+                {active && <Ionicons name="checkmark" size={14} color={colors.background} />}
               </View>
             </TouchableOpacity>
           );
         })}
 
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground, marginTop: Spacing[6] }]}>AMOUNT (PKR)</Text>
-        <View style={[styles.amountBox, { backgroundColor: colors.card, borderColor: selectedId ? method?.color ?? colors.border : colors.border }]}>
+        <View style={[styles.amountBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.currencyLabel, { color: colors.mutedForeground }]}>Rs.</Text>
           <TextInput
             style={[styles.amountInput, { color: colors.foreground }]}
@@ -189,9 +206,9 @@ export default function PaymentScreen() {
           />
         </View>
 
-        <View style={[styles.infoBox, { backgroundColor: isDark ? '#1A2744' : '#EFF6FF', borderColor: isDark ? '#2563EB44' : '#BFDBFE' }]}>
-          <Ionicons name="shield-checkmark-outline" size={18} color="#3B82F6" />
-          <Text style={[styles.infoText, { color: isDark ? '#93C5FD' : '#1D4ED8' }]}>
+        <View style={[styles.infoBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+          <Ionicons name="shield-checkmark-outline" size={18} color={colors.foreground} />
+          <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
             A unique Transaction ID will be generated for your payment — this protects against fraud and helps us verify your receipt.
           </Text>
         </View>
@@ -221,15 +238,15 @@ export default function PaymentScreen() {
         <ScrollView contentContainerStyle={styles.content}>
 
           {/* TXN ID */}
-          <View style={[styles.txnCard, { backgroundColor: isDark ? '#111827' : '#FAFAFA', borderColor: method.color + '44' }]}>
+          <View style={[styles.txnCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.txnCardHeader}>
-              <Ionicons name="receipt-outline" size={18} color={method.color} />
-              <Text style={[styles.txnLabel, { color: method.color }]}>Your Transaction ID</Text>
+              <Ionicons name="receipt-outline" size={18} color={colors.foreground} />
+              <Text style={[styles.txnLabel, { color: colors.foreground }]}>Your Transaction ID</Text>
             </View>
             <Text style={[styles.txnId, { color: colors.foreground }]}>{txnId}</Text>
-            <TouchableOpacity style={[styles.copyBtn, { borderColor: method.color + '55' }]} onPress={() => handleCopy(txnId)} activeOpacity={0.7}>
-              <Ionicons name="copy-outline" size={15} color={method.color} />
-              <Text style={[styles.copyBtnText, { color: method.color }]}>Copy Transaction ID</Text>
+            <TouchableOpacity style={[styles.copyBtn, { borderColor: colors.border }]} onPress={() => handleCopy(txnId)} activeOpacity={0.7}>
+              <Ionicons name="copy-outline" size={15} color={colors.foreground} />
+              <Text style={[styles.copyBtnText, { color: colors.foreground }]}>Copy Transaction ID</Text>
             </TouchableOpacity>
             <Text style={[styles.txnNote, { color: colors.mutedForeground }]}>
               ⚠️ Use this ID as the payment reference/remarks. Required for verification.
@@ -237,9 +254,9 @@ export default function PaymentScreen() {
           </View>
 
           {/* Amount badge */}
-          <View style={[styles.amountBadge, { backgroundColor: method.color + '18', borderColor: method.color + '33' }]}>
-            <Text style={[styles.amountBadgeLabel, { color: method.color }]}>Amount to Pay</Text>
-            <Text style={[styles.amountBadgeValue, { color: method.color }]}>Rs. {parseFloat(amount).toLocaleString()}</Text>
+          <View style={[styles.amountBadge, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+            <Text style={[styles.amountBadgeLabel, { color: colors.mutedForeground }]}>Amount to Pay</Text>
+            <Text style={[styles.amountBadgeValue, { color: colors.foreground }]}>Rs. {parseFloat(amount).toLocaleString()}</Text>
           </View>
 
           {/* Wallet / Bank account details */}
@@ -249,10 +266,10 @@ export default function PaymentScreen() {
               ? 'Bank Account Details'
               : `Send Money to This ${method.name} Account`;
             return (
-              <View style={[styles.bankBox, { backgroundColor: colors.card, borderColor: method.color + '55', borderWidth: 1.5 }]}>
+              <View style={[styles.bankBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={styles.bankBoxHeaderRow}>
-                  <Ionicons name={method.id === 'bank' ? 'business-outline' : 'phone-portrait-outline'} size={18} color={method.color} />
-                  <Text style={[styles.bankBoxTitle, { color: method.color }]}>{title}</Text>
+                  <Ionicons name={method.id === 'bank' ? 'business-outline' : 'phone-portrait-outline'} size={18} color={colors.foreground} />
+                  <Text style={[styles.bankBoxTitle, { color: colors.foreground }]}>{title}</Text>
                 </View>
                 {details.map((d) => (
                   <View key={d.label} style={styles.bankRow}>
@@ -284,18 +301,18 @@ export default function PaymentScreen() {
           {/* Open App */}
           {method.id !== 'bank' && (
             <TouchableOpacity activeOpacity={0.85}
-              style={[styles.openAppBtn, { backgroundColor: method.color }]}
+              style={[styles.openAppBtn, { backgroundColor: colors.foreground }]}
               onPress={handleOpenApp} disabled={openingApp}
             >
-              {openingApp ? <ActivityIndicator color="#fff" /> : <>
-                <Ionicons name="phone-portrait-outline" size={20} color="#fff" />
-                <Text style={styles.openAppBtnText}>Open {method.name}</Text>
+              {openingApp ? <ActivityIndicator color={colors.background} /> : <>
+                <Ionicons name="phone-portrait-outline" size={20} color={colors.background} />
+                <Text style={[styles.openAppBtnText, { color: colors.background }]}>Open {method.name}</Text>
               </>}
             </TouchableOpacity>
           )}
 
           <TouchableOpacity activeOpacity={0.85}
-            style={[styles.proceedBtn, { backgroundColor: isDark ? '#1F2937' : '#111827', marginTop: Spacing[3] }]}
+            style={[styles.proceedBtn, { backgroundColor: colors.foreground, marginTop: Spacing[3] }]}
             onPress={() => setStep('upload')}
           >
             <Text style={styles.proceedBtnText}>I've Paid — Upload Receipt</Text>
@@ -315,17 +332,17 @@ export default function PaymentScreen() {
         {renderHeader('Upload Receipt', 'Proof of your payment')}
         {renderStepDots()}
         <ScrollView contentContainerStyle={styles.content}>
-          <View style={[styles.txnReminder, { backgroundColor: isDark ? '#1A2744' : '#EFF6FF', borderColor: method.color + '44' }]}>
+          <View style={[styles.txnReminder, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
             <Text style={[styles.txnReminderLabel, { color: colors.mutedForeground }]}>Our Transaction ID (for your reference)</Text>
-            <Text style={[styles.txnReminderValue, { color: method.color }]}>{txnId}</Text>
+            <Text style={[styles.txnReminderValue, { color: colors.foreground }]}>{txnId}</Text>
           </View>
 
           {/* External TXN ID (Easypaisa/JazzCash generated) */}
           {method.id !== 'bank' && (
-            <View style={[styles.externalTxnBox, { backgroundColor: colors.card, borderColor: method.color + '66' }]}>
+            <View style={[styles.externalTxnBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.externalTxnHeader}>
-                <Ionicons name="receipt-outline" size={18} color={method.color} />
-                <Text style={[styles.externalTxnTitle, { color: method.color }]}>
+                <Ionicons name="receipt-outline" size={18} color={colors.foreground} />
+                <Text style={[styles.externalTxnTitle, { color: colors.foreground }]}>
                   {method.name} Transaction ID *
                 </Text>
               </View>
@@ -333,7 +350,7 @@ export default function PaymentScreen() {
                 Enter the Transaction ID shown on your {method.name} payment confirmation screen or SMS.
               </Text>
               <TextInput
-                style={[styles.externalTxnInput, { color: colors.foreground, borderColor: method.color + '55', backgroundColor: isDark ? '#111827' : '#F9FAFB' }]}
+                style={[styles.externalTxnInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.secondary }]}
                 placeholder={`e.g. EP12345678 or ETP-XXXXXXXX`}
                 placeholderTextColor={colors.mutedForeground}
                 value={externalTxnId}
@@ -357,7 +374,7 @@ export default function PaymentScreen() {
             </View>
           ) : (
             <View style={styles.uploadArea}>
-              <View style={[styles.uploadPlaceholder, { backgroundColor: isDark ? '#1C1C1E' : '#F9FAFB', borderColor: colors.border }]}>
+              <View style={[styles.uploadPlaceholder, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
                 <Ionicons name="cloud-upload-outline" size={48} color={colors.mutedForeground} />
                 <Text style={[styles.uploadTitle, { color: colors.foreground }]}>Upload Receipt</Text>
                 <Text style={[styles.uploadDesc, { color: colors.mutedForeground }]}>
@@ -366,36 +383,36 @@ export default function PaymentScreen() {
               </View>
               <View style={styles.uploadBtns}>
                 <TouchableOpacity activeOpacity={0.8}
-                  style={[styles.uploadBtn, { backgroundColor: method.color + '15', borderColor: method.color + '44' }]}
+                  style={[styles.uploadBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
                   onPress={() => handlePickImage('gallery')}
                 >
-                  <Ionicons name="images-outline" size={22} color={method.color} />
-                  <Text style={[styles.uploadBtnText, { color: method.color }]}>Photo Library</Text>
+                  <Ionicons name="images-outline" size={22} color={colors.foreground} />
+                  <Text style={[styles.uploadBtnText, { color: colors.foreground }]}>Photo Library</Text>
                 </TouchableOpacity>
                 <TouchableOpacity activeOpacity={0.8}
-                  style={[styles.uploadBtn, { backgroundColor: method.color + '15', borderColor: method.color + '44' }]}
+                  style={[styles.uploadBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
                   onPress={() => handlePickImage('camera')}
                 >
-                  <Ionicons name="camera-outline" size={22} color={method.color} />
-                  <Text style={[styles.uploadBtnText, { color: method.color }]}>Camera</Text>
+                  <Ionicons name="camera-outline" size={22} color={colors.foreground} />
+                  <Text style={[styles.uploadBtnText, { color: colors.foreground }]}>Camera</Text>
                 </TouchableOpacity>
               </View>
             </View>
           )}
 
-          <View style={[styles.infoBox, { backgroundColor: isDark ? '#1A3A2A' : '#F0FFF4', borderColor: isDark ? '#16A34A44' : '#BBF7D0' }]}>
-            <Ionicons name="information-circle-outline" size={16} color="#16A34A" />
-            <Text style={[styles.infoText, { color: isDark ? '#86EFAC' : '#166534' }]}>
+          <View style={[styles.infoBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+            <Ionicons name="information-circle-outline" size={16} color={colors.foreground} />
+            <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
               Your receipt is matched against your unique Transaction ID. Mismatched or fraudulent receipts will be automatically rejected.
             </Text>
           </View>
 
           <TouchableOpacity activeOpacity={0.85}
-            style={[styles.proceedBtn, { backgroundColor: (receipt && (method.id === 'bank' || externalTxnId.trim())) ? method.color : colors.border }]}
+            style={[styles.proceedBtn, { backgroundColor: (receipt && (method.id === 'bank' || externalTxnId.trim())) ? colors.foreground : colors.border }]}
             onPress={handleSubmitReceipt} disabled={isUploading || !receipt || (method.id !== 'bank' && !externalTxnId.trim())}
           >
-            {isUploading ? <ActivityIndicator color="#fff" /> : <>
-              <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+            {isUploading ? <ActivityIndicator color={colors.background} /> : <>
+              <Ionicons name="checkmark-circle-outline" size={20} color={colors.background} />
               <Text style={styles.proceedBtnText}>Submit Receipt</Text>
             </>}
           </TouchableOpacity>
@@ -410,8 +427,8 @@ export default function PaymentScreen() {
     <>
       {renderHeader('Payment Submitted', '')}
       <ScrollView contentContainerStyle={[styles.content, styles.doneContent]}>
-        <View style={[styles.doneIcon, { backgroundColor: '#F0FFF4' }]}>
-          <Ionicons name="checkmark-circle" size={72} color="#16A34A" />
+        <View style={[styles.doneIcon, { backgroundColor: colors.secondary }]}>
+          <Ionicons name="checkmark-circle" size={72} color={colors.foreground} />
         </View>
         <Text style={[styles.doneTitle, { color: colors.foreground }]}>Receipt Submitted!</Text>
         <Text style={[styles.doneDesc, { color: colors.mutedForeground }]}>
@@ -421,17 +438,17 @@ export default function PaymentScreen() {
         <View style={[styles.doneTxnBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.doneTxnLabel, { color: colors.mutedForeground }]}>Transaction ID</Text>
           <Text style={[styles.doneTxnValue, { color: colors.foreground }]}>{txnId}</Text>
-          <View style={[styles.doneStatusBadge, { backgroundColor: '#FEF3C7' }]}>
-            <Ionicons name="time-outline" size={14} color="#92400E" />
-            <Text style={[styles.doneStatusText, { color: '#92400E' }]}>Pending Verification</Text>
+          <View style={[styles.doneStatusBadge, { backgroundColor: colors.secondary, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }]}>
+            <Ionicons name="time-outline" size={14} color={colors.mutedForeground} />
+            <Text style={[styles.doneStatusText, { color: colors.mutedForeground }]}>Pending Verification</Text>
           </View>
         </View>
 
         {receiptUrl ? <Image source={{ uri: receiptUrl }} style={styles.doneReceiptThumb} resizeMode="cover" /> : null}
 
-        <View style={[styles.infoBox, { backgroundColor: isDark ? '#1A2744' : '#EFF6FF', borderColor: isDark ? '#2563EB44' : '#BFDBFE' }]}>
-          <Ionicons name="shield-checkmark-outline" size={16} color="#3B82F6" />
-          <Text style={[styles.infoText, { color: isDark ? '#93C5FD' : '#1D4ED8' }]}>
+        <View style={[styles.infoBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+          <Ionicons name="shield-checkmark-outline" size={16} color={colors.foreground} />
+          <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
             Keep your Transaction ID ({txnId}) as proof. Contact support if verification takes more than 24 hours.
           </Text>
         </View>
@@ -456,6 +473,7 @@ export default function PaymentScreen() {
         {step === 'upload'       && renderUpload()}
         {step === 'done'         && renderDone()}
       </KeyboardAvoidingView>
+      {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
     </SafeAreaView>
   );
 }
@@ -549,7 +567,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: Spacing[2], paddingVertical: Spacing[4], borderRadius: BorderRadius.DEFAULT, marginBottom: Spacing[2],
   },
-  openAppBtnText: { color: '#fff', fontSize: Typography.fontSize.base, fontWeight: '700' },
+  openAppBtnText: { fontSize: Typography.fontSize.base, fontWeight: '700' },
 
   txnReminder: { padding: Spacing[4], borderRadius: BorderRadius.DEFAULT, borderWidth: 1, marginBottom: Spacing[4], alignItems: 'center' },
   txnReminderLabel: { fontSize: Typography.fontSize.xs, fontWeight: '700', textTransform: 'uppercase', marginBottom: 4 },

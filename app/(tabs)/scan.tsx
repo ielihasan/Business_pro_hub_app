@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Modal, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Modal, TextInput, Platform } from 'react-native';
 import { router } from 'expo-router';
+import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -155,6 +156,7 @@ export default function ScanScreen() {
   } | null>(null);
   const joinQueueInSupabase = useStore((s) => s.joinQueueInSupabase);
   const isAuthenticated = useStore((s) => s.isAuthenticated);
+  const [dialog, setDialog] = useState<DialogConfig | null>(null);
 
   // Helper function to process business ID (used by both QR scan and manual entry)
   const processBusinessId = async (
@@ -165,20 +167,16 @@ export default function ScanScreen() {
   ) => {
     // 1. Validate auth
     if (!isAuthenticated) {
-      Alert.alert(
-        'Sign In Required',
-        'Please sign in to join a queue.',
-        [
-          { text: 'Cancel', style: 'cancel', onPress: () => setScanned(false) },
-          {
-            text: 'Sign In',
-            onPress: () => {
-              setScanned(false);
-              router.push('/(auth)/login');
-            },
-          },
-        ]
-      );
+      setDialog({
+        title: 'Sign In Required',
+        message: 'Please sign in to join a queue.',
+        icon: 'log-in-outline',
+        iconVariant: 'warning',
+        actions: [
+          { label: 'Cancel', onPress: () => { setDialog(null); setScanned(false); } },
+          { label: 'Sign In', variant: 'primary', onPress: () => { setDialog(null); setScanned(false); router.push('/(auth)/login'); } },
+        ],
+      });
       return;
     }
 
@@ -191,11 +189,13 @@ export default function ScanScreen() {
     setResolving(false);
 
     if (bizResult.error || !bizResult.data) {
-      Alert.alert(
-        'Business Not Found',
-        'We could not find this business. The QR code may be outdated.',
-        [{ text: 'OK', onPress: () => setScanned(false) }]
-      );
+      setDialog({
+        title: 'Business Not Found',
+        message: 'We could not find this business. The QR code may be outdated.',
+        icon: 'alert-circle-outline',
+        iconVariant: 'destructive',
+        actions: [{ label: 'OK', onPress: () => { setDialog(null); setScanned(false); } }],
+      });
       return;
     }
 
@@ -219,14 +219,18 @@ export default function ScanScreen() {
     if (svc?.estimated_duration) lines.push(`Est. wait per person: ${svc.estimated_duration} min`);
     lines.push('\nWould you like to join the queue?');
 
-    Alert.alert(
-      `Join Queue — ${biz.name}`,
-      lines.join('\n'),
-      [
-        { text: 'Cancel', style: 'cancel', onPress: () => setScanned(false) },
+    setDialog({
+      title: `Join Queue — ${biz.name}`,
+      message: lines.join('\n'),
+      icon: 'people-outline',
+      iconVariant: 'default',
+      actions: [
+        { label: 'Cancel', onPress: () => { setDialog(null); setScanned(false); } },
         {
-          text: 'Join Queue',
+          label: 'Join Queue',
+          variant: 'primary',
           onPress: () => {
+            setDialog(null);
             setPendingJoin({
               businessId,
               businessName: biz.name,
@@ -238,8 +242,8 @@ export default function ScanScreen() {
             setShowQuantityModal(true);
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const handleConfirmJoinWithQuantity = async () => {
@@ -264,11 +268,13 @@ export default function ScanScreen() {
     setJoining(false);
 
     if (!result.success || !result.queueEntryId) {
-      Alert.alert(
-        'Could Not Join',
-        result.error ?? 'An error occurred while joining the queue.',
-        [{ text: 'OK', onPress: () => setScanned(false) }]
-      );
+      setDialog({
+        title: 'Could Not Join',
+        message: result.error ?? 'An error occurred while joining the queue.',
+        icon: 'alert-circle-outline',
+        iconVariant: 'destructive',
+        actions: [{ label: 'OK', onPress: () => { setDialog(null); setScanned(false); } }],
+      });
       setPendingJoin(null);
       return;
     }
@@ -285,11 +291,13 @@ export default function ScanScreen() {
     // Parse QR data
     const parsed = parseQrData(data);
     if (!parsed) {
-      Alert.alert(
-        'Invalid QR Code',
-        'This QR code is not a valid BusinessHub Pro queue code.',
-        [{ text: 'OK', onPress: () => setScanned(false) }]
-      );
+      setDialog({
+        title: 'Invalid QR Code',
+        message: 'This QR code is not a valid BusinessHub Pro queue code.',
+        icon: 'alert-circle-outline',
+        iconVariant: 'destructive',
+        actions: [{ label: 'OK', onPress: () => { setDialog(null); setScanned(false); } }],
+      });
       return;
     }
 
@@ -305,7 +313,13 @@ export default function ScanScreen() {
 
   const handleManualSubmit = async () => {
     if (!manualBusinessId || manualBusinessId.trim() === '') {
-      Alert.alert('Invalid Input', 'Please enter a valid business ID.');
+      setDialog({
+        title: 'Invalid Input',
+        message: 'Please enter a valid business ID.',
+        icon: 'alert-circle-outline',
+        iconVariant: 'warning',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
       return;
     }
     
@@ -415,6 +429,7 @@ export default function ScanScreen() {
             </View>
           </View>
         </Modal>
+        {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
       </SafeAreaView>
     );
   }
@@ -609,6 +624,7 @@ export default function ScanScreen() {
           </View>
         </View>
       </Modal>
+      {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
     </View>
   );
 }

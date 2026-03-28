@@ -6,12 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  Alert,
   ActivityIndicator,
   Linking,
   Share,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
@@ -41,6 +41,7 @@ export default function BusinessDetailScreen() {
   const favoriteBusinesses = useStore((s) => s.favoriteBusinesses);
   const isAuthenticated = useStore((s) => s.isAuthenticated);
   const isFavorite = !!(business?.id && favoriteBusinesses.includes(business.id));
+  const [dialog, setDialog] = useState<DialogConfig | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -60,33 +61,49 @@ export default function BusinessDetailScreen() {
     if (!business) return;
 
     if (!isAuthenticated) {
-      Alert.alert('Sign In Required', 'Please sign in to join a queue.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign In', onPress: () => router.push('/(auth)/login') },
-      ]);
+      setDialog({
+        title: 'Sign In Required',
+        message: 'Please sign in to join a queue.',
+        icon: 'log-in-outline',
+        iconVariant: 'warning',
+        actions: [
+          { label: 'Cancel', onPress: () => setDialog(null) },
+          { label: 'Sign In', variant: 'primary', onPress: () => { setDialog(null); router.push('/(auth)/login'); } },
+        ],
+      });
       return;
     }
 
-    Alert.alert(
-      `Join Queue — ${business.name}`,
-      `Current queue: ${business.queue_length} people\nEstimated wait: ${business.wait_time ?? 'N/A'}\n\nWould you like to join?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
+    setDialog({
+      title: `Join Queue`,
+      message: `${business.name}\n\nCurrent queue: ${business.queue_length} people\nEstimated wait: ${business.wait_time ?? 'N/A'}\n\nWould you like to join?`,
+      icon: 'people-outline',
+      iconVariant: 'default',
+      actions: [
+        { label: 'Cancel', onPress: () => setDialog(null) },
         {
-          text: 'Join Queue',
+          label: 'Join Queue',
+          variant: 'primary',
           onPress: async () => {
+            setDialog(null);
             setLoading(true);
             const result = await joinQueueInSupabase(business.id);
             setLoading(false);
             if (!result.success || !result.queueEntryId) {
-              Alert.alert('Could Not Join', result.error ?? 'An error occurred.');
+              setDialog({
+                title: 'Could Not Join',
+                message: result.error ?? 'An error occurred.',
+                icon: 'alert-circle-outline',
+                iconVariant: 'destructive',
+                actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+              });
               return;
             }
             router.push(`/queue/${result.queueEntryId}`);
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   // Loading / error states
@@ -122,14 +139,26 @@ export default function BusinessDetailScreen() {
         title: business.name,
       });
     } catch {
-      Alert.alert('Share Failed', 'Could not open the share sheet on this device.');
+      setDialog({
+        title: 'Share Failed',
+        message: 'Could not open the share sheet on this device.',
+        icon: 'alert-circle-outline',
+        iconVariant: 'destructive',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
     }
   };
 
   const handleCall = async () => {
     const phoneRaw = (business.phone ?? '').trim();
     if (!phoneRaw) {
-      Alert.alert('No Phone Number', 'This business has not provided a phone number yet.');
+      setDialog({
+        title: 'No Phone Number',
+        message: 'This business has not provided a phone number yet.',
+        icon: 'call-outline',
+        iconVariant: 'warning',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
       return;
     }
 
@@ -137,7 +166,13 @@ export default function BusinessDetailScreen() {
     const telUrl = `tel:${phone}`;
     const supported = await Linking.canOpenURL(telUrl);
     if (!supported) {
-      Alert.alert('Call Not Supported', 'This device cannot place phone calls.');
+      setDialog({
+        title: 'Call Not Supported',
+        message: 'This device cannot place phone calls.',
+        icon: 'alert-circle-outline',
+        iconVariant: 'destructive',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
       return;
     }
     await Linking.openURL(telUrl);
@@ -152,7 +187,13 @@ export default function BusinessDetailScreen() {
 
     const supported = await Linking.canOpenURL(mapUrl);
     if (!supported) {
-      Alert.alert('Directions Unavailable', 'Could not open maps on this device.');
+      setDialog({
+        title: 'Directions Unavailable',
+        message: 'Could not open maps on this device.',
+        icon: 'alert-circle-outline',
+        iconVariant: 'destructive',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
       return;
     }
     await Linking.openURL(mapUrl);
@@ -166,7 +207,13 @@ export default function BusinessDetailScreen() {
 
     const supported = await Linking.canOpenURL(target);
     if (!supported) {
-      Alert.alert('Website Unavailable', 'Could not open website on this device.');
+      setDialog({
+        title: 'Website Unavailable',
+        message: 'Could not open website on this device.',
+        icon: 'alert-circle-outline',
+        iconVariant: 'destructive',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
       return;
     }
     await Linking.openURL(target);
@@ -225,7 +272,7 @@ export default function BusinessDetailScreen() {
             {/* Rating & Stats */}
             <View style={styles.statsRow}>
               <View style={styles.ratingContainer}>
-                <Ionicons name="star" size={18} color="#F59E0B" />
+                <Ionicons name="star" size={18} color={colors.warning} />
                 <Text style={[styles.ratingText, { color: colors.foreground }]}>
                   {business.rating ?? 'N/A'}
                 </Text>
@@ -370,6 +417,7 @@ export default function BusinessDetailScreen() {
           <View style={{ height: Spacing[6] }} />
         </View>
       </ScrollView>
+      {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
     </SafeAreaView>
   );
 }

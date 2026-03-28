@@ -3,114 +3,77 @@ import { useEffect } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { Platform, View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { Platform, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useStore } from '@/store/useStore';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
-const ACCENT = '#6366F1';
-const { width } = Dimensions.get('window');
-
-const TAB_ICONS: Record<string, { focused: IconName; outline: IconName }> = {
-  queue:   { focused: 'list',    outline: 'list-outline' },
-  map:     { focused: 'map',     outline: 'map-outline' },
-  index:   { focused: 'home',    outline: 'home-outline' },
-  orders:  { focused: 'receipt', outline: 'receipt-outline' },
-  profile: { focused: 'person',  outline: 'person-outline' },
+const TAB_CONFIG: Record<string, { filled: IconName; outline: IconName; label: string }> = {
+  queue:   { filled: 'hourglass',  outline: 'hourglass-outline', label: 'Queue'   },
+  map:     { filled: 'search',      outline: 'search-outline',    label: 'Discover'},
+  index:   { filled: 'home',        outline: 'home-outline',      label: 'Home'    },
+  orders:  { filled: 'receipt',    outline: 'receipt-outline',   label: 'Orders'  },
+  profile: { filled: 'person',     outline: 'person-outline',    label: 'Profile' },
 };
 
-const TAB_LABELS: Record<string, string> = {
-  queue:   'Queue',
-  map:     'Map',
-  index:   'Home',
-  orders:  'Orders',
-  profile: 'Profile',
-};
+const BAR_H = 64;
 
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-  const { colors, isDark } = useTheme();
+  const { isDark }  = useTheme();
+  const insets      = useSafeAreaInsets();
+  const bottomInset = insets.bottom;
 
-  const bgColor     = isDark ? '#16163A' : '#FFFFFF';
-  const shadowColor = isDark ? '#000000' : '#6366F1';
+  const BAR_BG     = isDark ? 'rgba(10,10,10,0.96)'      : 'rgba(255,255,255,0.96)';
+  const BORDER_CLR = isDark ? 'rgba(255,255,255,0.12)'   : 'rgba(0,0,0,0.10)';
+  const ACTIVE_CLR = isDark ? '#ffffff'                  : '#000000';
+  const MUTED_CLR  = isDark ? 'rgba(255,255,255,0.32)'   : 'rgba(0,0,0,0.25)';
+  const CENTER_BG  = isDark ? '#ffffff'                  : '#000000';
+  const CENTER_ICO = isDark ? '#000000'                  : '#ffffff';
+  const RING_CLR   = isDark ? 'rgba(255,255,255,0.15)'   : 'rgba(0,0,0,0.10)';
 
   return (
-    <View style={[styles.wrapper, { paddingBottom: Platform.OS === 'ios' ? 26 : 10 }]}>
-      {/* Floating pill bar */}
-      <View style={[styles.bar, { backgroundColor: bgColor, shadowColor }]}>
+    <View style={[styles.wrapper, { paddingBottom: bottomInset }]}>
+      <View style={[styles.bar, { backgroundColor: BAR_BG, borderTopColor: BORDER_CLR, height: BAR_H + (bottomInset > 0 ? 0 : 4) }]}>
         {state.routes.map((route, index) => {
-          const icons = TAB_ICONS[route.name];
-          if (!icons) return null; // skip hidden tabs (scan)
+          const cfg = TAB_CONFIG[route.name];
+          if (!cfg) return null;
 
-          const focused = state.index === index;
-          const isHome  = route.name === 'index';
-          const label   = TAB_LABELS[route.name] ?? route.name;
+          const focused  = state.index === index;
+          const isCenter = route.name === 'index';
 
           const onPress = () => {
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
-            if (!focused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
+            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
           };
 
-          /* ── Center Home button ── */
-          if (isHome) {
+          if (isCenter) {
             return (
-              <TouchableOpacity
-                key={route.key}
-                onPress={onPress}
-                style={styles.centerWrapper}
-                activeOpacity={0.85}
-              >
-                {/* Outer glow ring */}
-                <View style={[
-                  styles.homeRing,
-                  { borderColor: focused ? ACCENT + '55' : 'transparent' },
-                ]}>
-                  <View style={[styles.homeCircle, { shadowColor: ACCENT }]}>
-                    <Ionicons name={icons.focused} size={26} color="#FFF" />
+              <TouchableOpacity key={route.key} onPress={onPress} style={styles.centerWrap} activeOpacity={0.82}>
+                {/* Outer ring */}
+                <View style={[styles.centerRing, { borderColor: RING_CLR, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+                  <View style={[styles.centerCircle, { backgroundColor: CENTER_BG }]}>
+                    <Ionicons name={focused ? cfg.filled : cfg.outline} size={24} color={CENTER_ICO} />
                   </View>
                 </View>
-                <Text style={[styles.homeLabel, { color: ACCENT }]}>{label}</Text>
+                <Text style={[styles.centerLabel, { color: focused ? ACTIVE_CLR : MUTED_CLR }]}>
+                  {cfg.label}
+                </Text>
               </TouchableOpacity>
             );
           }
 
-          /* ── Regular tab ── */
           return (
-            <TouchableOpacity
-              key={route.key}
-              onPress={onPress}
-              style={styles.tab}
-              activeOpacity={0.7}
-            >
-              {/* Pill bubble behind icon when active */}
-              <View style={[
-                styles.iconBubble,
-                focused && { backgroundColor: ACCENT + '1A' },
-              ]}>
-                <Ionicons
-                  name={focused ? icons.focused : icons.outline}
-                  size={22}
-                  color={focused ? ACCENT : colors.mutedForeground}
-                />
-                {/* Active dot */}
-                {focused && <View style={styles.activeDot} />}
-              </View>
-              <Text
-                style={[
-                  styles.tabLabel,
-                  { color: focused ? ACCENT : colors.mutedForeground },
-                  focused && styles.tabLabelActive,
-                ]}
-                numberOfLines={1}
-              >
-                {label}
+            <TouchableOpacity key={route.key} onPress={onPress} style={styles.tab} activeOpacity={0.65}>
+              <Ionicons
+                name={focused ? cfg.filled : cfg.outline}
+                size={21}
+                color={focused ? ACTIVE_CLR : MUTED_CLR}
+              />
+              <Text style={[styles.tabLabel, { color: focused ? ACTIVE_CLR : MUTED_CLR }, focused && styles.tabLabelActive]}>
+                {cfg.label}
               </Text>
             </TouchableOpacity>
           );
@@ -120,96 +83,54 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   );
 }
 
-const BAR_HEIGHT = 62;
-
 const styles = StyleSheet.create({
-  wrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
+  wrapper: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   bar: {
     flexDirection: 'row',
-    width: '100%',
-    height: BAR_HEIGHT,
-    borderRadius: 32,
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 16,
+    alignItems: 'flex-end',
+    paddingBottom: 10,
+    borderTopWidth: 1,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'visible',
   },
+
   tab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: BAR_HEIGHT,
-    gap: 2,
+    flex: 1, alignItems: 'center', justifyContent: 'flex-end',
+    gap: 3, paddingBottom: 2,
   },
-  iconBubble: {
-    width: 44,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
+  tabLabel:       { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  tabLabelActive: { fontWeight: '800' },
+
+  centerWrap: {
+    flex: 1, alignItems: 'center', justifyContent: 'flex-end',
+    gap: 4, paddingBottom: 2,
   },
-  activeDot: {
-    position: 'absolute',
-    bottom: 2,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: ACCENT,
+  centerRing: {
+    width: 66, height: 66, borderRadius: 33,
+    borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center',
+    marginTop: -34,
   },
-  tabLabel: {
-    fontSize: 10,
-    fontWeight: '500',
+  centerCircle: {
+    width: 54, height: 54, borderRadius: 27,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 10,
   },
-  tabLabelActive: {
-    fontWeight: '700',
-  },
-  /* Center home */
-  centerWrapper: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: BAR_HEIGHT,
-    gap: 2,
-  },
-  homeRing: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-    marginTop: -28, // lifts the circle above the bar
-  },
-  homeCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: ACCENT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 14,
-    elevation: 12,
-  },
-  homeLabel: {
-    fontSize: 10,
-    fontWeight: '700',
+  centerLabel: {
+    fontSize: 9, fontWeight: '800',
+    textTransform: 'uppercase', letterSpacing: 0.5,
   },
 });
 
 export default function TabLayout() {
-  const { t } = useTranslation();
+  const { t }      = useTranslation();
+  const insets     = useSafeAreaInsets();
+  const { colors } = useTheme();
   const { isAuthenticated, isLoading } = useStore();
 
   useEffect(() => {
@@ -218,26 +139,23 @@ export default function TabLayout() {
     }
   }, [isAuthenticated, isLoading]);
 
-  if (!isLoading && !isAuthenticated) {
-    return null;
-  }
+
+  if (!isLoading && !isAuthenticated) return null;
+
+  // Scene bottom padding = bar height + bottom safe inset + buffer for floating button ring
+  const BOTTOM_PAD = BAR_H + insets.bottom + 24;
 
   return (
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-        // Leave extra room at the bottom so content isn't hidden under the floating bar
-        sceneStyle: { paddingBottom: Platform.OS === 'ios' ? 110 : 90 },
-      }}
+      screenOptions={{ headerShown: false, sceneStyle: { paddingBottom: BOTTOM_PAD, backgroundColor: colors.background } }}
     >
-      <Tabs.Screen name="queue"   options={{ title: t('tabs.queue') }} />
-      <Tabs.Screen name="map"     options={{ title: t('tabs.map') }} />
-      <Tabs.Screen name="index"   options={{ title: t('tabs.home') }} />
-      <Tabs.Screen name="orders"  options={{ title: t('tabs.orders') }} />
+      <Tabs.Screen name="queue"   options={{ title: t('tabs.queue')   }} />
+      <Tabs.Screen name="map"     options={{ title: t('tabs.map')     }} />
+      <Tabs.Screen name="index"   options={{ title: t('tabs.home')    }} />
+      <Tabs.Screen name="orders"  options={{ title: t('tabs.orders')  }} />
       <Tabs.Screen name="profile" options={{ title: t('tabs.profile') }} />
       <Tabs.Screen name="scan"    options={{ title: t('tabs.scan'), href: null }} />
     </Tabs>
   );
 }
-
