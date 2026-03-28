@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  StatusBar,
   FlatList,
   Dimensions,
   Animated,
@@ -108,21 +107,14 @@ export default function WelcomeScreen() {
   }, []);
 
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
-      <StatusBar
-        barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={colors.background}
-      />
-
+    <SafeAreaView edges={['top']} style={[s.root, { backgroundColor: colors.background }]}>
       {/* Brand bar */}
-      <SafeAreaView edges={['top']}>
-        <View style={s.brandBar}>
-          <Text style={[s.wordmark, { color: colors.foreground }]}>BUSINESSHUB PRO</Text>
-          <View style={[s.betaBadge, { backgroundColor: colors.secondary }]}>
-            <Text style={[s.betaText, { color: colors.mutedForeground }]}>BETA</Text>
-          </View>
+      <View style={s.brandBar}>
+        <Text style={[s.wordmark, { color: colors.foreground }]}>BUSINESSHUB PRO</Text>
+        <View style={[s.betaBadge, { backgroundColor: colors.secondary }]}>
+          <Text style={[s.betaText, { color: colors.mutedForeground }]}>BETA</Text>
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* Hero */}
       <Animated.View style={[s.hero, { opacity: heroFade, transform: [{ translateY: heroSlide }] }]}>
@@ -214,7 +206,7 @@ export default function WelcomeScreen() {
           </TouchableOpacity>
         </SafeAreaView>
       </Animated.View>
-    </View>
+    </SafeAreaView>
   );
 }
 

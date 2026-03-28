@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  StatusBar,
   TextInput,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -25,18 +24,12 @@ import { sendVerificationOtp, verifyEmailOtp } from '@/lib/auth';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { GoogleLogo } from '@/components/ui/GoogleLogo';
 import { OtpModal } from '@/components/ui/OtpModal';
+import { useTheme } from '@/hooks/useTheme';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// ── Design tokens (always dark) ──
-const BG      = '#000000';
-const SURFACE = '#141414';
-const BORDER  = '#2a2a2a';
-const FG      = '#ffffff';
-const MUTED   = '#919191';
-const PLACEHOLDER = '#555555';
-
 export default function RegisterScreen() {
+  const { colors, isDark } = useTheme();
   const [formData, setFormData] = useState({ fullName: '', email: '', phone: '', password: '', confirmPassword: '' });
   const [errors, setErrors]           = useState<Record<string, string>>({});
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -285,26 +278,25 @@ export default function RegisterScreen() {
   const busy = isLoading || socialLoading !== null;
 
   return (
-    <View style={[styles.root, { backgroundColor: BG }]}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
           {/* ── Top bar ── */}
-          <SafeAreaView edges={['top']}>
-            <View style={styles.topBar}>
-              <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
-                <Ionicons name="close" size={24} color={FG} />
-              </TouchableOpacity>
-              <Text style={[styles.wordmark, { color: FG }]}>BUSINESSHUB PRO</Text>
-              <View style={{ width: 32 }} />
-            </View>
-          </SafeAreaView>
+          <View style={styles.topBar}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
+              <Ionicons name="close" size={24} color={colors.foreground} />
+            </TouchableOpacity>
+            <Text style={[styles.wordmark, { color: colors.foreground }]}>BUSINESSHUB PRO</Text>
+            <View style={{ width: 32 }} />
+          </View>
 
           {/* ── Hero headline ── */}
           <View style={styles.heroSection}>
-            <Text style={[styles.heroTitle, { color: FG }]}>Create{'\n'}Account</Text>
-            <Text style={[styles.heroSub, { color: MUTED }]}>Enter your credentials to begin your journey.</Text>
+            <Text style={[styles.heroTitle, { color: colors.foreground }]}>CREATE{'\n'}ACCOUNT.</Text>
+            <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
+              Join Pakistan's smartest virtual queue platform. Set up your profile in seconds.
+            </Text>
           </View>
 
           {/* ── Form ── */}
@@ -317,59 +309,62 @@ export default function RegisterScreen() {
             )}
 
             {googlePrefilled && (
-              <View style={[styles.googleBanner, { backgroundColor: SURFACE, borderColor: BORDER }]}>
+              <View style={[styles.googleBanner, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
                 <GoogleLogo size={14} />
-                <Text style={[styles.googleBannerText, { color: MUTED }]}>Google account linked — just add your phone number.</Text>
+                <Text style={[styles.googleBannerText, { color: colors.mutedForeground }]}>Google account linked. Just add your phone number.</Text>
               </View>
             )}
 
             {/* Full Name */}
             <View style={styles.fieldWrap}>
-              <Text style={[styles.fieldLabel, { color: MUTED }]}>FULL NAME</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>FULL NAME</Text>
               <TextInput
-                style={[styles.input, { borderColor: errors.fullName ? '#ffb4ab' : BORDER, color: FG }]}
-                placeholder="M. Hamza Khan"
-                placeholderTextColor={PLACEHOLDER}
+                style={[styles.input, { borderColor: errors.fullName ? '#ffb4ab' : colors.border, color: colors.foreground, backgroundColor: colors.input }]}
+                placeholder="Your full name"
+                placeholderTextColor={colors.mutedForeground}
                 value={formData.fullName}
                 onChangeText={(v) => updateField('fullName', v)}
                 autoCapitalize="words"
                 autoComplete="name"
                 editable={!busy && !googlePrefilled}
+                keyboardAppearance={isDark ? 'dark' : 'light'}
               />
-              {googlePrefilled && <Text style={[styles.googleVerified, { color: MUTED }]}>✓ Verified by Google</Text>}
+              {googlePrefilled && <Text style={[styles.googleVerified, { color: colors.mutedForeground }]}>✓ Verified by Google</Text>}
               {!!errors.fullName && <Text style={styles.fieldError}>{errors.fullName}</Text>}
             </View>
 
             {/* Email */}
             <View style={styles.fieldWrap}>
-              <Text style={[styles.fieldLabel, { color: MUTED }]}>EMAIL ADDRESS</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>EMAIL ADDRESS</Text>
               <TextInput
-                style={[styles.input, { borderColor: errors.email ? '#ffb4ab' : BORDER, color: FG }]}
+                style={[styles.input, { borderColor: errors.email ? '#ffb4ab' : colors.border, color: colors.foreground, backgroundColor: colors.input }]}
                 placeholder="name@business.pk"
-                placeholderTextColor={PLACEHOLDER}
+                placeholderTextColor={colors.mutedForeground}
                 value={formData.email}
                 onChangeText={(v) => updateField('email', v)}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
                 editable={!busy && !googlePrefilled}
+                keyboardAppearance={isDark ? 'dark' : 'light'}
               />
-              {googlePrefilled && <Text style={[styles.googleVerified, { color: MUTED }]}>✓ Verified by Google</Text>}
+              {googlePrefilled && <Text style={[styles.googleVerified, { color: colors.mutedForeground }]}>✓ Verified by Google</Text>}
               {!!errors.email && <Text style={styles.fieldError}>{errors.email}</Text>}
             </View>
 
             {/* Phone */}
             <View style={styles.fieldWrap}>
-              <Text style={[styles.fieldLabel, { color: MUTED }]}>PHONE NUMBER</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>PHONE NUMBER</Text>
               <TextInput
-                style={[styles.input, { borderColor: errors.phone ? '#ffb4ab' : BORDER, color: FG }]}
+                style={[styles.input, { borderColor: errors.phone ? '#ffb4ab' : colors.border, color: colors.foreground, backgroundColor: colors.input }]}
                 placeholder="+92 300 1234567"
-                placeholderTextColor={PLACEHOLDER}
+                placeholderTextColor={colors.mutedForeground}
                 value={formData.phone}
                 onChangeText={(v) => updateField('phone', v)}
                 keyboardType="phone-pad"
                 autoComplete="tel"
                 editable={!busy}
+                keyboardAppearance={isDark ? 'dark' : 'light'}
               />
               {!!errors.phone && <Text style={styles.fieldError}>{errors.phone}</Text>}
             </View>
@@ -378,40 +373,42 @@ export default function RegisterScreen() {
             {!googlePrefilled && (
               <>
                 <View style={styles.fieldWrap}>
-                  <Text style={[styles.fieldLabel, { color: MUTED }]}>PASSWORD</Text>
-                  <View style={[styles.inputWrap, { borderColor: errors.password ? '#ffb4ab' : BORDER }]}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>PASSWORD</Text>
+                  <View style={[styles.inputWrap, { borderColor: errors.password ? '#ffb4ab' : colors.border, backgroundColor: colors.input }]}>
                     <TextInput
-                      style={[styles.inputInner, { color: FG }]}
+                      style={[styles.inputInner, { color: colors.foreground }]}
                       placeholder="••••••••"
-                      placeholderTextColor={PLACEHOLDER}
+                      placeholderTextColor={colors.mutedForeground}
                       value={formData.password}
                       onChangeText={(v) => updateField('password', v)}
                       secureTextEntry={!showPwd}
                       autoCapitalize="none"
                       editable={!busy}
+                      keyboardAppearance={isDark ? 'dark' : 'light'}
                     />
                     <TouchableOpacity onPress={() => setShowPwd(v => !v)} style={styles.eyeBtn}>
-                      <Ionicons name={showPwd ? 'eye-off-outline' : 'eye-outline'} size={18} color={MUTED} />
+                      <Ionicons name={showPwd ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.mutedForeground} />
                     </TouchableOpacity>
                   </View>
                   {!!errors.password && <Text style={styles.fieldError}>{errors.password}</Text>}
                 </View>
 
                 <View style={styles.fieldWrap}>
-                  <Text style={[styles.fieldLabel, { color: MUTED }]}>CONFIRM PASSWORD</Text>
-                  <View style={[styles.inputWrap, { borderColor: errors.confirmPassword ? '#ffb4ab' : BORDER }]}>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>CONFIRM PASSWORD</Text>
+                  <View style={[styles.inputWrap, { borderColor: errors.confirmPassword ? '#ffb4ab' : colors.border, backgroundColor: colors.input }]}>
                     <TextInput
-                      style={[styles.inputInner, { color: FG }]}
+                      style={[styles.inputInner, { color: colors.foreground }]}
                       placeholder="••••••••"
-                      placeholderTextColor={PLACEHOLDER}
+                      placeholderTextColor={colors.mutedForeground}
                       value={formData.confirmPassword}
                       onChangeText={(v) => updateField('confirmPassword', v)}
                       secureTextEntry={!showConfirmPwd}
                       autoCapitalize="none"
                       editable={!busy}
+                      keyboardAppearance={isDark ? 'dark' : 'light'}
                     />
                     <TouchableOpacity onPress={() => setShowConfirmPwd(v => !v)} style={styles.eyeBtn}>
-                      <Ionicons name={showConfirmPwd ? 'eye-off-outline' : 'eye-outline'} size={18} color={MUTED} />
+                      <Ionicons name={showConfirmPwd ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.mutedForeground} />
                     </TouchableOpacity>
                   </View>
                   {!!errors.confirmPassword && <Text style={styles.fieldError}>{errors.confirmPassword}</Text>}
@@ -421,36 +418,39 @@ export default function RegisterScreen() {
 
             {/* Terms */}
             <TouchableOpacity style={styles.termsRow} onPress={() => setAgreedToTerms(v => !v)} disabled={busy} activeOpacity={0.7}>
-              <View style={[styles.checkbox, { borderColor: errors.terms ? '#ffb4ab' : (agreedToTerms ? FG : BORDER), backgroundColor: agreedToTerms ? FG : 'transparent' }]}>
-                {agreedToTerms && <Ionicons name="checkmark" size={13} color="#000" />}
+              <View style={[styles.checkbox, { borderColor: errors.terms ? '#ffb4ab' : (agreedToTerms ? colors.foreground : colors.border), backgroundColor: agreedToTerms ? colors.foreground : 'transparent' }]}>
+                {agreedToTerms && <Ionicons name="checkmark" size={13} color={colors.background} />}
               </View>
-              <Text style={[styles.termsText, { color: MUTED }]}>
+              <Text style={[styles.termsText, { color: colors.mutedForeground }]}>
                 By selecting, you agree to BusinessHub Pro's {' '}
-                <Text style={{ color: FG }}>Terms of Service</Text>
+                <Text style={{ color: colors.foreground }}>Terms of Service</Text>
                 {' '}and{' '}
-                <Text style={{ color: FG }}>Privacy Policy</Text>
+                <Text style={{ color: colors.foreground }}>Privacy Policy</Text>
               </Text>
             </TouchableOpacity>
             {!!errors.terms && <Text style={[styles.fieldError, { marginTop: -8 }]}>{errors.terms}</Text>}
 
             {/* Register button */}
             <TouchableOpacity
-              style={[styles.btnPrimary, { backgroundColor: FG }, busy && { opacity: 0.6 }]}
+              style={[styles.btnPrimary, { backgroundColor: colors.primary }, busy && { opacity: 0.6 }]}
               onPress={handleRegister}
               disabled={busy}
               activeOpacity={0.88}
             >
               {isLoading
-                ? <ActivityIndicator color="#000" />
-                : <Text style={[styles.btnPrimaryText, { color: '#000' }]}>REGISTER +</Text>
+                ? <ActivityIndicator color={colors.primaryForeground} />
+                : <>
+                    <Text style={[styles.btnPrimaryText, { color: colors.primaryForeground }]}>Create Account</Text>
+                    <Ionicons name="arrow-forward" size={18} color={colors.primaryForeground} />
+                  </>
               }
             </TouchableOpacity>
 
             {/* Divider */}
             <View style={styles.divider}>
-              <View style={[styles.divLine, { backgroundColor: BORDER }]} />
-              <Text style={[styles.divLabel, { color: MUTED }]}>OR CONTINUE WITH</Text>
-              <View style={[styles.divLine, { backgroundColor: BORDER }]} />
+              <View style={[styles.divLine, { backgroundColor: colors.border }]} />
+              <Text style={[styles.divLabel, { color: colors.mutedForeground }]}>OR CONTINUE WITH</Text>
+              <View style={[styles.divLine, { backgroundColor: colors.border }]} />
             </View>
 
             {/* Google button */}
@@ -458,7 +458,7 @@ export default function RegisterScreen() {
               style={[
                 styles.btnGoogle,
                 googlePrefilled
-                  ? { backgroundColor: SURFACE, borderColor: BORDER }
+                  ? { backgroundColor: colors.secondary, borderColor: colors.border }
                   : { backgroundColor: '#FFFFFF', borderColor: '#dadce0' },
                 busy && { opacity: 0.5 },
               ]}
@@ -467,23 +467,23 @@ export default function RegisterScreen() {
               activeOpacity={0.8}
             >
               {socialLoading === 'google'
-                ? <ActivityIndicator color={googlePrefilled ? FG : '#000000'} size="small" />
+                ? <ActivityIndicator color={googlePrefilled ? colors.foreground : '#000000'} size="small" />
                 : googlePrefilled
-                  ? <><Ionicons name="checkmark-circle" size={19} color={FG} /><Text style={[styles.btnGoogleText, { color: FG }]}>Google Connected ✓</Text></>
+                  ? <><Ionicons name="checkmark-circle" size={19} color={colors.foreground} /><Text style={[styles.btnGoogleText, { color: colors.foreground }]}>Google Connected</Text></>
                   : <><GoogleLogo size={20} /><Text style={[styles.btnGoogleText, { color: '#1F1F1F' }]}>Continue with Google</Text></>
               }
             </TouchableOpacity>
 
             {Platform.OS === 'ios' && (
               <TouchableOpacity
-                style={[styles.btnGoogle, { backgroundColor: SURFACE, borderColor: BORDER, marginTop: 10 }, busy && { opacity: 0.5 }]}
+                style={[styles.btnGoogle, { backgroundColor: colors.secondary, borderColor: colors.border, marginTop: 10 }, busy && { opacity: 0.5 }]}
                 onPress={handleAppleSignUp}
                 disabled={busy}
                 activeOpacity={0.8}
               >
                 {socialLoading === 'apple'
-                  ? <ActivityIndicator color={FG} size="small" />
-                  : <><Ionicons name="logo-apple" size={19} color={FG} /><Text style={[styles.btnGoogleText, { color: FG }]}>Continue with Apple</Text></>
+                  ? <ActivityIndicator color={colors.foreground} size="small" />
+                  : <><Ionicons name="logo-apple" size={19} color={colors.foreground} /><Text style={[styles.btnGoogleText, { color: colors.foreground }]}>Continue with Apple</Text></>
                 }
               </TouchableOpacity>
             )}
@@ -491,9 +491,9 @@ export default function RegisterScreen() {
 
           {/* Sign in link */}
           <View style={styles.switchRow}>
-            <Text style={[styles.switchText, { color: MUTED }]}>Already have an account?{'  '}</Text>
+            <Text style={[styles.switchText, { color: colors.mutedForeground }]}>Already have an account?{'  '}</Text>
             <TouchableOpacity onPress={() => router.push('/(auth)/login')} disabled={busy}>
-              <Text style={[styles.switchLink, { color: FG }]}>Log In</Text>
+              <Text style={[styles.switchLink, { color: colors.foreground }]}>Log In</Text>
             </TouchableOpacity>
           </View>
 
@@ -509,7 +509,7 @@ export default function RegisterScreen() {
       />
 
       {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   checkbox:  { width: 22, height: 22, borderRadius: 6, borderWidth: 2, justifyContent: 'center', alignItems: 'center', marginTop: 2 },
   termsText: { flex: 1, fontSize: 12, lineHeight: 18 },
 
-  btnPrimary:     { height: 56, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  btnPrimary:     { height: 56, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   btnPrimaryText: { fontSize: 15, fontWeight: '900', letterSpacing: 1 },
   btnGoogle:      { height: 52, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   btnGoogleText:  { fontSize: 15, fontWeight: '600' },

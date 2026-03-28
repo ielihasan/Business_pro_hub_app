@@ -7,11 +7,8 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
-  Modal,
   ActivityIndicator,
-  StatusBar,
-  Dimensions,
+  TextInput,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,39 +16,30 @@ import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
-import { useTheme } from '@/hooks/useTheme';
-import { Input } from '@/components/ui';
-import { Spacing, BorderRadius } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
 import { signInWithApple } from '@/lib/oauth';
 import { supabase } from '@/lib/supabase';
-import { resendVerificationEmail } from '@/lib/auth';
+import Dialog, { DialogConfig } from '@/components/ui/Dialog';
+import { GoogleLogo } from '@/components/ui/GoogleLogo';
+import { OtpModal } from '@/components/ui/OtpModal';
+import { sendVerificationOtp, verifyEmailOtp } from '@/lib/auth';
+import { useTheme } from '@/hooks/useTheme';
 
 WebBrowser.maybeCompleteAuthSession();
-
-const { width } = Dimensions.get('window');
-
-// Mini feature chips shown in the visual strip
-const CHIPS = [
-  { icon: 'qr-code',        label: 'Scan & Join',  color: '#6366F1', bg: '#EEF2FF' },
-  { icon: 'time',           label: 'Live Queue',   color: '#10B981', bg: '#F0FDF4' },
-  { icon: 'notifications',  label: 'Smart Alerts', color: '#F59E0B', bg: '#FFFBEB' },
-  { icon: 'star',           label: 'Rewards',      color: '#EC4899', bg: '#FDF2F8' },
-];
 
 export default function LoginScreen() {
   const { colors, isDark } = useTheme();
   const { prefillEmail } = useLocalSearchParams<{ prefillEmail?: string }>();
   const [email, setEmail]       = useState(prefillEmail ?? '');
   const [password, setPassword] = useState('');
+  const [showPwd, setShowPwd]   = useState(false);
   const [errors, setErrors]     = useState<{ email?: string; password?: string }>({});
-  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [showOtpModal, setShowOtpModal]       = useState(false);
+  const [otpEmail, setOtpEmail]               = useState('');
   const [socialLoading, setSocialLoading]     = useState<'google' | 'apple' | null>(null);
-  const [resendLoading, setResendLoading]     = useState(false);
+  const [dialog, setDialog]                   = useState<DialogConfig | null>(null);
 
   const { login, initializeAuth, isLoading, authError, clearAuthError } = useStore();
-
-
 
   const handleLogin = async () => {
     clearAuthError();
@@ -67,10 +55,13 @@ export default function LoginScreen() {
     const result = await login({ email: normalizedEmail, password });
     if (result.success) router.replace('/(tabs)');
     else {
-      if (result.error?.includes('verify your email') || result.error?.includes('Email not confirmed'))
-        setShowVerifyModal(true);
-      else
-        Alert.alert('Login Failed', result.error || 'Invalid email or password.', [{ text: 'OK' }]);
+      if (result.error?.includes('verify your email') || result.error?.includes('Email not confirmed')) {
+        // Auto-send OTP and show code entry
+        const sent = await sendVerificationOtp(normalizedEmail);
+        if (sent.success) { setOtpEmail(normalizedEmail); setShowOtpModal(true); }
+        else setDialog({ title: 'Email Not Verified', message: 'Please verify your email. We could not send a code right now — try again later.', icon: 'mail-outline', iconVariant: 'warning', actions: [{ label: 'OK', variant: 'primary', onPress: () => setDialog(null) }] });
+      } else
+        setDialog({ title: 'Login Failed', message: result.error || 'Invalid email or password.', icon: 'alert-circle-outline', iconVariant: 'destructive', actions: [{ label: 'OK', variant: 'primary', onPress: () => setDialog(null) }] });
     }
   };
 
@@ -78,24 +69,17 @@ export default function LoginScreen() {
     setSocialLoading('google');
     try {
       const redirectUri = makeRedirectUri({ scheme: 'businesshubpro', path: 'auth/callback' });
-
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: redirectUri, skipBrowserRedirect: true },
       });
-
       if (error || !data.url) {
         setSocialLoading(null);
-        Alert.alert('Error', error?.message || 'Failed to start Google sign-in.');
+        setDialog({ title: 'Error', message: error?.message || 'Failed to start Google sign-in.', icon: 'alert-circle-outline', iconVariant: 'destructive', actions: [{ label: 'OK', variant: 'primary', onPress: () => setDialog(null) }] });
         return;
       }
-
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-
       if (result.type === 'success') {
-        // ── iOS path ────────────────────────────────────────────────────────
-        // Safari View Controller returns the URL before Expo Router can route
-        // it, so we handle the session + profile check directly here.
         const url = result.url;
         const [beforeHash, hashPart = ''] = url.split('#');
         const queryPart = beforeHash.includes('?') ? beforeHash.split('?')[1] : '';
@@ -104,67 +88,52 @@ export default function LoginScreen() {
         const at   = hp.get('access_token')  || qp.get('access_token');
         const rt   = hp.get('refresh_token') || qp.get('refresh_token') || '';
         const code = qp.get('code');
-
         if (at) {
           const { error: se } = await supabase.auth.setSession({ access_token: at, refresh_token: rt });
-          if (se) { setSocialLoading(null); Alert.alert('Sign-In Failed', se.message); return; }
+          if (se) {
+            setSocialLoading(null);
+            setDialog({ title: 'Sign-In Failed', message: se.message, icon: 'alert-circle-outline', iconVariant: 'destructive', actions: [{ label: 'OK', variant: 'primary', onPress: () => setDialog(null) }] });
+            return;
+          }
         } else if (code) {
           const { error: ce } = await supabase.auth.exchangeCodeForSession(code);
-          if (ce) { setSocialLoading(null); Alert.alert('Sign-In Failed', ce.message); return; }
+          if (ce) {
+            setSocialLoading(null);
+            setDialog({ title: 'Sign-In Failed', message: ce.message, icon: 'alert-circle-outline', iconVariant: 'destructive', actions: [{ label: 'OK', variant: 'primary', onPress: () => setDialog(null) }] });
+            return;
+          }
         } else {
           setSocialLoading(null);
-          Alert.alert('Sign-In Failed', 'Could not retrieve session. Please try again.');
+          setDialog({ title: 'Sign-In Failed', message: 'Could not retrieve session. Please try again.', icon: 'alert-circle-outline', iconVariant: 'destructive', actions: [{ label: 'OK', variant: 'primary', onPress: () => setDialog(null) }] });
           return;
         }
-
-        // Profile check
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) { setSocialLoading(null); return; }
-
         let profile: { phone_number?: string | null } | null = null;
-
-        const { data: profileById } = await supabase
-          .from('users')
-          .select('phone_number')
-          .eq('id', session.user.id)
-          .maybeSingle();
+        const { data: profileById } = await supabase.from('users').select('phone_number').eq('id', session.user.id).maybeSingle();
         profile = profileById;
-
         if (!profile && session.user.email) {
-          const { data: profileByEmail } = await supabase
-            .from('users')
-            .select('phone_number')
-            .ilike('email', session.user.email)
-            .maybeSingle();
+          const { data: profileByEmail } = await supabase.from('users').select('phone_number').ilike('email', session.user.email).maybeSingle();
           profile = profileByEmail;
         }
-
         setSocialLoading(null);
         if (!profile?.phone_number) {
           await supabase.auth.signOut();
-          Alert.alert(
-            'Account Not Found',
-            'No registered account found for this Google email.\n\nPlease sign up first.',
-            [
-              { text: 'Sign Up Now', onPress: () => router.push('/(auth)/register') },
-              { text: 'Cancel', style: 'cancel' },
-            ]
-          );
-        } else {
-          await initializeAuth();
-          router.replace('/(tabs)');
-        }
-      } else {
-        // ── Android path ─────────────────────────────────────────────────────
-        // The OS intercepts the deep link and Expo Router routes it to
-        // auth/callback.tsx. That screen handles the profile check and navigates
-        // to /(tabs) or /(auth)/register automatically.
-        // Just clear the spinner here — navigation is handled externally.
-        setSocialLoading(null);
-      }
+          setDialog({
+            title: 'Account Not Found',
+            message: 'No registered account found for this Google email.\n\nPlease sign up first.',
+            icon: 'person-circle-outline',
+            iconVariant: 'default',
+            actions: [
+              { label: 'Sign Up Now', variant: 'primary', onPress: () => { setDialog(null); router.push('/(auth)/register'); } },
+              { label: 'Cancel', variant: 'secondary', onPress: () => setDialog(null) },
+            ],
+          });
+        } else { await initializeAuth(); router.replace('/(tabs)'); }
+      } else { setSocialLoading(null); }
     } catch (err: any) {
       setSocialLoading(null);
-      Alert.alert('Error', err.message || 'Google sign-in failed.');
+      setDialog({ title: 'Error', message: err.message || 'Google sign-in failed.', icon: 'alert-circle-outline', iconVariant: 'destructive', actions: [{ label: 'OK', variant: 'primary', onPress: () => setDialog(null) }] });
     }
   };
 
@@ -173,141 +142,118 @@ export default function LoginScreen() {
     try {
       const result = await signInWithApple();
       if (result.success) router.replace('/(tabs)');
-      else Alert.alert('Apple Sign-In Failed', result.error || 'Please try again.');
-    } catch (e: any) { Alert.alert('Error', e.message || 'Unexpected error.'); }
+      else setDialog({ title: 'Apple Sign-In Failed', message: result.error || 'Please try again.', icon: 'logo-apple', iconVariant: 'default', actions: [{ label: 'OK', variant: 'primary', onPress: () => setDialog(null) }] });
+    } catch (e: any) {
+      setDialog({ title: 'Error', message: e.message || 'Unexpected error.', icon: 'alert-circle-outline', iconVariant: 'destructive', actions: [{ label: 'OK', variant: 'primary', onPress: () => setDialog(null) }] });
+    }
     finally { setSocialLoading(null); }
   };
 
-  const handleResendVerification = async () => {
-    const targetEmail = (email || prefillEmail || '').trim().toLowerCase();
-    if (!targetEmail || !/\S+@\S+\.\S+/.test(targetEmail)) {
-      Alert.alert('Missing Email', 'Please enter your email first, then tap Resend Verification.');
-      return;
-    }
+  const handleVerifyOtp = async (code: string): Promise<string | null> => {
+    const result = await verifyEmailOtp(otpEmail, code);
+    if (!result.success) return result.error || 'Invalid code. Please try again.';
+    await initializeAuth();
+    setShowOtpModal(false);
+    router.replace('/(tabs)');
+    return null;
+  };
 
-    setResendLoading(true);
-    const result = await resendVerificationEmail(targetEmail);
-    setResendLoading(false);
-
-    if (result.success) {
-      Alert.alert(
-        'Verification Sent',
-        `A new verification email has been sent to ${targetEmail}. Please check inbox and spam folder.`
-      );
-    } else {
-      Alert.alert('Resend Failed', result.error || 'Could not resend verification email right now.');
-    }
+  const handleResendOtp = async () => {
+    await sendVerificationOtp(otpEmail);
   };
 
   const busy = isLoading || socialLoading !== null;
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+    <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* ── Top brand bar ── */}
-          <SafeAreaView edges={['top']}>
-            <View style={styles.topBar}>
-              <TouchableOpacity
-                style={[styles.backBtn, { backgroundColor: colors.secondary }]}
-                onPress={() => router.back()}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-back" size={20} color={colors.foreground} />
-              </TouchableOpacity>
-              <View style={[styles.brandPill, { backgroundColor: colors.primary }]}>
-                <Ionicons name="grid" size={13} color={colors.primaryForeground} />
-                <Text style={[styles.brandText, { color: colors.primaryForeground }]}>BusinessHub Pro</Text>
-              </View>
-              <View style={{ width: 36 }} />
-            </View>
-          </SafeAreaView>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-          {/* ── Visual hero strip ── */}
-          <View style={[styles.heroStrip, { backgroundColor: isDark ? '#0F0F1A' : '#F0F1FF' }]}>
-            <View style={[styles.heroBlob, { backgroundColor: isDark ? '#6366F125' : '#6366F115' }]} />
-            <View style={styles.chipsRow}>
-              {CHIPS.map((c, i) => (
-                <View
-                  key={i}
-                  style={[styles.chip, { backgroundColor: isDark ? colors.secondary : c.bg }]}
-                >
-                  <View style={[styles.chipIcon, { backgroundColor: c.color }]}>
-                    <Ionicons name={c.icon as any} size={13} color="#fff" />
-                  </View>
-                  <Text style={[styles.chipLabel, { color: isDark ? colors.foreground : c.color }]}>{c.label}</Text>
-                </View>
-              ))}
+          {/* Top bar */}
+          <View style={styles.topBar}>
+            <Text style={[styles.wordmark, { color: colors.foreground }]}>BUSINESSHUB PRO</Text>
+            <View style={styles.topRight}>
+              <Ionicons name="notifications-outline" size={22} color={colors.foreground} />
+              <View style={[styles.avatar, { backgroundColor: colors.secondary }]}>
+                <Text style={[styles.avatarText, { color: colors.mutedForeground }]}>PH</Text>
+              </View>
             </View>
-            <Text style={[styles.heroHeading, { color: isDark ? '#EDEDFF' : '#1A1A3A' }]}>Welcome back</Text>
-            <Text style={[styles.heroSub, { color: isDark ? '#ABABCC' : '#5C5C8A' }]}>
-              Sign in to manage your queues & rewards
+          </View>
+
+          {/* Hero headline */}
+          <View style={styles.heroSection}>
+            <Text style={[styles.heroTitle, { color: colors.foreground }]}>WELCOME{'\n'}BACK.</Text>
+            <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
+              Access your premium business dashboard and manage your queues with professional precision.
             </Text>
           </View>
 
-          {/* ── Form card ── */}
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-
-            {/* Auth error */}
+          {/* Form */}
+          <View style={styles.form}>
             {!!authError && (
-              <View style={[styles.errorBanner, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive + '40' }]}>
-                <Ionicons name="alert-circle" size={16} color={colors.destructive} />
-                <Text style={[styles.errorBannerText, { color: colors.destructive }]}>{authError}</Text>
+              <View style={[styles.errorBanner, { backgroundColor: '#ffb4ab18', borderColor: '#ffb4ab40' }]}>
+                <Ionicons name="alert-circle" size={15} color="#ffb4ab" />
+                <Text style={[styles.errorBannerText, { color: '#ffb4ab' }]}>{authError}</Text>
               </View>
             )}
 
-            <Input
-              label="Email"
-              placeholder="you@example.com"
-              value={email}
-              onChangeText={(v) => { setEmail(v); setErrors(p => ({ ...p, email: '' })); }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              leftIcon="mail-outline"
-              error={errors.email}
-              editable={!busy}
-            />
-
-            <View style={{ marginTop: Spacing[3] }}>
-              <Input
-                label="Password"
-                placeholder="Enter your password"
-                value={password}
-                onChangeText={(v) => { setPassword(v); setErrors(p => ({ ...p, password: '' })); }}
-                secureTextEntry
+            {/* Email */}
+            <View style={styles.fieldWrap}>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>PROFESSIONAL EMAIL</Text>
+              <TextInput
+                style={[styles.input, { borderColor: errors.email ? '#ffb4ab' : colors.border, color: colors.foreground, backgroundColor: colors.input }]}
+                placeholder="name@business.pro"
+                placeholderTextColor={colors.mutedForeground}
+                value={email}
+                onChangeText={(v) => { setEmail(v); setErrors(p => ({ ...p, email: '' })); }}
+                keyboardType="email-address"
                 autoCapitalize="none"
-                autoComplete="password"
-                leftIcon="lock-closed-outline"
-                error={errors.password}
+                autoComplete="email"
+                keyboardAppearance={isDark ? 'dark' : 'light'}
                 editable={!busy}
               />
+              {!!errors.email && <Text style={styles.fieldError}>{errors.email}</Text>}
             </View>
 
-            <TouchableOpacity
-              style={styles.forgotRow}
-              onPress={() => router.push('/(auth)/forgot-password')}
-              disabled={busy}
-            >
-              <Text style={[styles.forgotText, { color: colors.primary }]}>Forgot password?</Text>
-            </TouchableOpacity>
+            {/* Password */}
+            <View style={styles.fieldWrap}>
+              <View style={styles.fieldLabelRow}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>SECURITY KEY</Text>
+                <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')} disabled={busy}>
+                  <Text style={[styles.forgotLink, { color: colors.foreground }]}>FORGOT PASSWORD</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={[styles.inputWrap, { borderColor: errors.password ? '#ffb4ab' : colors.border, backgroundColor: colors.input }]}>
+                <TextInput
+                  style={[styles.inputInner, { color: colors.foreground }]}
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.mutedForeground}
+                  value={password}
+                  onChangeText={(v) => { setPassword(v); setErrors(p => ({ ...p, password: '' })); }}
+                  secureTextEntry={!showPwd}
+                  autoCapitalize="none"
+                  keyboardAppearance={isDark ? 'dark' : 'light'}
+                  editable={!busy}
+                />
+                <TouchableOpacity onPress={() => setShowPwd(v => !v)} style={styles.eyeBtn}>
+                  <Ionicons name={showPwd ? 'eye-off-outline' : 'eye-outline'} size={18} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              </View>
+              {!!errors.password && <Text style={styles.fieldError}>{errors.password}</Text>}
+            </View>
 
+            {/* Sign In button */}
             <TouchableOpacity
-              style={[styles.submitBtn, { backgroundColor: colors.primary }, busy && { opacity: 0.6 }]}
+              style={[styles.btnPrimary, { backgroundColor: colors.primary }, busy && { opacity: 0.6 }]}
               onPress={handleLogin}
               disabled={busy}
-              activeOpacity={0.85}
+              activeOpacity={0.88}
             >
               {isLoading
                 ? <ActivityIndicator color={colors.primaryForeground} />
                 : <>
-                    <Ionicons name="log-in-outline" size={20} color={colors.primaryForeground} />
-                    <Text style={[styles.submitText, { color: colors.primaryForeground }]}>Sign In</Text>
+                    <Text style={[styles.btnPrimaryText, { color: colors.primaryForeground }]}>Sign In</Text>
+                    <Ionicons name="arrow-forward" size={18} color={colors.primaryForeground} />
                   </>
               }
             </TouchableOpacity>
@@ -315,201 +261,116 @@ export default function LoginScreen() {
             {/* Divider */}
             <View style={styles.divider}>
               <View style={[styles.divLine, { backgroundColor: colors.border }]} />
-              <Text style={[styles.divLabel, { color: colors.mutedForeground }]}>or continue with</Text>
+              <Text style={[styles.divLabel, { color: colors.mutedForeground }]}>OR CONTINUE WITH</Text>
               <View style={[styles.divLine, { backgroundColor: colors.border }]} />
             </View>
 
-            {/* Social */}
-            <View style={styles.socialRow}>
+            {/* Google */}
+            <TouchableOpacity
+              style={[styles.btnGoogle, { backgroundColor: '#FFFFFF', borderColor: '#dadce0' }, busy && { opacity: 0.5 }]}
+              onPress={handleGooglePress}
+              disabled={busy}
+              activeOpacity={0.8}
+            >
+              {socialLoading === 'google'
+                ? <ActivityIndicator color="#000000" size="small" />
+                : <>
+                    <GoogleLogo size={20} />
+                    <Text style={[styles.btnGoogleText, { color: '#1F1F1F' }]}>Continue with Google</Text>
+                  </>
+              }
+            </TouchableOpacity>
+
+            {/* Apple (iOS only) */}
+            {Platform.OS === 'ios' && (
               <TouchableOpacity
-                style={[styles.socialBtn, { backgroundColor: colors.secondary, borderColor: colors.border }, busy && { opacity: 0.5 }]}
-                onPress={handleGooglePress}
+                style={[styles.btnGoogle, { backgroundColor: colors.secondary, borderColor: colors.border, marginTop: 10 }, busy && { opacity: 0.5 }]}
+                onPress={handleAppleSignIn}
                 disabled={busy}
-                activeOpacity={0.75}
+                activeOpacity={0.8}
               >
-                {socialLoading === 'google'
+                {socialLoading === 'apple'
                   ? <ActivityIndicator color={colors.foreground} size="small" />
-                  : <><Ionicons name="logo-google" size={19} color="#EA4335" /><Text style={[styles.socialLabel, { color: colors.foreground }]}>Google</Text></>
+                  : <>
+                      <Ionicons name="logo-apple" size={19} color={colors.foreground} />
+                      <Text style={[styles.btnGoogleText, { color: colors.foreground }]}>Continue with Apple</Text>
+                    </>
                 }
               </TouchableOpacity>
-              {Platform.OS === 'ios' && (
-                <TouchableOpacity
-                  style={[styles.socialBtn, { backgroundColor: colors.secondary, borderColor: colors.border }, busy && { opacity: 0.5 }]}
-                  onPress={handleAppleSignIn}
-                  disabled={busy}
-                  activeOpacity={0.75}
-                >
-                  {socialLoading === 'apple'
-                    ? <ActivityIndicator color={colors.foreground} size="small" />
-                    : <><Ionicons name="logo-apple" size={19} color={colors.foreground} /><Text style={[styles.socialLabel, { color: colors.foreground }]}>Apple</Text></>
-                  }
-                </TouchableOpacity>
-              )}
-            </View>
+            )}
           </View>
 
           {/* Sign up link */}
           <View style={styles.switchRow}>
-            <Text style={[styles.switchText, { color: colors.mutedForeground }]}>Don't have an account?{'  '}</Text>
+            <Text style={[styles.switchText, { color: colors.mutedForeground }]}>New to the platform?{'  '}</Text>
             <TouchableOpacity onPress={() => router.push('/(auth)/register')} disabled={busy}>
-              <Text style={[styles.switchLink, { color: colors.primary }]}>Sign up</Text>
+              <Text style={[styles.switchLink, { color: colors.foreground }]}>Create an account</Text>
             </TouchableOpacity>
           </View>
 
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Verify email modal */}
-      <Modal visible={showVerifyModal} transparent animationType="fade" onRequestClose={() => setShowVerifyModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
-            <View style={styles.modalIconWrap}>
-              <Ionicons name="warning" size={44} color="#F59E0B" />
-            </View>
-            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Email Not Verified</Text>
-            <Text style={[styles.modalBody, { color: colors.mutedForeground }]}>
-              Please verify your email before signing in. Check your inbox for the verification link.
-            </Text>
-            <TouchableOpacity
-              style={[styles.modalSecondaryBtn, { borderColor: colors.primary }, resendLoading && { opacity: 0.7 }]}
-              onPress={handleResendVerification}
-              disabled={resendLoading}
-            >
-              {resendLoading
-                ? <ActivityIndicator color={colors.primary} />
-                : <Text style={[styles.modalSecondaryBtnText, { color: colors.primary }]}>Resend Verification Email</Text>
-              }
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalBtn, { backgroundColor: colors.primary }]}
-              onPress={() => setShowVerifyModal(false)}
-            >
-              <Text style={[styles.modalBtnText, { color: colors.primaryForeground }]}>OK, Got It</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </View>
+      <OtpModal
+        visible={showOtpModal}
+        email={otpEmail}
+        onVerify={handleVerifyOtp}
+        onResend={handleResendOtp}
+        onClose={() => setShowOtpModal(false)}
+      />
+
+      {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   root:   { flex: 1 },
-  scroll: { flexGrow: 1, paddingBottom: Spacing[8] },
+  scroll: { flexGrow: 1, paddingBottom: 48 },
 
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing[4],
-    paddingTop: Spacing[3],
-    paddingBottom: Spacing[2],
-  },
-  backBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  brandPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-  },
-  brandText: { fontSize: 12, fontWeight: '700' },
+  topBar:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 8, paddingBottom: 8 },
+  wordmark:   { fontSize: 17, fontWeight: '900', letterSpacing: -0.5 },
+  topRight:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar:     { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontSize: 10, fontWeight: '700' },
 
-  heroStrip: {
-    marginHorizontal: Spacing[4],
-    borderRadius: 20,
-    padding: Spacing[4],
-    paddingBottom: Spacing[5],
-    overflow: 'hidden',
-    marginBottom: Spacing[4],
-    position: 'relative',
-  },
-  heroBlob: {
-    position: 'absolute', width: 180, height: 180, borderRadius: 90,
-    top: -60, right: -40,
-  },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: Spacing[4] },
-  chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
-  },
-  chipIcon: { width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  chipLabel: { fontSize: 11, fontWeight: '600' },
-  heroHeading: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4, marginBottom: 4 },
-  heroSub:     { fontSize: 13, lineHeight: 18 },
+  heroSection: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 32 },
+  heroTitle: { fontSize: 54, fontWeight: '900', letterSpacing: -2, lineHeight: 56, marginBottom: 16 },
+  heroSub:   { fontSize: 15, lineHeight: 22 },
 
-  card: {
-    marginHorizontal: Spacing[4],
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: Spacing[5],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
-    marginBottom: Spacing[4],
-  },
+  form: { paddingHorizontal: 24, gap: 20, marginBottom: 24 },
 
-  errorBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    padding: 10, borderRadius: 10, borderWidth: 1,
-    marginBottom: Spacing[4],
-  },
+  errorBanner:     { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
   errorBannerText: { flex: 1, fontSize: 13 },
 
-  forgotRow:  { alignSelf: 'flex-end', marginTop: Spacing[2] },
-  forgotText: { fontSize: 13, fontWeight: '600' },
-
-  submitBtn: {
-    height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 8, marginTop: Spacing[4],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
+  fieldWrap:     { gap: 6 },
+  fieldLabel:    { fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  fieldLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  forgotLink:    { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  input: {
+    height: 54, borderWidth: 1, borderRadius: 12,
+    paddingHorizontal: 20, fontSize: 15, backgroundColor: 'transparent',
   },
-  submitText: { fontSize: 16, fontWeight: '700' },
-
-  divider:  { flexDirection: 'row', alignItems: 'center', marginVertical: Spacing[4], gap: Spacing[3] },
-  divLine:  { flex: 1, height: 1 },
-  divLabel: { fontSize: 12 },
-
-  socialRow: { flexDirection: 'row', gap: Spacing[3] },
-  socialBtn: {
-    flex: 1, height: 46, borderRadius: 12, borderWidth: 1,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+  inputWrap: {
+    height: 54, borderWidth: 1, borderRadius: 12,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: 'transparent',
+    paddingHorizontal: 20,
   },
-  socialLabel: { fontSize: 14, fontWeight: '600' },
+  inputInner: { flex: 1, fontSize: 15 },
+  eyeBtn:     { padding: 4 },
+  fieldError: { fontSize: 11, color: '#ffb4ab', marginTop: 2 },
 
-  switchRow:  { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing[4] },
+  btnPrimary:     { height: 56, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  btnPrimaryText: { fontSize: 16, fontWeight: '800' },
+  btnGoogle:      { height: 52, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  btnGoogleText:  { fontSize: 15, fontWeight: '600' },
+
+  divider:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  divLine:  { flex: 1, height: StyleSheet.hairlineWidth },
+  divLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+
+  switchRow:  { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   switchText: { fontSize: 14 },
   switchLink: { fontSize: 14, fontWeight: '700' },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', padding: Spacing[6] },
-  modalCard: {
-    width: '100%', maxWidth: 380, borderRadius: 24,
-    padding: Spacing[6], alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25, shadowRadius: 12, elevation: 12,
-  },
-  modalIconWrap: {
-    width: 76, height: 76, borderRadius: 38,
-    backgroundColor: '#FEF3C7',
-    justifyContent: 'center', alignItems: 'center', marginBottom: Spacing[4],
-  },
-  modalTitle:   { fontSize: 20, fontWeight: '800', marginBottom: Spacing[2], textAlign: 'center' },
-  modalBody:    { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: Spacing[5] },
-  modalSecondaryBtn: {
-    width: '100%',
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing[3],
-  },
-  modalSecondaryBtnText: { fontSize: 14, fontWeight: '700' },
-  modalBtn:     { width: '100%', height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  modalBtnText: { fontSize: 15, fontWeight: '700' },
 });
-
-
