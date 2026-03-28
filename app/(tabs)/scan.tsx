@@ -443,9 +443,10 @@ export default function ScanScreen() {
         enableTorch={flashOn}
         barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-      >
+      />
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
         <ScannerOverlay flashOn={flashOn} onToggleFlash={() => setFlashOn(!flashOn)} />
-      </CameraView>
+      </View>
 
       {busy && (
         <View style={styles.busyOverlay}>
