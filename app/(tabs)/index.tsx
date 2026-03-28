@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -86,7 +87,7 @@ export default function HomeScreen() {
               onPress={() => router.push('/(tabs)/profile')}
             >
               {user?.avatar ? (
-                <Text style={styles.avatarText}>{avatarInitial}</Text>
+                <Image source={{ uri: user.avatar }} style={styles.avatarImage} />
               ) : (
                 <Text style={[styles.avatarText, { color: '#6366F1' }]}>{avatarInitial}</Text>
               )}
@@ -176,6 +177,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarText: { fontSize: 18, fontWeight: '700', color: '#6366F1' },
+  avatarImage: { width: 40, height: 40, borderRadius: 20 },
   greetSmall: { fontSize: Typography.fontSize.xs },
   greetName: { fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.bold },
   bellBtn: {

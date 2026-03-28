@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -7,8 +7,6 @@ import { useTheme } from '@/hooks/useTheme';
 import { fetchBusinesses, BusinessRecord, subscribeToBusinesses, createBusiness } from '@/lib/business';
 import { MapControls } from '@/components/map';
 import { useStore } from '@/store/useStore';
-
-const { width, height } = Dimensions.get('window');
 
 export default function MapScreen() {
   const { colors, isDark } = useTheme();
@@ -234,7 +232,7 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  map: { width, height },
+  map: { flex: 1 },
   gpsBanner: {
     flexDirection: 'row',
     alignItems: 'center',

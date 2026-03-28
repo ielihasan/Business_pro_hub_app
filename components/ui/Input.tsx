@@ -40,7 +40,7 @@ export function Input({
 }: InputProps) {
   const { colors } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
-  const [isPasswordVisible, setIsPasswordVisible] = useState(!secureTextEntry);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   const handleFocus = () => setIsFocused(true);
   const handleBlur = () => setIsFocused(false);

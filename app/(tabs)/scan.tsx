@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Modal, TextInput, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useTheme } from '@/hooks/useTheme';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
@@ -315,6 +316,109 @@ export default function ScanScreen() {
     setManualBusinessId('');
   };
 
+  // Web: camera-based QR scanning is not available — show manual entry only
+  if (Platform.OS === 'web') {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+        <View style={styles.webFallbackContainer}>
+          <View style={[styles.webFallbackIcon, { backgroundColor: colors.secondary }]}>
+            <Ionicons name="qr-code-outline" size={56} color={colors.mutedForeground} />
+          </View>
+          <Text style={[styles.webFallbackTitle, { color: colors.foreground }]}>QR Scanning Unavailable</Text>
+          <Text style={[styles.webFallbackDesc, { color: colors.mutedForeground }]}>
+            Camera-based QR scanning is only available on the mobile app.{'\n'}
+            Use the button below to join a queue by entering the business ID manually.
+          </Text>
+          <TouchableOpacity
+            style={[styles.manualButton, { backgroundColor: colors.primary, marginTop: 24, width: '80%' }]}
+            onPress={handleManualEntry}
+          >
+            <Text style={styles.manualButtonText}>Enter Business ID</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Manual Entry Modal */}
+        <Modal
+          visible={showManualModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowManualModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Enter Business ID</Text>
+              <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>
+                Enter the business ID to join its queue
+              </Text>
+              <TextInput
+                style={[styles.modalInput, {
+                  backgroundColor: colors.muted,
+                  color: colors.foreground,
+                  borderColor: colors.border,
+                }]}
+                placeholder="e.g., 3b7a50bb-b48d-4ae8..."
+                placeholderTextColor={colors.mutedForeground}
+                value={manualBusinessId}
+                onChangeText={setManualBusinessId}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoFocus={true}
+              />
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, { backgroundColor: colors.muted }]}
+                  onPress={() => setShowManualModal(false)}
+                >
+                  <Text style={[styles.modalButtonText, { color: colors.foreground }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, { backgroundColor: colors.primary }]}
+                  onPress={handleManualSubmit}
+                >
+                  <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>Join Queue</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Quantity Modal (shared with native) */}
+        <Modal
+          visible={showQuantityModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => { setShowQuantityModal(false); setPendingJoin(null); setScanned(false); }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.quantityModalContent, { backgroundColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Select Quantity</Text>
+              <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>{pendingJoin?.businessName || 'Business'}</Text>
+              <View style={styles.qtyStepperRow}>
+                <TouchableOpacity style={[styles.stepperBtn, { backgroundColor: colors.secondary }]} onPress={() => setQuantity((q) => Math.max(1, q - 1))}>
+                  <Text style={[styles.stepperBtnText, { color: colors.foreground }]}>-</Text>
+                </TouchableOpacity>
+                <View style={[styles.qtyValueBox, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                  <Text style={[styles.qtyValueText, { color: colors.foreground }]}>{quantity}</Text>
+                </View>
+                <TouchableOpacity style={[styles.stepperBtn, { backgroundColor: colors.secondary }]} onPress={() => setQuantity((q) => Math.min(99, q + 1))}>
+                  <Text style={[styles.stepperBtnText, { color: colors.foreground }]}>+</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.muted }]} onPress={() => { setShowQuantityModal(false); setPendingJoin(null); setScanned(false); }}>
+                  <Text style={[styles.modalButtonText, { color: colors.foreground }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={handleConfirmJoinWithQuantity}>
+                  <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>Join Queue</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </SafeAreaView>
+    );
+  }
+
   if (!permission) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -376,12 +480,9 @@ export default function ScanScreen() {
               Enter Business ID
             </Text>
             <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>
-              Paste the business ID from Supabase
+              Enter the business ID to join its queue
             </Text>
-            <Text style={[styles.modalHint, { color: colors.mutedForeground }]}>
-              💡 Run DEBUG_AND_FIX_BUSINESS.sql in Supabase to get a valid ID
-            </Text>
-            
+
             <TextInput
               style={[styles.modalInput, { 
                 backgroundColor: colors.muted,
@@ -515,6 +616,31 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   camera: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  webFallbackContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing[8],
+    gap: Spacing[4],
+  },
+  webFallbackIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing[2],
+  },
+  webFallbackTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  webFallbackDesc: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 21,
+  },
   loadingText: { fontSize: Typography.fontSize.base },
   busyOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -577,11 +703,6 @@ const styles = StyleSheet.create({
   modalSubtitle: {
     fontSize: Typography.fontSize.sm,
     marginBottom: Spacing[2],
-  },
-  modalHint: {
-    fontSize: Typography.fontSize.xs,
-    fontStyle: 'italic',
-    marginBottom: Spacing[3],
   },
   modalInput: {
     borderWidth: 1,

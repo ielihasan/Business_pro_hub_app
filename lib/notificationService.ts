@@ -46,8 +46,8 @@ try {
  */
 export async function requestNotificationPermissions(): Promise<boolean> {
   try {
-    // Expo Go (SDK 53+): remote push not available – skip silently
-    if (isExpoGo()) return false;
+    // Web & Expo Go: push notifications not available – skip silently
+    if (Platform.OS === 'web' || isExpoGo()) return false;
 
     const { status: existingStatus } = await ExpoNotifications.getPermissionsAsync();
     let finalStatus = existingStatus;

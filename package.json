@@ -60,6 +60,7 @@
     "@babel/core": "^7.24.0",
     "@types/react": "~19.1.10",
     "babel-plugin-module-resolver": "^5.0.2",
+    "babel-plugin-transform-import-meta": "^2.3.3",
     "canvas": "^3.2.1",
     "expo-module-scripts": "^55.0.2",
     "typescript": "~5.9.2"

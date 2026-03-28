@@ -4,7 +4,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   StatusBar,
-  Dimensions,
+  useWindowDimensions,
   ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -13,16 +13,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Spacing } from '@/constants/theme';
 
-const { width, height } = Dimensions.get('window');
-
-const BUBBLES: Array<{ icon: string; color: string; bg: string; top: number; left: number; size: number }> = [
-  { icon: 'qr-code',       color: '#fff', bg: '#6366F1', top: 16,  left: 24,          size: 50 },
-  { icon: 'storefront',    color: '#fff', bg: '#0EA5E9', top: 62,  left: width * 0.6, size: 44 },
-  { icon: 'time',          color: '#fff', bg: '#10B981', top: 114, left: 48,          size: 40 },
-  { icon: 'notifications', color: '#fff', bg: '#F59E0B', top: 90,  left: width * 0.4, size: 36 },
-  { icon: 'star',          color: '#fff', bg: '#EC4899', top: 150, left: width * 0.66,size: 42 },
-  { icon: 'card',          color: '#fff', bg: '#8B5CF6', top: 154, left: 10,          size: 36 },
-  { icon: 'people',        color: '#fff', bg: '#14B8A6', top: 34,  left: width * 0.36,size: 42 },
+const BUBBLE_DEFS: Array<{ icon: string; color: string; bg: string; top: number; leftRatio: number; size: number }> = [
+  { icon: 'qr-code',       color: '#fff', bg: '#6366F1', top: 16,  leftRatio: 0.02,  size: 50 },
+  { icon: 'storefront',    color: '#fff', bg: '#0EA5E9', top: 62,  leftRatio: 0.60,  size: 44 },
+  { icon: 'time',          color: '#fff', bg: '#10B981', top: 114, leftRatio: 0.04,  size: 40 },
+  { icon: 'notifications', color: '#fff', bg: '#F59E0B', top: 90,  leftRatio: 0.40,  size: 36 },
+  { icon: 'star',          color: '#fff', bg: '#EC4899', top: 150, leftRatio: 0.66,  size: 42 },
+  { icon: 'card',          color: '#fff', bg: '#8B5CF6', top: 154, leftRatio: 0.008, size: 36 },
+  { icon: 'people',        color: '#fff', bg: '#14B8A6', top: 34,  leftRatio: 0.36,  size: 42 },
 ];
 
 const FEATURES = [
@@ -34,6 +32,8 @@ const FEATURES = [
 
 export default function WelcomeScreen() {
   const { colors, isDark } = useTheme();
+  const { width, height } = useWindowDimensions();
+  const heroHeight = Math.min(height * 0.43, 340);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -41,15 +41,15 @@ export default function WelcomeScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll} bounces={false}>
 
         {/* ── Hero ── */}
-        <View style={[styles.hero, { backgroundColor: isDark ? '#0F0F1A' : '#F0F1FF' }]}>
+        <View style={[styles.hero, { backgroundColor: isDark ? '#0F0F1A' : '#F0F1FF', height: heroHeight }]}>
           <View style={[styles.blob1, { backgroundColor: isDark ? '#6366F130' : '#6366F11A' }]} />
           <View style={[styles.blob2, { backgroundColor: isDark ? '#10B98130' : '#10B98115' }]} />
 
-          {BUBBLES.map((b, i) => (
+          {BUBBLE_DEFS.map((b, i) => (
             <View
               key={i}
               style={[styles.bubble, { width: b.size, height: b.size, borderRadius: b.size / 2,
-                backgroundColor: b.bg, top: b.top, left: b.left, shadowColor: b.bg }]}
+                backgroundColor: b.bg, top: b.top, left: b.leftRatio * width, shadowColor: b.bg }]}
             >
               <Ionicons name={b.icon as any} size={b.size * 0.44} color={b.color} />
             </View>
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   root:   { flex: 1 },
   scroll: { flexGrow: 1 },
 
-  hero: { height: height * 0.43, overflow: 'hidden', position: 'relative' },
+  hero: { overflow: 'hidden', position: 'relative' },
   blob1: { position: 'absolute', width: 260, height: 260, borderRadius: 130, top: -80, left: -60 },
   blob2: { position: 'absolute', width: 200, height: 200, borderRadius: 100, bottom: -40, right: -40 },
   bubble: {
@@ -161,7 +161,8 @@ const styles = StyleSheet.create({
   secLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 12, paddingLeft: 2 },
   grid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   tile: {
-    width: (width - Spacing[4] * 2 - 12) / 2,
+    flex: 1,
+    minWidth: 140,
     borderRadius: 16, borderWidth: StyleSheet.hairlineWidth,
     padding: 16, shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,

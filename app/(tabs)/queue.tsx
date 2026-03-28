@@ -102,7 +102,18 @@ export default function QueueScreen() {
         ) : queueHistory.length > 0 ? (
           <View style={styles.list}>
             {queueHistory.map((q) => (
-              <PastQueueItem key={q.id} queue={q as any} />
+              <PastQueueItem
+                key={q.id}
+                queue={{
+                  id: q.id,
+                  businessId: q.businessId,
+                  businessName: q.businessName,
+                  businessCategory: q.businessCategory,
+                  ticketNumber: q.ticketNumber,
+                  status: q.status === 'completed' || q.status === 'cancelled' ? q.status : 'completed',
+                  completedAt: q.completedAt ?? q.joinedAt,
+                }}
+              />
             ))}
           </View>
         ) : (

@@ -1,6 +1,8 @@
 # BusinessHub Pro
 
-A cross-platform mobile application for virtual queue management, built with React Native and Expo. Users can discover nearby businesses, join virtual queues, track orders, and receive real-time notifications.
+A cross-platform virtual queue management app built with React Native, Expo SDK 54, and Supabase. Users scan QR codes to join business queues, track wait times in real time, manage orders, and earn loyalty rewards.
+
+---
 
 ## Table of Contents
 
@@ -8,514 +10,534 @@ A cross-platform mobile application for virtual queue management, built with Rea
 - [Tech Stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Project Setup](#project-setup)
-  - [1. Clone the Repository](#1-clone-the-repository)
-  - [2. Install Dependencies](#2-install-dependencies)
-  - [3. Supabase Setup](#3-supabase-setup)
-  - [4. Environment Variables](#4-environment-variables)
-  - [5. Supabase Database Setup](#5-supabase-database-setup)
-  - [6. Email Template Configuration](#6-email-template-configuration)
 - [Running the App](#running-the-app)
+- [Environment Variables](#environment-variables)
+- [Supabase Database Setup](#supabase-database-setup)
 - [Project Structure](#project-structure)
 - [Available Scripts](#available-scripts)
-- [Configuration Details](#configuration-details)
+- [Known Limitations](#known-limitations)
 - [Troubleshooting](#troubleshooting)
-- [Contributor Setup (Private Repository)](#contributor-setup-private-repository)
-- [License](#license)
+
+---
 
 ## Features
 
-- **Virtual Queue Management** - Join and track queues remotely
-- **Real-Time Updates** - Live queue position and wait time notifications
-- **Business Discovery** - Find nearby businesses with ratings and reviews
-- **QR Code Scanner** - Quick queue joining via QR codes
-- **Order Tracking** - Track order status from placement to completion
-- **User Authentication** - Secure email/password authentication with email verification
-- **Profile Management** - Manage user profile, loyalty points, and preferences
-- **Dark Mode Support** - Automatic system theme detection
+- **Virtual Queue** — Join, track, and leave queues remotely via QR code scan
+- **Real-Time Updates** — Live position and wait-time via Supabase Realtime subscriptions
+- **Business Discovery** — Nearby businesses on an interactive Google Map with radius filters
+- **Order Tracking** — View active and completed orders per business
+- **Authentication** — Email/password, Google OAuth, Apple Sign-In (iOS), email verification, password reset
+- **Profile & Loyalty** — Edit profile photo, track visit history and loyalty points, change password
+- **Notifications** — Push and in-app notifications for queue and order events
+- **Internationalization** — 10 languages: English, Urdu, Spanish, French, German, Chinese, Arabic, Hindi, Portuguese, Russian
+- **Dark Mode** — System-aware with manual override
+- **Web Support** — Runs in browser via `npm run web`
+
+---
 
 ## Tech Stack
 
-| Category         | Technology                          |
-| ---------------- | ----------------------------------- |
-| Framework        | React Native 0.81.5                 |
-| Build System     | Expo SDK 54                         |
-| Navigation       | Expo Router (file-based routing)    |
-| State Management | Zustand 4.5                         |
-| Backend          | Supabase (Auth + PostgreSQL)        |
-| Language         | TypeScript 5.9                      |
-| UI Components    | Custom components with React Native |
-| Animations       | React Native Reanimated             |
+| Layer | Technology |
+|-------|-----------|
+| Framework | React Native 0.81, Expo SDK 54 |
+| Navigation | Expo Router (file-based) |
+| Language | TypeScript 5 (strict) |
+| State | Zustand 4 with AsyncStorage persistence |
+| Backend | Supabase (Postgres, Auth, Realtime, Storage) |
+| Maps | react-native-maps (Google Maps) |
+| Camera | expo-camera (QR scanning) |
+| Notifications | expo-notifications |
+| i18n | i18next + react-i18next |
+| Animations | React Native Reanimated 4 |
+| Auth | expo-auth-session, expo-apple-authentication |
+
+---
 
 ## Prerequisites
 
-Before setting up the project, ensure you have the following installed:
+### All platforms
 
-- **Node.js** (v18 or higher) - [Download](https://nodejs.org/)
-- **npm** (v9 or higher) or **yarn** (v1.22 or higher)
-- **Expo CLI** - Install globally: `npm install -g expo-cli`
-- **Expo Go App** - Install on your mobile device from [App Store](https://apps.apple.com/app/expo-go/id982107779) or [Play Store](https://play.google.com/store/apps/details?id=host.exp.exponent)
-- **Git** - [Download](https://git-scm.com/)
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| Node.js | 18 or later | [nodejs.org](https://nodejs.org) |
+| npm | 9 or later | Comes with Node |
+| Git | Any | [git-scm.com](https://git-scm.com) |
+| Supabase account | — | [supabase.com](https://supabase.com) |
 
-For iOS development (macOS only):
+### Android (Windows / macOS / Linux)
 
-- **Xcode** (latest version) - From Mac App Store
-- **CocoaPods** - `sudo gem install cocoapods`
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| Android Studio | Hedgehog or later | Required **once** to install SDK + NDK |
+| Android SDK | API 36 | Install via Android Studio SDK Manager |
+| NDK (Side by side) | **27.1.12297006** | Install via Android Studio → SDK Tools |
+| JDK | 17 (bundled with Android Studio) | Uses Android Studio's JBR automatically |
+| Android device or emulator | API 24+ (Android 7.0+) | Physical device recommended |
 
-For Android development:
+> **After the one-time Android Studio setup you never need to open it again.** All builds run from the terminal.
 
-- **Android Studio** - [Download](https://developer.android.com/studio)
-- **Android SDK** (API Level 34 or higher)
-- **Java Development Kit (JDK)** 17
+### iOS (macOS only)
+
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| macOS | 13 Ventura or later | — |
+| Xcode | 15 or later | App Store |
+| CocoaPods | 1.13 or later | `sudo gem install cocoapods` |
+
+---
 
 ## Project Setup
 
-### 1. Clone the Repository
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/Business_pro_hub_app.git
+git clone <repo-url>
 cd Business_pro_hub_app
 ```
 
-### 2. Install Dependencies
+### 2. Install dependencies
 
 ```bash
-# Using npm
 npm install
-
-# Or using yarn
-yarn install
 ```
 
-### 3. Supabase Setup
+### 3. Configure environment variables
 
-This app uses [Supabase](https://supabase.com/) as the backend for authentication and database. You need to create your own Supabase project.
-
-#### Create a Supabase Project
-
-1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
-2. Click **"New Project"**
-3. Fill in the project details:
-   - **Name**: BusinessHub Pro (or your preferred name)
-   - **Database Password**: Create a strong password (save this!)
-   - **Region**: Choose the closest region to your users
-4. Click **"Create new project"** and wait for it to be ready
-
-#### Get Your API Keys
-
-1. In your Supabase project dashboard, go to **Settings** > **API**
-2. Copy the following values:
-   - **Project URL** (e.g., `https://xxxxxxxxxxxxx.supabase.co`)
-   - **anon public** key (under "Project API keys")
-
-### 4. Environment Variables
-
-Create a `.env` file in the project root:
-
-```bash
-# Copy the example file
-cp .env.example .env
-```
-
-Edit the `.env` file with your Supabase credentials:
+Create a `.env` file at the project root:
 
 ```env
-# Supabase Configuration
-# Get these values from your Supabase project dashboard
-# Go to: https://supabase.com/dashboard/project/YOUR_PROJECT/settings/api
-
-EXPO_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+EXPO_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
 ```
 
-**Important:** Never commit your `.env` file to version control. It's already listed in `.gitignore`.
+Both values are in your Supabase project under **Settings → API**.
 
-### 5. Supabase Database Setup
+> Never commit `.env` to version control — it is listed in `.gitignore`.
 
-Run the following SQL in your Supabase SQL Editor (**SQL Editor** > **New Query**):
+### 4. Supabase Database Setup
+
+Run the following SQL in the **Supabase SQL Editor** (`supabase.com → your project → SQL Editor`):
 
 ```sql
--- Create User profile table
-CREATE TABLE IF NOT EXISTS public."User" (
-    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    full_name TEXT,
-    email TEXT UNIQUE NOT NULL,
-    phone_number TEXT,
-    avatar_url TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- Users profile table
+create table if not exists public.users (
+  id uuid references auth.users(id) on delete cascade primary key,
+  full_name text,
+  email text,
+  phone_number text,
+  avatar_url text,
+  loyalty_points integer default 0,
+  total_visits integer default 0,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Businesses table
+create table if not exists public.businesses (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  category text,
+  description text,
+  address text,
+  phone text,
+  latitude double precision,
+  longitude double precision,
+  queue_length integer default 0,
+  wait_time text default 'No wait',
+  rating numeric(3,2) default 0,
+  review_count integer default 0,
+  is_open boolean default true,
+  image_url text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Queues table
+create table if not exists public.queues (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid references public.businesses(id) on delete cascade,
+  customer_id uuid references auth.users(id) on delete cascade,
+  customer_name text,
+  customer_email text,
+  customer_phone text,
+  service_type text,
+  quantity integer default 1,
+  unit_price numeric(10,2),
+  total_amount numeric(10,2),
+  position integer not null,
+  status text default 'waiting' check (status in ('waiting','in_progress','completed','cancelled')),
+  priority text default 'normal',
+  notes text,
+  estimated_wait_time integer default 0,
+  joined_at timestamptz default now(),
+  called_at timestamptz,
+  started_at timestamptz,
+  completed_at timestamptz,
+  cancelled_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- Feedback table
+create table if not exists public."Feedback" (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  user_name text,
+  user_email text,
+  rating integer check (rating between 1 and 5),
+  category text,
+  message text,
+  points_awarded integer default 0,
+  created_at timestamptz default now()
 );
 
 -- Enable Row Level Security
-ALTER TABLE public."User" ENABLE ROW LEVEL SECURITY;
+alter table public.users enable row level security;
+alter table public.businesses enable row level security;
+alter table public.queues enable row level security;
+alter table public."Feedback" enable row level security;
 
--- Create policies for User table
-CREATE POLICY "Users can view their own profile"
-    ON public."User"
-    FOR SELECT
-    USING (auth.uid() = id);
+-- RLS Policies
+create policy "Users can read own profile"   on public.users for select using (auth.uid() = id);
+create policy "Users can update own profile" on public.users for update using (auth.uid() = id);
+create policy "Users can insert own profile" on public.users for insert with check (auth.uid() = id);
 
-CREATE POLICY "Users can update their own profile"
-    ON public."User"
-    FOR UPDATE
-    USING (auth.uid() = id);
+create policy "Anyone can read businesses"   on public.businesses for select using (true);
+create policy "Anyone can insert businesses" on public.businesses for insert with check (true);
 
-CREATE POLICY "Users can insert their own profile"
-    ON public."User"
-    FOR INSERT
-    WITH CHECK (auth.uid() = id);
+create policy "Users can read own queues"   on public.queues for select using (auth.uid() = customer_id);
+create policy "Users can insert own queues" on public.queues for insert with check (auth.uid() = customer_id);
+create policy "Users can update own queues" on public.queues for update using (auth.uid() = customer_id);
 
--- Create function to update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
--- Create trigger for updated_at
-CREATE TRIGGER update_user_updated_at
-    BEFORE UPDATE ON public."User"
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+create policy "Users can insert feedback"   on public."Feedback" for insert with check (auth.uid() = user_id);
+create policy "Users can read own feedback" on public."Feedback" for select using (auth.uid() = user_id);
 ```
 
-### 6. Email Template Configuration
+#### Loyalty points RPC (required for feedback rewards)
 
-The app uses email verification. Configure the email template in Supabase:
+```sql
+create or replace function award_loyalty_points(p_user_id uuid, p_points int)
+returns int language plpgsql security definer as $$
+declare new_pts int;
+begin
+  if auth.uid() <> p_user_id then raise exception 'Unauthorized'; end if;
+  update users
+    set loyalty_points = coalesce(loyalty_points, 0) + p_points,
+        updated_at = now()
+  where id = p_user_id
+  returning loyalty_points into new_pts;
+  return new_pts;
+end; $$;
+```
 
-1. Go to **Authentication** > **Email Templates** in your Supabase dashboard
-2. Select **"Confirm signup"** template
-3. Replace the default template with the content from `email-templates/verification-email.html`
-4. Update the **Subject** to: `Verify your BusinessHub Pro account`
+#### Account deletion RPC (required for delete account feature)
 
-#### Configure Email Settings
+```sql
+create or replace function delete_my_account()
+returns void language plpgsql security definer as $$
+begin
+  if auth.uid() is null then raise exception 'Unauthorized'; end if;
+  delete from auth.users where id = auth.uid();
+end; $$;
+```
 
-1. Go to **Authentication** > **Settings**
-2. Under **Email Auth**, ensure:
-   - **Enable Email Signup** is ON
-   - **Confirm email** is ON
-3. Under **Site URL**, set your app's deep link URL:
-   - For development: `businesshubpro://auth/callback`
-   - For production: Your production URL
-4. Under **Redirect URLs**, add:
-   - `businesshubpro://auth/callback`
-   - `exp://localhost:8081/--/auth/callback` (for Expo Go development)
+### 5. Configure Supabase Auth
+
+In the Supabase dashboard under **Authentication → URL Configuration**:
+
+- **Site URL**: `businesshubpro://`
+- **Redirect URLs**: Add `businesshubpro://auth/callback`
+
+For **Google OAuth**: go to **Authentication → Providers → Google** and enter your Google Cloud OAuth credentials (Client ID + Secret).
+
+### 6. Enable Supabase Realtime
+
+In the Supabase dashboard go to **Database → Replication** and enable the `queues` and `businesses` tables for realtime.
+
+### 7. Configure Email Templates (optional)
+
+The `email-templates/verification-email.html` file contains a custom verification email template. Paste its contents into **Supabase → Authentication → Email Templates → Confirm signup**.
+
+---
 
 ## Running the App
 
-### Development Mode
+> **Important:** This project uses native modules (`react-native-maps`, `expo-camera`) and **cannot run inside the standard Expo Go app**. It requires a custom development build installed directly on your device.
+
+### Android — Physical Device (USB) — Recommended
 
 ```bash
-# Start the Expo development server
-npm start
+# 1. Enable USB Debugging on your Android phone:
+#    Settings → About Phone → tap "Build number" 7 times
+#    Settings → Developer Options → enable "USB Debugging"
+#    Plug in via USB and accept the "Allow USB Debugging?" prompt
 
-# Or with specific platform
-npm run android    # Android
-npm run ios        # iOS (macOS only)
-npm run web        # Web browser
+# 2. Verify your device is detected
+adb devices          # should list your device (not "offline")
+
+# 3. First-time build & install (~8–15 min, compiles all native code)
+npx expo run:android
+
+# 4. Every subsequent session — just start Metro (fast, no rebuild)
+npx expo start
 ```
 
-### Using Expo Go (Recommended for Development)
+After the first `npx expo run:android` installs the APK, you only need `npx expo start` for day-to-day development. Any code change you save appears on the device in **under 2 seconds** via Fast Refresh.
 
-1. Start the development server: `npm start`
-2. Scan the QR code with:
-   - **iOS**: Camera app
-   - **Android**: Expo Go app
-
-### Building for Production
+### Android — Emulator
 
 ```bash
-# Install EAS CLI
+# Start an AVD from Android Studio's Device Manager, then:
+npx expo run:android
+```
+
+### Web (browser)
+
+```bash
+npm run web
+# Opens at http://localhost:8081
+```
+
+> Camera and Maps are unavailable on web (see Known Limitations).
+
+### iOS — Simulator (macOS only)
+
+```bash
+cd ios && pod install && cd ..
+npx expo run:ios
+```
+
+### Production Builds (EAS)
+
+```bash
 npm install -g eas-cli
-
-# Login to Expo
 eas login
-
-# Build for Android
-eas build --platform android
-
-# Build for iOS
+eas build --platform android   # generates signed APK / AAB
 eas build --platform ios
 ```
+
+---
+
+## Windows Firewall — allow Metro on a physical device
+
+If your Android device shows `failed to download remote update` when connecting over Wi-Fi, Windows Firewall is blocking port 8081. Run once in an **Administrator** terminal:
+
+```cmd
+netsh advfirewall firewall add rule name="Expo Metro 8081" dir=in action=allow protocol=TCP localport=8081
+```
+
+---
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `EXPO_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous/public key (safe to expose) |
+
+All `EXPO_PUBLIC_` variables are bundled into the client at build time. The anon key is intentionally public — Supabase Row Level Security controls what each user can access.
+
+---
+
+## Android SDK — Version Requirements
+
+The `android/build.gradle` pins these values. Do **not** lower them:
+
+| Setting | Value | Reason |
+|---------|-------|--------|
+| `minSdkVersion` | 24 (Android 7.0) | Required by React Native 0.76+ Hermes |
+| `compileSdkVersion` | 36 | Required by Expo SDK 54 |
+| `targetSdkVersion` | 36 | Google Play requirement |
+| `ndkVersion` | 27.1.12297006 | Required by react-native-screens / worklets |
+
+---
 
 ## Project Structure
 
 ```
 Business_pro_hub_app/
-├── app/                      # Expo Router screens
-│   ├── (auth)/              # Authentication screens
-│   │   ├── welcome.tsx      # Welcome/landing screen
-│   │   ├── login.tsx        # Login screen
-│   │   ├── register.tsx     # Registration screen
-│   │   └── forgot-password.tsx
-│   ├── (tabs)/              # Main tab navigation
-│   │   ├── index.tsx        # Home screen
-│   │   ├── queue.tsx        # Queue management
-│   │   ├── orders.tsx       # Order tracking
-│   │   ├── profile.tsx      # User profile
-│   │   └── scan.tsx         # QR scanner
-│   ├── auth/                # Auth callback handlers
-│   ├── business/[id].tsx    # Business detail (dynamic route)
-│   ├── queue/[id].tsx       # Queue status (dynamic route)
-│   ├── _layout.tsx          # Root layout
-│   └── index.tsx            # Entry point
-├── components/              # Reusable components
-│   └── ui/                  # Core UI components
-│       ├── Button.tsx
-│       ├── Input.tsx
-│       ├── Card.tsx
-│       └── ...
-├── lib/                     # Core libraries
-│   ├── supabase.ts         # Supabase client
-│   └── auth.ts             # Auth functions
-├── store/                   # State management
-│   └── useStore.ts         # Zustand store
-├── hooks/                   # Custom React hooks
-│   └── useTheme.ts
-├── constants/               # App constants
-│   └── theme.ts            # Theme configuration
-├── types/                   # TypeScript types
-│   └── index.ts
-├── email-templates/         # Email templates
-├── assets/                  # Images, icons, fonts
-├── .env.example            # Environment template
-├── app.json                # Expo configuration
-├── package.json            # Dependencies
-└── tsconfig.json           # TypeScript config
+├── app/                        # Expo Router screens (file-based routing)
+│   ├── (auth)/                 # Unauthenticated screens
+│   │   ├── welcome.tsx         # Landing / onboarding
+│   │   ├── login.tsx           # Sign in
+│   │   ├── register.tsx        # Sign up
+│   │   ├── forgot-password.tsx # Request password reset
+│   │   └── reset-password.tsx  # Confirm new password
+│   ├── (tabs)/                 # Authenticated main app (floating tab bar)
+│   │   ├── index.tsx           # Home / dashboard
+│   │   ├── queue.tsx           # Active queues & history
+│   │   ├── orders.tsx          # Order tracking
+│   │   ├── map.tsx             # Business map (Google Maps)
+│   │   ├── scan.tsx            # QR code scanner
+│   │   └── profile.tsx         # User profile
+│   ├── profile/                # Profile sub-screens
+│   │   ├── edit.tsx            # Edit name, email, photo
+│   │   ├── settings.tsx        # Notifications, theme, language
+│   │   ├── payment.tsx         # Saved payment methods
+│   │   ├── help.tsx            # FAQ & support
+│   │   ├── feedback.tsx        # Submit feedback (earns loyalty points)
+│   │   ├── about.tsx           # App info
+│   │   ├── terms.tsx           # Terms of service
+│   │   └── change-password.tsx # Change password
+│   ├── business/[id].tsx       # Business detail (dynamic route)
+│   ├── queue/[id].tsx          # Queue status detail (dynamic route)
+│   ├── auth/callback.tsx       # OAuth / email verification deep-link handler
+│   ├── _layout.tsx             # Root layout (deep linking, auth gate)
+│   └── index.tsx               # Splash / auth redirect
+│
+├── components/                 # Reusable UI components
+│   ├── ui/                     # Core design system (Button, Input, Card, …)
+│   ├── home/                   # Home screen components
+│   ├── profile/                # Profile screen components
+│   ├── queue/                  # Queue screen components
+│   ├── orders/                 # Orders screen components
+│   ├── map/                    # Map screen components
+│   ├── scan/                   # Scanner screen components
+│   └── notifications/          # Notification panel
+│
+├── lib/                        # Services and utilities
+│   ├── supabase.ts             # Supabase client
+│   ├── auth.ts                 # Auth helpers (login, register, OAuth sync)
+│   ├── queue.ts                # Queue CRUD + real-time subscription
+│   ├── business.ts             # Business data fetching + map subscription
+│   ├── oauth.ts                # Google / Apple OAuth flows
+│   ├── oauthState.ts           # OAuth mutable state flags
+│   ├── payment.ts              # Payment methods
+│   ├── notificationService.ts  # Push & local notifications
+│   ├── geoutils.ts             # Haversine distance utilities
+│   ├── suppressWarnings.ts     # Suppress noisy dev warnings
+│   ├── i18n/                   # Internationalization
+│   │   ├── index.ts            # i18next setup
+│   │   └── locales/            # en, ur, es, fr, de, zh, ar, hi, pt, ru
+│   └── web-stubs/              # Web platform polyfills
+│       ├── maps.js             # react-native-maps stub for web
+│       └── pkgr-core.js        # @pkgr/core stub for web
+│
+├── store/
+│   └── useStore.ts             # Zustand global store (auth, queue, orders, settings)
+│
+├── hooks/
+│   ├── useTheme.ts             # Theme hook (light/dark/system)
+│   ├── useNearbyBusinesses.ts  # Fetches & filters nearby businesses
+│   └── useProfilePhoto.ts      # Profile photo upload helper
+│
+├── constants/
+│   └── theme.ts                # Colors, spacing, typography, shadows
+│
+├── types/
+│   └── index.ts                # Shared TypeScript types
+│
+├── assets/                     # App icons, splash screen, favicon
+├── android/                    # Android native project (do not delete)
+│   ├── build.gradle            # Root Gradle — SDK versions pinned here
+│   ├── app/build.gradle        # App module Gradle config
+│   └── gradle.properties       # NDK, parallel builds, new arch settings
+├── email-templates/            # Supabase email HTML templates
+├── scripts/
+│   └── generate-assets.js      # Generates placeholder app icons
+├── docs/
+│   └── QA_BUTTON_FLOW_CHECKLIST.md  # Manual QA test checklist
+│
+├── app.json                    # Expo app config (scheme, permissions, plugins)
+├── babel.config.js             # Babel (module-resolver, reanimated plugin)
+├── metro.config.js             # Metro bundler (web stubs, Zustand CJS override)
+├── tsconfig.json               # TypeScript configuration
+├── eas.json                    # EAS build profiles
+└── .env                        # Environment variables (never committed)
 ```
-
-## Available Scripts
-
-| Command           | Description                    |
-| ----------------- | ------------------------------ |
-| `npm start`       | Start Expo development server  |
-| `npm run android` | Run on Android device/emulator |
-| `npm run ios`     | Run on iOS device/simulator    |
-| `npm run web`     | Run in web browser             |
-| `npm run lint`    | Run ESLint                     |
-
-## Configuration Details
-
-### App Configuration (`app.json`)
-
-| Setting           | Value                      |
-| ----------------- | -------------------------- |
-| App Name          | BusinessHub Pro            |
-| Bundle ID (iOS)   | `com.businesshubpro.app`   |
-| Package (Android) | `com.businesshubpro.app`   |
-| Deep Link Scheme  | `businesshubpro://`        |
-| Orientation       | Portrait                   |
-| Theme             | Automatic (follows system) |
-
-### Required Permissions
-
-**iOS:**
-
-- Camera - QR code scanning
-- Location When In Use - Find nearby businesses
-
-**Android:**
-
-- `CAMERA` - QR code scanning
-- `ACCESS_FINE_LOCATION` - Precise location
-- `ACCESS_COARSE_LOCATION` - Approximate location
-
-### Environment Variables Reference
-
-| Variable                        | Description                   | Required |
-| ------------------------------- | ----------------------------- | -------- |
-| `EXPO_PUBLIC_SUPABASE_URL`      | Your Supabase project URL     | Yes      |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous/public key | Yes      |
-
-## Troubleshooting
-
-### Common Issues
-
-**1. "Metro Bundler" connection issues**
-
-```bash
-# Clear Metro cache
-npx expo start --clear
-```
-
-**2. iOS build fails on M1/M2 Mac**
-
-```bash
-cd ios && pod install --repo-update && cd ..
-```
-
-**3. Android Gradle sync issues**
-
-```bash
-cd android && ./gradlew clean && cd ..
-```
-
-**4. Environment variables not loading**
-
-- Ensure `.env` file is in the project root
-- Restart the Expo server after changing `.env`
-- Variables must be prefixed with `EXPO_PUBLIC_`
-
-**5. Email verification not working**
-
-- Check Supabase email settings are configured
-- Verify the redirect URL includes your app scheme
-- Check spam folder for verification emails
-
-**6. Supabase connection errors**
-
-- Verify your API keys are correct
-- Check if your Supabase project is active
-- Ensure Row Level Security policies are set up
-
-### Getting Help
-
-If you encounter issues:
-
-1. Check the [Expo Documentation](https://docs.expo.dev/)
-2. Check the [Supabase Documentation](https://supabase.com/docs)
-3. Search existing [GitHub Issues](https://github.com/your-username/Business_pro_hub_app/issues)
-4. Create a new issue with detailed information
-
-## Contributor Setup (Private Repository)
-
-If you're a contributor joining this private repository and need to use the **shared Supabase backend**, follow these steps. The project owner will provide you with the necessary credentials.
-
-### For Project Owner: How to Share Credentials Securely
-
-**Never commit credentials to the repository.** Use one of these secure methods:
-
-#### Option 1: GitHub Repository Secrets (Recommended for CI/CD)
-
-1. Go to your GitHub repo → **Settings** → **Secrets and variables** → **Actions**
-2. Add repository secrets:
-   - `EXPO_PUBLIC_SUPABASE_URL`
-   - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-3. These can be used in GitHub Actions workflows
-
-#### Option 2: Private Sharing via Secure Channels
-
-Share credentials with contributors through:
-
-- **Password manager** (1Password, Bitwarden, LastPass) - Create a shared vault
-- **Encrypted messaging** (Signal, WhatsApp) - Send credentials directly
-- **GitHub Codespaces Secrets** - If using Codespaces for development
-- **Notion/Confluence** (private team page with restricted access)
-
-#### Option 3: Create a `.env.shared` File (Not Committed)
-
-Create a file called `CREDENTIALS.md` or share via team chat:
-
-```
-# BusinessHub Pro - Shared Development Credentials
-# DO NOT COMMIT THIS FILE
-
-EXPO_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-### For Contributors: Setting Up with Shared Credentials
-
-#### Step 1: Clone the Repository
-
-```bash
-git clone https://github.com/owner-username/Business_pro_hub_app.git
-cd Business_pro_hub_app
-```
-
-#### Step 2: Install Dependencies
-
-```bash
-npm install
-```
-
-#### Step 3: Get Credentials from Project Owner
-
-Contact the project owner to receive:
-
-| Credential                      | Description                            |
-| ------------------------------- | -------------------------------------- |
-| `EXPO_PUBLIC_SUPABASE_URL`      | Supabase project URL                   |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key (safe to share) |
-
-**Note:** The `anon` key is designed to be used in client-side applications. It's safe to share with contributors as it only allows operations permitted by Row Level Security (RLS) policies.
-
-#### Step 4: Create Your `.env` File
-
-```bash
-# Copy the example file
-cp .env.example .env
-```
-
-Open `.env` and paste the credentials provided by the project owner:
-
-```env
-# Supabase Configuration (provided by project owner)
-EXPO_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-#### Step 5: Verify Setup
-
-```bash
-# Start the development server
-npm start
-```
-
-If the app connects to Supabase successfully (you can register/login), the setup is complete.
-
-### Adding Contributors to Supabase (Optional)
-
-If contributors need **direct access to the Supabase dashboard** (to view data, run SQL, etc.):
-
-1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
-2. Select your project
-3. Go to **Settings** → **Team**
-4. Click **Invite** and enter the contributor's email
-5. Choose role:
-   - **Developer** - Can view/edit database, but can't change billing
-   - **Read-only** - Can only view data
-
-### Security Best Practices for Teams
-
-| Do                                       | Don't                               |
-| ---------------------------------------- | ----------------------------------- |
-| Share credentials via encrypted channels | Commit `.env` to git                |
-| Use environment variables                | Hardcode credentials in source code |
-| Rotate keys if a team member leaves      | Share service_role key (admin key)  |
-| Use RLS policies to protect data         | Disable Row Level Security          |
-| Add `.env` to `.gitignore`               | Post credentials in public channels |
-
-### Quick Reference: What Each Key Does
-
-| Key                         | Access Level                      | Safe to Share with Contributors? |
-| --------------------------- | --------------------------------- | -------------------------------- |
-| `SUPABASE_URL`              | Project URL                       | Yes                              |
-| `SUPABASE_ANON_KEY`         | Client-side access (respects RLS) | Yes                              |
-| `SUPABASE_SERVICE_ROLE_KEY` | Full admin access (bypasses RLS)  | **NO - Never share**             |
-
-### Troubleshooting Contributor Setup
-
-**"Invalid API key" error**
-
-- Double-check the credentials were copied correctly (no extra spaces)
-- Ensure variables are prefixed with `EXPO_PUBLIC_`
-
-**"Permission denied" database errors**
-
-- RLS policies may not be set up correctly
-- Ask project owner to verify database policies
-
-**Can't connect to Supabase**
-
-- Check if the Supabase project is paused (free tier pauses after inactivity)
-- Project owner needs to unpause from dashboard
-
-## License
-
-This project is private and proprietary.
 
 ---
 
-Built with React Native, Expo, and Supabase
+## Available Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npx expo run:android` | Build native APK and install on connected Android device |
+| `npx expo start` | Start Metro (use after APK is already installed) |
+| `npm run web` | Run in browser at `http://localhost:8081` |
+| `npm run lint` | Run ESLint across the project |
+| `node scripts/generate-assets.js` | Regenerate placeholder app icons |
+
+---
+
+## Known Limitations
+
+| Feature | Platform | Reason |
+|---------|----------|--------|
+| QR code scanner | Web | `expo-camera` requires native camera API |
+| Google Maps | Web | `react-native-maps` is native-only (grey stub shown on web) |
+| Push notifications | Web / Expo Go | Requires native push infrastructure |
+| Apple Sign-In | Android / Web | iOS only |
+| Haptic feedback | Web | Native API unavailable |
+
+---
+
+## Troubleshooting
+
+### `failed to download remote update` on Android (Wi-Fi)
+Windows Firewall is blocking Metro. Run in an admin terminal:
+```cmd
+netsh advfirewall firewall add rule name="Expo Metro 8081" dir=in action=allow protocol=TCP localport=8081
+```
+
+### App not found / `adb devices` shows nothing
+- Ensure USB Debugging is ON in Developer Options
+- Try a different USB cable (some are charge-only)
+- Accept the "Allow USB Debugging?" prompt that appears on the phone screen
+
+### Build fails — `minSdkVersion 22 but library was built for 24`
+The `android/build.gradle` `ext` block pins all SDK versions. Do not modify those values. If you see this error, run:
+```bash
+rm -rf android/.gradle android/build android/app/build
+npx expo run:android
+```
+
+### NDK not found / `does not contain platforms`
+NDK 27.1.12297006 must be fully installed (not just the stub). Verify:
+```bash
+ls "C:/Users/X/AppData/Local/Android/Sdk/ndk/27.1.12297006"
+# Should show: build  ndk-build  platforms  prebuilt  toolchains  ...
+```
+If it only shows `source.properties`, reinstall via Android Studio → SDK Manager → SDK Tools → NDK (Side by side) → 27.1.12297006.
+
+### Blank screen on web
+```bash
+rm -rf node_modules/.cache
+npm run web
+```
+
+### Metro bundler errors / stale cache
+```bash
+npx expo start --clear
+```
+
+### Android Gradle sync fails
+```bash
+cd android && ./gradlew clean && cd ..
+npx expo run:android
+```
+
+### "Email not confirmed" on login
+The user must click the verification link sent to their email. Use the **Resend Verification Email** button on the login screen or check Supabase → Authentication → Users.
+
+### Supabase connection errors
+- Verify `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` in `.env`
+- Ensure the Supabase project is not paused (free tier pauses after inactivity — click **Restore** in the Supabase dashboard)
+- Confirm all RLS policies are applied correctly
+
+### Deep links not working (OAuth / email callback)
+- Add `businesshubpro://auth/callback` to **Supabase → Authentication → URL Configuration → Redirect URLs**
+- On Android, confirm `scheme: "businesshubpro"` is set in `app.json`
+
+### iOS — CocoaPods not installed
+```bash
+sudo gem install cocoapods
+cd ios && pod install && cd ..
+npx expo run:ios
+```
+
+---
+
+## License
+
+This project is for academic / FYP use. All rights reserved.

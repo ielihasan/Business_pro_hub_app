@@ -12,11 +12,12 @@ export default function OrdersScreen() {
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
 
   const orders = useStore((s) => s.orders);
-  const syncQueuesFromSupabase = useStore((s) => s.syncQueuesFromSupabase);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await syncQueuesFromSupabase();
+    // Orders are derived from the persisted store; a brief delay gives
+    // any background Supabase update time to propagate before the spinner clears.
+    await new Promise((r) => setTimeout(r, 600));
     setRefreshing(false);
   };
 

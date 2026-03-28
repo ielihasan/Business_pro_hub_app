@@ -20,7 +20,7 @@ export default function SplashIndex() {
           // User is not logged in, go to welcome screen
           router.replace('/(auth)/welcome');
         }
-      }, 1000); // Short delay for splash screen effect
+      }, 300); // Brief delay for splash screen effect
 
       return () => clearTimeout(timer);
     }

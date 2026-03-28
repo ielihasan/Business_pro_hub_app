@@ -81,6 +81,8 @@ export interface QueueEntry {
   estimatedWait: string;
   status: 'waiting' | 'in_progress' | 'completed' | 'cancelled';
   joinedAt: string;
+  /** Set when the entry is completed or cancelled (from DB completed_at / cancelled_at) */
+  completedAt?: string;
 }
 
 export interface Order {
@@ -224,6 +226,32 @@ const mapSupabaseUserToUser = (supabaseUser: SupabaseUser, profile?: any): User 
   };
 };
 
+// ─── Realtime subscription for current user's queue entries ──────────────────
+let _queueRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+
+function _setupQueueSubscription(userId: string) {
+  // Remove any existing channel before creating a new one
+  _teardownQueueSubscription();
+  _queueRealtimeChannel = supabase
+    .channel(`user-queues:${userId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'queues', filter: `customer_id=eq.${userId}` },
+      () => {
+        // Re-sync the full queue state whenever any of this user's rows change
+        useStore.getState().syncQueuesFromSupabase();
+      }
+    )
+    .subscribe();
+}
+
+function _teardownQueueSubscription() {
+  if (_queueRealtimeChannel) {
+    supabase.removeChannel(_queueRealtimeChannel);
+    _queueRealtimeChannel = null;
+  }
+}
+
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -283,6 +311,7 @@ export const useStore = create<AppState>()(
           const user = mapSupabaseUserToUser(result.user, profile);
 
           set({ isAuthenticated: true, user, session: result.session, isLoading: false, authError: null });
+          _setupQueueSubscription(result.user.id);
 
           // Request notification permissions and send welcome notification
           const { notificationsEnabled, addNotification } = get();
@@ -329,6 +358,7 @@ export const useStore = create<AppState>()(
 
       logout: async () => {
         set({ isLoading: true });
+        _teardownQueueSubscription();
         await logoutUser();
         set({
           isAuthenticated: false,
@@ -357,6 +387,7 @@ export const useStore = create<AppState>()(
             const profile = await getUserProfile(session.user.id);
             const user = mapSupabaseUserToUser(session.user, profile);
             set({ isAuthenticated: true, user, session, isLoading: false });
+            _setupQueueSubscription(session.user.id);
           } else {
             set({ isAuthenticated: false, user: null, session: null, isLoading: false });
           }
@@ -624,6 +655,10 @@ export const useStore = create<AppState>()(
           fetchUserActiveQueues(user.id),
           fetchUserQueueHistory(user.id),
         ]);
+        if (activeRes.error) console.warn('syncQueues active error:', activeRes.error);
+        if (historyRes.error) console.warn('syncQueues history error:', historyRes.error);
+        const toTime = (iso: string) =>
+          new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
         const mapEntry = (r: QueueEntryRecord): QueueEntry => ({
           id: r.id,
           businessId: r.business_id,
@@ -634,7 +669,12 @@ export const useStore = create<AppState>()(
           totalInQueue: r.business?.queue_length ?? r.position,
           estimatedWait: formatWait(r.estimated_wait_time),
           status: r.status,
-          joinedAt: new Date(r.joined_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          joinedAt: toTime(r.joined_at),
+          completedAt: r.completed_at
+            ? toTime(r.completed_at)
+            : r.cancelled_at
+            ? toTime(r.cancelled_at)
+            : undefined,
         });
         set({
           activeQueues: (activeRes.data ?? []).map(mapEntry),
@@ -883,8 +923,10 @@ export const setupAuthListener = () => {
         const profile = await getUserProfile(session.user.id);
         const user = mapSupabaseUserToUser(session.user, profile);
         useStore.setState({ isAuthenticated: true, user, session });
+        _setupQueueSubscription(session.user.id);
       }
     } else if (event === 'SIGNED_OUT') {
+      _teardownQueueSubscription();
       useStore.setState({ isAuthenticated: false, user: null, session: null, activeQueues: [], queueHistory: [], orders: [], notifications: [], unreadCount: 0 });
     } else if (event === 'TOKEN_REFRESHED' && session) {
       useStore.setState({ session });

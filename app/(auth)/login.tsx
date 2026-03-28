@@ -246,7 +246,7 @@ export default function LoginScreen() {
             </View>
             <Text style={[styles.heroHeading, { color: isDark ? '#EDEDFF' : '#1A1A3A' }]}>Welcome back</Text>
             <Text style={[styles.heroSub, { color: isDark ? '#ABABCC' : '#5C5C8A' }]}>
-              Sign in to manage your queues &amp; rewards
+              Sign in to manage your queues & rewards
             </Text>
           </View>
 
