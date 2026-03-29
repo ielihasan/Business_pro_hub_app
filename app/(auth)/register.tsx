@@ -42,7 +42,7 @@ export default function RegisterScreen() {
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
   const [dialog, setDialog]             = useState<DialogConfig | null>(null);
 
-  const { register, initializeAuth, isLoading, authError, clearAuthError } = useStore();
+  const { register, initializeAuth, activateSession, isLoading, authError, clearAuthError } = useStore();
 
   const updateField = (field: string, value: string) => {
     setFormData(p => ({ ...p, [field]: value }));
@@ -68,7 +68,12 @@ export default function RegisterScreen() {
   };
 
   useFocusEffect(useCallback(() => {
-    if (oauthState.pendingGooglePrefill) oauthState.pendingGooglePrefill = null;
+    const prefill = oauthState.pendingGooglePrefill;
+    if (prefill) {
+      oauthState.pendingGooglePrefill = null;
+      setFormData(p => ({ ...p, fullName: prefill.name, email: prefill.email }));
+      setGooglePrefilled(true);
+    }
     const alreadyRegistered = oauthState.pendingAlreadyRegistered;
     if (alreadyRegistered) {
       oauthState.pendingAlreadyRegistered = null;
@@ -213,9 +218,12 @@ export default function RegisterScreen() {
         await supabase.from('users').upsert({ id: liveSession.user.id, email: liveSession.user.email, full_name: formData.fullName, phone_number: formData.phone }, { onConflict: 'id', ignoreDuplicates: false });
         await supabase.auth.updateUser({ data: { full_name: formData.fullName, phone_number: formData.phone } });
         oauthState.oauthSource = null;
-        await supabase.auth.signOut();
+        // Google email is already verified — no sign-out or OTP needed.
+        // Activate the live session in the store (no isLoading side-effects)
+        // and go directly to the app.
         setSocialLoading(null);
-        await sendOtpAndShowModal(normalizedEmail);
+        await activateSession();
+        router.replace('/(tabs)');
       } catch (err: any) {
         setSocialLoading(null);
         setGooglePrefilled(false);

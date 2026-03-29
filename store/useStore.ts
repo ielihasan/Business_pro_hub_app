@@ -137,7 +137,7 @@ interface AppState {
   notificationsEnabled: boolean;
   locationEnabled: boolean;
   darkMode: boolean;
-  theme?: 'light' | 'dark';
+  theme: 'light' | 'dark' | 'black' | null;  // null = follow system
   // Granular notification settings
   soundEnabled: boolean;
   vibrationEnabled: boolean;
@@ -154,6 +154,8 @@ interface AppState {
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   initializeAuth: () => Promise<void>;
+  /** Activate auth state from an already-live session without touching isLoading */
+  activateSession: () => Promise<void>;
   setAuthError: (error: string | null) => void;
   clearAuthError: () => void;
 
@@ -199,7 +201,7 @@ interface AppState {
   toggleNotifications: () => Promise<void>;
   toggleLocation: () => Promise<void>;
   toggleDarkMode: () => void;
-  setTheme: (theme: 'light' | 'dark') => void;
+  setTheme: (theme: 'light' | 'dark' | 'black' | null) => void;
   toggleSound: () => void;
   toggleVibration: () => void;
   toggleQueueNotifications: () => void;
@@ -270,7 +272,7 @@ export const useStore = create<AppState>()(
       notificationsEnabled: true,
       locationEnabled: true,
       darkMode: false,
-      theme: 'light',
+      theme: null,  // null = adaptive to system
       soundEnabled: true,
       vibrationEnabled: true,
       queueNotificationsEnabled: true,
@@ -394,6 +396,22 @@ export const useStore = create<AppState>()(
         } catch (error) {
           console.error('Auth initialization error:', error);
           set({ isAuthenticated: false, user: null, session: null, isLoading: false });
+        }
+      },
+
+      activateSession: async () => {
+        // Like initializeAuth but does NOT set isLoading — safe to call from
+        // within a screen without triggering index.tsx navigation side-effects.
+        try {
+          const session = await getCurrentSession();
+          if (session?.user) {
+            const profile = await getUserProfile(session.user.id);
+            const user = mapSupabaseUserToUser(session.user, profile);
+            set({ isAuthenticated: true, user, session });
+            _setupQueueSubscription(session.user.id);
+          }
+        } catch (error) {
+          console.error('activateSession error:', error);
         }
       },
 
@@ -872,8 +890,8 @@ export const useStore = create<AppState>()(
         // If disabling, we can't revoke the OS grant — just disable in-app usage
         set({ locationEnabled: !current });
       },
-      setTheme: (theme) => set({ theme, darkMode: theme === 'dark' }),
-      toggleDarkMode: () => set((state) => { const newTheme = state.theme === 'dark' ? 'light' : 'dark'; return { theme: newTheme, darkMode: !state.darkMode }; }),
+      setTheme: (theme) => set({ theme, darkMode: theme === 'dark' || theme === 'black' }),
+      toggleDarkMode: () => set((state) => { const newTheme = (state.theme === 'dark' || state.theme === 'black') ? 'light' : 'dark'; return { theme: newTheme, darkMode: newTheme !== 'light' }; }),
       toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),
       toggleVibration: () => set((s) => ({ vibrationEnabled: !s.vibrationEnabled })),
       toggleQueueNotifications: () => set((s) => ({ queueNotificationsEnabled: !s.queueNotificationsEnabled })),
@@ -921,6 +939,11 @@ export const setupAuthListener = () => {
         }
 
         const profile = await getUserProfile(session.user.id);
+
+        // Only mark as fully authenticated when registration is complete (phone saved).
+        // If phone is missing, let auth/callback.tsx handle routing to the register screen.
+        if (!profile?.phone_number) return;
+
         const user = mapSupabaseUserToUser(session.user, profile);
         useStore.setState({ isAuthenticated: true, user, session });
         _setupQueueSubscription(session.user.id);

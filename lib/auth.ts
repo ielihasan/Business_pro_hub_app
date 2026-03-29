@@ -34,14 +34,18 @@ export async function syncAuthUserToUsersTable(
   try {
     const metadata = (authUser.user_metadata as any) || {};
 
-    const payload = {
+    const phone = overrides?.phone ?? metadata.phone_number ?? null;
+    const payload: Record<string, unknown> = {
       id: authUser.id,
       email: normalizeEmail(authUser.email || ''),
       full_name: overrides?.fullName ?? metadata.full_name ?? null,
-      phone_number: overrides?.phone ?? metadata.phone_number ?? null,
       avatar_url: metadata.avatar_url ?? null,
       updated_at: new Date().toISOString(),
     };
+    // Only include phone_number when we actually have a value — otherwise the
+    // upsert would overwrite the user's saved phone with null (e.g. Google OAuth
+    // metadata never carries a phone number).
+    if (phone) payload.phone_number = phone;
 
     const { error } = await supabase
       .from('users')

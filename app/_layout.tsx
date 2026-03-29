@@ -17,7 +17,11 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { theme, initializeAuth } = useStore();
-  const resolvedTheme = theme ?? (colorScheme === 'dark' ? 'dark' : 'light');
+  const resolvedTheme =
+    theme === 'black' ? 'black'
+    : theme === 'dark'  ? 'dark'
+    : theme === 'light' ? 'light'
+    : colorScheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[resolvedTheme];
   // appReady gates the spinner only for the one-time startup auth check.
   // Using isLoading from the store would unmount the nav stack whenever
@@ -47,6 +51,9 @@ export default function RootLayout() {
       const url = event.url;
 
       // Check if this is an auth callback URL
+      if (url.includes('access_token') || url.includes('refresh_token') || url.includes('code=')) {
+        oauthState.oauthCallbackInProgress = true;
+      }
       if (url.includes('access_token') || url.includes('refresh_token')) {
         // Extract tokens from URL fragment
         const params = new URLSearchParams(url.split('#')[1] || url.split('?')[1]);
@@ -95,14 +102,14 @@ export default function RootLayout() {
   if (!appReady) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={colors.foreground} />
       </View>
     );
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={(resolvedTheme === 'dark' || resolvedTheme === 'black') ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerShown: false,

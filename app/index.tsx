@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { Typography, Spacing } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
+import { oauthState } from '@/lib/oauthState';
 
 export default function SplashIndex() {
   const { colors } = useTheme();
@@ -13,6 +14,10 @@ export default function SplashIndex() {
     // Wait for auth to be initialized, then redirect
     if (!isLoading) {
       const timer = setTimeout(() => {
+        // Don't redirect while an OAuth callback is being processed —
+        // auth/callback.tsx will handle navigation once it resolves.
+        if (oauthState.oauthCallbackInProgress) return;
+
         if (isAuthenticated) {
           // User is logged in, go to main tabs
           router.replace('/(tabs)');

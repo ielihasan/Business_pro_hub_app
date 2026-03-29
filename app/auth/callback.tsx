@@ -109,15 +109,33 @@ export default function AuthCallbackScreen() {
 
         // If profile is complete, always route to app home.
         // This avoids loops where stale source='register' sends verified users back.
+        // setupAuthListener already set isAuthenticated:true — no need to re-run initializeAuth.
         if (profile?.phone_number) {
-          await initializeAuth();
+          oauthState.oauthCallbackInProgress = false;
+          router.replace('/(tabs)');
+          return;
+        }
+
+        // No phone_number yet. Could be a brand-new user OR the auth listener's
+        // syncAuthUserToUsersTable hasn't written the row yet. Wait a moment and
+        // retry once before deciding this is a new registration.
+        await new Promise(r => setTimeout(r, 600));
+        const { data: retryProfile } = await supabase
+          .from('users')
+          .select('phone_number')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (retryProfile?.phone_number) {
+          oauthState.oauthCallbackInProgress = false;
           router.replace('/(tabs)');
           return;
         }
 
         {
           // ── REGISTER FLOW ────────────────────────────────────────────────
-          // Extract name + email from Google metadata
+          // Genuinely new Google user who hasn't set a phone number yet.
+          // Extract name + email from Google metadata.
           const meta       = session.user.user_metadata || {};
           const googleName = (
             meta.full_name ||
@@ -131,11 +149,12 @@ export default function AuthCallbackScreen() {
           // Do NOT sign out — the session must stay alive so handleRegister
           // can call getSession() on submit instead of restoring dead tokens.
           oauthState.pendingGooglePrefill = { name: googleName, email: googleEmail };
-
+          oauthState.oauthCallbackInProgress = false;
           router.replace('/(auth)/register');
         }
       } catch (error) {
         console.error('Auth callback error:', error);
+        oauthState.oauthCallbackInProgress = false;
         router.replace('/(auth)/login');
       }
     };
