@@ -14,13 +14,14 @@ function useDebounce<T>(value: T, delayMs: number): T {
 
 type BusinessWithDistance = BusinessRecord & { distanceKm: number };
 
+const DEFAULT_RADIUS_KM = 10;
+
 interface UseNearbyBusinessesOptions {
-  radiusKm: number;
   category: string;
   query: string;
 }
 
-export function useNearbyBusinesses({ radiusKm, category, query }: UseNearbyBusinessesOptions) {
+export function useNearbyBusinesses({ category, query }: UseNearbyBusinessesOptions) {
   const locationEnabled = useStore((s) => s.locationEnabled);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [businesses, setBusinesses] = useState<BusinessWithDistance[]>([]);
@@ -32,7 +33,7 @@ export function useNearbyBusinesses({ radiusKm, category, query }: UseNearbyBusi
   const loadBusinesses = async (loc: { latitude: number; longitude: number } | null) => {
     try {
       const opts = loc
-        ? { latitude: loc.latitude, longitude: loc.longitude, radiusKm, category, query: debouncedQuery }
+        ? { latitude: loc.latitude, longitude: loc.longitude, radiusKm: DEFAULT_RADIUS_KM, category, query: debouncedQuery }
         : { category, query: debouncedQuery };
       const bs = await fetchBusinesses(opts);
       setBusinesses(bs);
@@ -81,7 +82,7 @@ export function useNearbyBusinesses({ radiusKm, category, query }: UseNearbyBusi
   useEffect(() => {
     loadBusinesses(locationRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, debouncedQuery, radiusKm]);
+  }, [category, debouncedQuery]);
 
   const refresh = () => loadBusinesses(locationRef.current);
 

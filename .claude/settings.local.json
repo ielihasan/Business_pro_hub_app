@@ -8,7 +8,14 @@
       "Bash(npx kill-port:*)",
       "Bash(ls:*)",
       "Bash(cat:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8081/)",
+      "Bash(grep -rl import.meta C:UsersXFYPBusiness_pro_hub_appnode_modules --include=*.js --exclude-dir=.cache)",
+      "Bash(node -e \":*)",
+      "Bash(curl -s \"http://localhost:8081/node_modules/expo-router/entry.bundle?platform=web&dev=true&hot=false&lazy=true&transform.engine=hermes&transform.routerRoot=app&unstable_transformProfile=hermes-stable\")",
+      "Bash(node -e \"const p = require\\(''C:/Users/X/FYP/Business_pro_hub_app/node_modules/zustand/package.json''\\); console.log\\(JSON.stringify\\({main: p.main, module: p.module, exports: p.exports?.[''.'']}  , null, 2\\)\\)\")"
     ]
   }
 }

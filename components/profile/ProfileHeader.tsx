@@ -16,26 +16,26 @@ interface ProfileHeaderProps {
   onAvatarPress: () => void;
 }
 
-function getMemberTier(pts: number): { label: string; color: string; bg: string; icon: string } {
-  if (pts >= 1000) return { label: 'Gold Member',   color: '#D97706', bg: '#FEF3C7', icon: 'trophy'        };
-  if (pts >= 500)  return { label: 'Silver Member', color: '#6B7280', bg: '#F3F4F6', icon: 'ribbon-outline' };
-  if (pts >= 100)  return { label: 'Bronze Member', color: '#92400E', bg: '#FEF3C7', icon: 'medal-outline'  };
-  return                   { label: 'Member',        color: '#3B82F6', bg: '#EFF6FF', icon: 'person-circle-outline' };
+function getMemberTier(pts: number): { label: string; icon: string } {
+  if (pts >= 1000) return { label: 'Gold Member',   icon: 'trophy'               };
+  if (pts >= 500)  return { label: 'Silver Member', icon: 'ribbon-outline'        };
+  if (pts >= 100)  return { label: 'Bronze Member', icon: 'medal-outline'         };
+  return                   { label: 'Member',        icon: 'person-circle-outline' };
 }
 
 export function ProfileHeader({ name, email, phone, avatarUri, isUploading, loyaltyPoints = 0, onAvatarPress }: ProfileHeaderProps) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const tier = getMemberTier(loyaltyPoints);
 
   return (
     <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       {/* Decorative top strip */}
-      <View style={[styles.heroStrip, { backgroundColor: isDark ? '#1e1e1e' : '#F8F8F8' }]} />
+      <View style={[styles.heroStrip, { backgroundColor: colors.secondary }]} />
 
       {/* Avatar row */}
       <View style={styles.avatarRow}>
         <TouchableOpacity
-          style={[styles.avatarRing, { borderColor: isDark ? colors.border : '#E5E7EB', backgroundColor: colors.background }]}
+          style={[styles.avatarRing, { borderColor: colors.border, backgroundColor: colors.background }]}
           onPress={onAvatarPress}
           disabled={isUploading}
           activeOpacity={0.85}
@@ -71,9 +71,9 @@ export function ProfileHeader({ name, email, phone, avatarUri, isUploading, loya
       )}
 
       {/* Membership tier badge */}
-      <View style={[styles.tierBadge, { backgroundColor: isDark ? colors.secondary : tier.bg }]}>
-        <Ionicons name={tier.icon as any} size={13} color={tier.color} />
-        <Text style={[styles.tierText, { color: tier.color }]}>{tier.label}</Text>
+      <View style={[styles.tierBadge, { backgroundColor: colors.secondary, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }]}>
+        <Ionicons name={tier.icon as any} size={13} color={colors.foreground} />
+        <Text style={[styles.tierText, { color: colors.foreground }]}>{tier.label}</Text>
       </View>
     </View>
   );

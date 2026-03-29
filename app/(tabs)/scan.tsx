@@ -158,6 +158,20 @@ export default function ScanScreen() {
   const joinQueueInSupabase = useStore((s) => s.joinQueueInSupabase);
   const isAuthenticated = useStore((s) => s.isAuthenticated);
   const [dialog, setDialog] = useState<DialogConfig | null>(null);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [joinModalData, setJoinModalData] = useState<{
+    businessId: string;
+    businessName: string;
+    category: string;
+    address?: string;
+    isOpen: boolean;
+    queueLength: number;
+    waitTime: string;
+    serviceType?: string;
+    serviceName?: string;
+    estimatedDuration?: number;
+    unitPrice: number;
+  } | null>(null);
 
   // Helper function to process business ID (used by both QR scan and manual entry)
   const processBusinessId = async (
@@ -204,47 +218,35 @@ export default function ScanScreen() {
     const svc = svcResult.data;
     const unitPrice = qrUnitPrice ?? (typeof svc?.price === 'number' ? svc.price : 0) ?? 0;
 
-    // 3. Build confirmation message
-    const lines: string[] = [];
-    if (qrPayload && Object.keys(qrPayload).length > 0) {
-      lines.push('QR Data:');
-      for (const [key, value] of Object.entries(qrPayload)) {
-        lines.push(`- ${key}: ${value}`);
-      }
-      lines.push('');
-    }
-    if (biz.category) lines.push(`Type: ${biz.category}`);
-    if (biz.address) lines.push(`Location: ${biz.address}`);
-    if (svc) lines.push(`Service: ${svc.name}`);
-    lines.push(`Unit Price: Rs. ${unitPrice.toLocaleString()}`);
-    if (svc?.estimated_duration) lines.push(`Est. wait per person: ${svc.estimated_duration} min`);
-    lines.push('\nWould you like to join the queue?');
-
-    setDialog({
-      title: `Join Queue — ${biz.name}`,
-      message: lines.join('\n'),
-      icon: 'people-outline',
-      iconVariant: 'default',
-      actions: [
-        { label: 'Cancel', onPress: () => { setDialog(null); setScanned(false); } },
-        {
-          label: 'Join Queue',
-          variant: 'primary',
-          onPress: () => {
-            setDialog(null);
-            setPendingJoin({
-              businessId,
-              businessName: biz.name,
-              serviceType,
-              serviceName: svc?.name,
-              unitPrice,
-            });
-            setQuantity(1);
-            setShowQuantityModal(true);
-          },
-        },
-      ],
+    // 3. Show beautiful join confirmation modal
+    setJoinModalData({
+      businessId,
+      businessName: biz.name,
+      category: biz.category,
+      address: (biz as any).address,
+      isOpen: biz.is_open,
+      queueLength: (biz as any).queue_length ?? 0,
+      waitTime: (biz as any).wait_time ?? 'N/A',
+      serviceType,
+      serviceName: svc?.name,
+      estimatedDuration: svc?.estimated_duration ?? undefined,
+      unitPrice,
     });
+    setShowJoinModal(true);
+  };
+
+  const handleJoinFromModal = () => {
+    if (!joinModalData) return;
+    setShowJoinModal(false);
+    setPendingJoin({
+      businessId: joinModalData.businessId,
+      businessName: joinModalData.businessName,
+      serviceType: joinModalData.serviceType,
+      serviceName: joinModalData.serviceName,
+      unitPrice: joinModalData.unitPrice,
+    });
+    setQuantity(1);
+    setShowQuantityModal(true);
   };
 
   const handleConfirmJoinWithQuantity = async () => {
@@ -583,7 +585,7 @@ export default function ScanScreen() {
                 style={[styles.modalButton, { backgroundColor: colors.primary }]}
                 onPress={handleManualSubmit}
               >
-                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>
+                <Text style={[styles.modalButtonText, { color: colors.primaryForeground }]}>
                   Join Queue
                 </Text>
               </TouchableOpacity>
@@ -679,6 +681,123 @@ export default function ScanScreen() {
           </View>
         </View>
       </Modal>
+      {/* ── Join Queue Confirmation Bottom Sheet ── */}
+      <Modal
+        visible={showJoinModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { setShowJoinModal(false); setScanned(false); }}
+      >
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.sheet, { backgroundColor: colors.card ?? colors.background }]}>
+            {/* Handle */}
+            <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+
+            {/* Business header */}
+            <View style={styles.sheetHeader}>
+              <View style={styles.sheetHeaderLeft}>
+                <View style={[styles.categoryBadge, { backgroundColor: colors.secondary }]}>
+                  <Ionicons name="storefront-outline" size={14} color={colors.mutedForeground} />
+                  <Text style={[styles.categoryText, { color: colors.mutedForeground }]}>
+                    {joinModalData?.category || 'Business'}
+                  </Text>
+                </View>
+                <Text style={[styles.bizName, { color: colors.foreground }]} numberOfLines={2}>
+                  {joinModalData?.businessName}
+                </Text>
+                {joinModalData?.address ? (
+                  <View style={styles.addressRow}>
+                    <Ionicons name="location-outline" size={13} color={colors.mutedForeground} />
+                    <Text style={[styles.addressText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      {joinModalData.address}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <View style={[styles.openBadge, {
+                backgroundColor: joinModalData?.isOpen ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+              }]}>
+                <View style={[styles.openDot, {
+                  backgroundColor: joinModalData?.isOpen ? '#22c55e' : '#ef4444',
+                }]} />
+                <Text style={[styles.openText, {
+                  color: joinModalData?.isOpen ? '#22c55e' : '#ef4444',
+                }]}>
+                  {joinModalData?.isOpen ? 'Open' : 'Closed'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Queue stats row */}
+            <View style={[styles.statsRow, { borderColor: colors.border }]}>
+              <View style={styles.statItem}>
+                <Ionicons name="people-outline" size={20} color={colors.primary} />
+                <Text style={[styles.statValue, { color: colors.foreground }]}>
+                  {joinModalData?.queueLength ?? 0}
+                </Text>
+                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>waiting</Text>
+              </View>
+              <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.statItem}>
+                <Ionicons name="time-outline" size={20} color={colors.primary} />
+                <Text style={[styles.statValue, { color: colors.foreground }]}>
+                  {joinModalData?.waitTime ?? 'N/A'}
+                </Text>
+                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>est. wait</Text>
+              </View>
+              {joinModalData?.estimatedDuration ? (
+                <>
+                  <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+                  <View style={styles.statItem}>
+                    <Ionicons name="timer-outline" size={20} color={colors.primary} />
+                    <Text style={[styles.statValue, { color: colors.foreground }]}>
+                      {joinModalData.estimatedDuration} min
+                    </Text>
+                    <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>per person</Text>
+                  </View>
+                </>
+              ) : null}
+            </View>
+
+            {/* Service + price */}
+            {joinModalData?.serviceName ? (
+              <View style={[styles.serviceRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                <View>
+                  <Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>Service</Text>
+                  <Text style={[styles.serviceName, { color: colors.foreground }]}>
+                    {joinModalData.serviceName}
+                  </Text>
+                </View>
+                <View style={styles.priceBlock}>
+                  <Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>Price</Text>
+                  <Text style={[styles.servicePrice, { color: colors.primary }]}>
+                    Rs. {joinModalData.unitPrice.toLocaleString()}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
+            {/* Actions */}
+            <TouchableOpacity
+              style={[styles.joinBtn, { backgroundColor: colors.primary }]}
+              onPress={handleJoinFromModal}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.joinBtnText, { color: colors.primaryForeground }]}>
+                Join Queue
+              </Text>
+              <Ionicons name="arrow-forward" size={18} color={colors.primaryForeground} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cancelLink}
+              onPress={() => { setShowJoinModal(false); setScanned(false); }}
+            >
+              <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
     </View>
   );
@@ -888,4 +1007,95 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontWeight: '600',
   },
+  // ── Join confirmation bottom sheet ──
+  sheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: Spacing[6],
+    paddingBottom: Spacing[8],
+    gap: Spacing[4],
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: Spacing[2],
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing[3],
+  },
+  sheetHeaderLeft: { flex: 1, gap: Spacing[1] },
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing[2],
+    paddingVertical: 3,
+    borderRadius: 999,
+    marginBottom: 2,
+  },
+  categoryText: { fontSize: 11, fontWeight: '600' },
+  bizName: { fontSize: 22, fontWeight: '800', lineHeight: 28 },
+  addressRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  addressText: { fontSize: 12, flex: 1 },
+  openBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: Spacing[3],
+    paddingVertical: Spacing[1],
+    borderRadius: 999,
+    alignSelf: 'flex-start',
+  },
+  openDot: { width: 7, height: 7, borderRadius: 4 },
+  openText: { fontSize: 12, fontWeight: '700' },
+  statsRow: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: BorderRadius.DEFAULT,
+    overflow: 'hidden',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing[3],
+    gap: 3,
+  },
+  statDivider: { width: 1 },
+  statValue: { fontSize: 15, fontWeight: '700' },
+  statLabel: { fontSize: 11 },
+  serviceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing[4],
+    borderRadius: BorderRadius.DEFAULT,
+    borderWidth: 1,
+  },
+  serviceLabel: { fontSize: 11, fontWeight: '500', marginBottom: 2 },
+  serviceName: { fontSize: 15, fontWeight: '700' },
+  priceBlock: { alignItems: 'flex-end' },
+  servicePrice: { fontSize: 18, fontWeight: '800' },
+  joinBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing[2],
+    paddingVertical: Spacing[4],
+    borderRadius: BorderRadius.DEFAULT,
+    marginTop: Spacing[2],
+  },
+  joinBtnText: { fontSize: Typography.fontSize.base, fontWeight: '700' },
+  cancelLink: { alignItems: 'center', paddingVertical: Spacing[2] },
+  cancelLinkText: { fontSize: Typography.fontSize.sm },
 });

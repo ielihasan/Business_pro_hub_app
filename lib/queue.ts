@@ -474,62 +474,90 @@ export async function fetchUserActiveQueues(
   return { data: normalized, error: null };
 }
 
+/** Returns true if the string is a UUID */
+function isUuidFormat(s: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+}
+
+export interface OrderHistoryEntry extends QueueEntryRecord {
+  /** Human-readable service/item name resolved from the services table */
+  serviceName?: string;
+  businessName: string;
+  businessCategory: string;
+}
+
 /**
- * Fetch past (completed / cancelled) queue entries for a user (separate business lookup).
+ * Fetch all queue entries for a user across all statuses.
+ * Batch-resolves business names (businesses → admins → business_applications)
+ * and service names from the services table.
  */
 export async function fetchUserQueueHistory(
   userId: string
-): Promise<{ data: QueueEntryRecord[]; error: string | null }> {
+): Promise<{ data: OrderHistoryEntry[]; error: string | null }> {
+  // 1. Fetch all queue entries for this user (all statuses)
   const { data, error } = await supabase
     .from('queues')
     .select(
-      `id, business_id, customer_id, customer_name, position, status,
-       estimated_wait_time, joined_at, completed_at, cancelled_at`
+      `id, business_id, customer_id, customer_name, customer_phone, customer_email,
+       service_type, quantity, unit_price, total_price,
+       position, status, notes, estimated_wait_time,
+       joined_at, called_at, started_at, completed_at, cancelled_at, created_at`
     )
     .eq('customer_id', userId)
-    .in('status', ['completed', 'cancelled'])
     .order('joined_at', { ascending: false })
-    .limit(50);
+    .limit(100);
 
   if (error) return { data: [], error: error.message };
-
   const entries = (data ?? []) as QueueEntryRecord[];
+  if (!entries.length) return { data: [], error: null };
 
-  // Collect unique business IDs and resolve them
+  // 2. Collect unique IDs to batch-resolve
   const bizIds = [...new Set(entries.map((e) => e.business_id).filter(Boolean))];
-  const bizMap: Record<string, BusinessDetail> = {};
-  if (bizIds.length > 0) {
-    const { data: bizRows } = await supabase
-      .from('Business')
-      .select('id, name, category, queue_length, wait_time, rating, is_open')
-      .in('id', bizIds);
-    for (const b of bizRows ?? []) {
-      bizMap[b.id] = b as BusinessDetail;
-    }
-    // Fallback to admins for any not found
-    const missing = bizIds.filter((id) => !bizMap[id]);
-    if (missing.length > 0) {
-      const { data: adminRows } = await supabase
-        .from('admins')
-        .select('id, business_name, business_type')
-        .in('id', missing)
-        .eq('role', 'business_owner');
-      for (const a of adminRows ?? []) {
-        bizMap[a.id] = {
-          id: a.id,
-          name: a.business_name ?? 'Business',
-          category: a.business_type ?? '',
-          queue_length: 0,
-          wait_time: '',
-          rating: 0,
-          is_open: true,
-        };
-      }
-    }
-  }
+  const svcIds = [...new Set(
+    entries.map((e) => e.service_type).filter((s): s is string => !!s && isUuidFormat(s))
+  )];
 
-  const normalized = entries.map((e) => ({ ...e, business: bizMap[e.business_id] }));
-  return { data: normalized, error: null };
+  // 3. Batch fetch from all business sources + services table in parallel
+  const [bizResult, adminResult, appResult, svcResult] = await Promise.all([
+    bizIds.length
+      ? supabase.from('businesses').select('id, name, category').in('id', bizIds)
+      : Promise.resolve({ data: [] as any[] }),
+    bizIds.length
+      ? supabase.from('admins').select('id, business_name, business_type').eq('role', 'business_owner').in('id', bizIds)
+      : Promise.resolve({ data: [] as any[] }),
+    bizIds.length
+      ? supabase.from('business_applications').select('id, business_name, business_type').in('id', bizIds)
+      : Promise.resolve({ data: [] as any[] }),
+    svcIds.length
+      ? supabase.from('services').select('id, name').in('id', svcIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
+
+  // 4. Build lookup maps (businesses > admins > business_applications)
+  const bizMap = new Map<string, { name: string; category: string }>();
+  for (const b of bizResult.data ?? []) bizMap.set(b.id, { name: b.name ?? '', category: b.category ?? '' });
+  for (const a of adminResult.data ?? []) { if (!bizMap.has(a.id)) bizMap.set(a.id, { name: a.business_name ?? '', category: a.business_type ?? '' }); }
+  for (const a of appResult.data ?? [])   { if (!bizMap.has(a.id)) bizMap.set(a.id, { name: a.business_name ?? '', category: a.business_type ?? '' }); }
+
+  const svcMap = new Map<string, string>();
+  for (const s of svcResult.data ?? []) svcMap.set(s.id, s.name ?? '');
+
+  // 5. Enrich entries
+  const enriched: OrderHistoryEntry[] = entries.map((e) => {
+    const biz = bizMap.get(e.business_id);
+    const rawSvc = e.service_type ?? '';
+    const serviceName = rawSvc
+      ? (isUuidFormat(rawSvc) ? svcMap.get(rawSvc) : rawSvc) ?? undefined
+      : undefined;
+    return {
+      ...e,
+      businessName:     biz?.name     ?? 'Unknown Business',
+      businessCategory: biz?.category ?? '',
+      serviceName,
+    };
+  });
+
+  return { data: enriched, error: null };
 }
 
 /**

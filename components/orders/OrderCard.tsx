@@ -1,178 +1,163 @@
-import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/hooks/useTheme';
-import { Card, CardContent, Badge, Avatar, Separator } from '@/components/ui';
-import { Typography, Spacing, BorderRadius } from '@/constants/theme';
-import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
+import { useTheme } from '@/hooks/useTheme';
+import { OrderHistoryEntry, ticketLabel } from '@/lib/queue';
 
-interface OrderItem {
-  name: string;
-  quantity: number;
-  price: number;
+function statusColor(status: string, colors: any) {
+  if (status === 'waiting')     return { fg: colors.statusWaiting  ?? '#F59E0B', bg: (colors.statusWaiting  ?? '#F59E0B') + '18' };
+  if (status === 'in_progress') return { fg: colors.statusInProgress ?? '#3B82F6', bg: (colors.statusInProgress ?? '#3B82F6') + '18' };
+  if (status === 'completed')   return { fg: colors.success,     bg: colors.success     + '18' };
+  if (status === 'cancelled')   return { fg: colors.destructive,  bg: colors.destructive + '18' };
+  return { fg: colors.mutedForeground, bg: colors.card };
 }
 
-interface Order {
-  id: string;
-  businessId: string;
-  businessName: string;
-  orderNumber: string;
-  status: string;
-  items: OrderItem[];
-  total: number;
-  createdAt: string;
-  paymentMethod: string;
+function statusLabel(status: string) {
+  if (status === 'in_progress') return 'IN PROGRESS';
+  return status.toUpperCase();
 }
 
-const getStatusConfig = (status: string) => {
-  switch (status) {
-    case 'pending':
-      return { variant: 'secondary' as const };
-    case 'in_progress':
-      return { variant: 'info' as const };
-    case 'ready':
-      return { variant: 'success' as const };
-    case 'completed':
-      return { variant: 'secondary' as const };
-    case 'cancelled':
-      return { variant: 'destructive' as const };
-    default:
-      return { variant: 'secondary' as const };
-  }
-};
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
-const formatPrice = (price: number) => `Rs. ${price.toLocaleString()}`;
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
 
 interface OrderCardProps {
-  order: Order;
-  onPress?: () => void;
+  order: OrderHistoryEntry;
 }
 
-export function OrderCard({ order, onPress }: OrderCardProps) {
+export function OrderCard({ order }: OrderCardProps) {
   const { colors } = useTheme();
-  const { t } = useTranslation();
-  const statusConfig = getStatusConfig(order.status);
 
-  const handlePress = () => {
-    if (onPress) {
-      onPress();
-    } else {
-      router.push(`/business/${order.businessId}`);
-    }
-  };
+  const FG     = colors.foreground;
+  const MUTED  = colors.mutedForeground;
+  const BORDER = colors.border;
+  const CARD   = colors.card;
+
+  const sc       = statusColor(order.status, colors);
+  const initials = (order.businessName ?? 'B').slice(0, 2).toUpperCase();
+
+  const qty        = order.quantity ?? 1;
+  const unitPrice  = order.unit_price ?? 0;
+  const total      = order.total_price ?? order.total_amount ?? (unitPrice * qty);
+  const hasAmount  = total > 0;
+  const dateStr    = formatDate(order.joined_at);
+  const timeStr    = formatTime(order.joined_at);
+  const ticket     = ticketLabel(order.position);
 
   return (
-    <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
-      <Card style={styles.card}>
-        <CardContent style={styles.content}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Avatar name={order.businessName} size="md" />
-            <View style={styles.info}>
-              <Text style={[styles.businessName, { color: colors.foreground }]}>
-                {order.businessName}
-              </Text>
-              <Text style={[styles.orderNumber, { color: colors.mutedForeground }]}>
-                {order.orderNumber}
-              </Text>
-            </View>
-            <Badge variant={statusConfig.variant}>
-              {t(`orders.status.${order.status}`)}
-            </Badge>
-          </View>
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => router.push(`/queue/${order.id}`)}
+      style={[styles.card, { backgroundColor: CARD, borderColor: BORDER }]}
+    >
+      {/* ── Header ── */}
+      <View style={styles.header}>
+        <View style={[styles.avatar, { backgroundColor: colors.secondary, borderColor: BORDER }]}>
+          <Text style={[styles.avatarText, { color: FG }]}>{initials}</Text>
+        </View>
 
-          <Separator style={{ marginVertical: Spacing[3] }} />
+        <View style={styles.headerMid}>
+          <Text style={[styles.bizName, { color: FG }]} numberOfLines={1}>
+            {order.businessName}
+          </Text>
+          {order.businessCategory ? (
+            <Text style={[styles.bizCat, { color: MUTED }]} numberOfLines={1}>
+              {order.businessCategory}
+            </Text>
+          ) : null}
+        </View>
 
-          {/* Items */}
-          <View style={styles.itemsList}>
-            {order.items.map((item, index) => (
-              <View key={index} style={styles.itemRow}>
-                <View style={styles.itemInfo}>
-                  <Text style={[styles.itemQuantity, { color: colors.mutedForeground }]}>
-                    {item.quantity}x
-                  </Text>
-                  <Text style={[styles.itemName, { color: colors.foreground }]}>
-                    {item.name}
-                  </Text>
-                </View>
-                <Text style={[styles.itemPrice, { color: colors.foreground }]}>
-                  {formatPrice(item.price)}
-                </Text>
-              </View>
-            ))}
-          </View>
+        <View style={[styles.statusPill, { backgroundColor: sc.bg, borderColor: sc.fg + '40' }]}>
+          <Text style={[styles.statusText, { color: sc.fg }]}>{statusLabel(order.status)}</Text>
+        </View>
+      </View>
 
-          <Separator style={{ marginVertical: Spacing[3] }} />
+      {/* ── Divider ── */}
+      <View style={[styles.divider, { backgroundColor: BORDER }]} />
 
-          {/* Footer */}
-          <View style={styles.footer}>
-            <View style={styles.footerLeft}>
-              <View style={styles.footerRow}>
-                <Ionicons name="time-outline" size={14} color={colors.mutedForeground} />
-                <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-                  {order.createdAt}
-                </Text>
-              </View>
-              <View style={styles.footerRow}>
-                <Ionicons name="card-outline" size={14} color={colors.mutedForeground} />
-                <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
-                  {order.paymentMethod}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.totalContainer}>
-              <Text style={[styles.totalLabel, { color: colors.mutedForeground }]}>
-                {t('orders.card.total')}
-              </Text>
-              <Text style={[styles.totalValue, { color: colors.foreground }]}>
-                {formatPrice(order.total)}
-              </Text>
-            </View>
-          </View>
-
-          {/* Ready banner */}
-          {order.status === 'ready' && (
-            <View style={[styles.readyBanner, { backgroundColor: colors.success + '15' }]}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-              <Text style={[styles.readyText, { color: colors.success }]}>
-                {t('orders.card.ready_message')}
-              </Text>
-            </View>
+      {/* ── Item row ── */}
+      <View style={styles.itemRow}>
+        {/* Ticket + service */}
+        <View style={styles.itemLeft}>
+          <Text style={[styles.ticket, { color: MUTED }]}>{ticket}</Text>
+          <Text style={[styles.serviceName, { color: FG }]} numberOfLines={2}>
+            {order.serviceName ?? 'Queue Entry'}
+          </Text>
+          {unitPrice > 0 && (
+            <Text style={[styles.unitMeta, { color: MUTED }]}>
+              ×{qty} · Rs {unitPrice.toLocaleString()} each
+            </Text>
           )}
-        </CardContent>
-      </Card>
+        </View>
+
+        {/* Total */}
+        {hasAmount && (
+          <View style={styles.totalBox}>
+            <Text style={[styles.totalLabel, { color: MUTED }]}>TOTAL</Text>
+            <Text style={[styles.totalValue, { color: FG }]}>
+              Rs {total.toLocaleString()}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* ── Divider ── */}
+      <View style={[styles.divider, { backgroundColor: BORDER }]} />
+
+      {/* ── Footer ── */}
+      <View style={styles.footer}>
+        <View style={styles.footerItem}>
+          <Ionicons name="calendar-outline" size={12} color={MUTED} />
+          <Text style={[styles.footerText, { color: MUTED }]}>{dateStr}</Text>
+        </View>
+        <View style={styles.footerItem}>
+          <Ionicons name="time-outline" size={12} color={MUTED} />
+          <Text style={[styles.footerText, { color: MUTED }]}>{timeStr}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={14} color={MUTED} style={{ marginLeft: 'auto' }} />
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { marginBottom: 0 },
-  content: { padding: Spacing[4] },
-  header: { flexDirection: 'row', alignItems: 'center' },
-  info: { flex: 1, marginLeft: Spacing[3] },
-  businessName: { fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.semibold, marginBottom: Spacing[0.5] },
-  orderNumber: { fontSize: Typography.fontSize.sm },
-  itemsList: { gap: Spacing[2] },
-  itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  itemInfo: { flexDirection: 'row', alignItems: 'center', gap: Spacing[2] },
-  itemQuantity: { fontSize: Typography.fontSize.sm, minWidth: 24 },
-  itemName: { fontSize: Typography.fontSize.sm },
-  itemPrice: { fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.medium },
-  footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  footerLeft: { gap: Spacing[1] },
-  footerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing[1] },
-  footerText: { fontSize: Typography.fontSize.xs },
-  totalContainer: { alignItems: 'flex-end' },
-  totalLabel: { fontSize: Typography.fontSize.xs },
-  totalValue: { fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.bold },
-  readyBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing[2],
-    marginTop: Spacing[4],
-    padding: Spacing[3],
-    borderRadius: BorderRadius.DEFAULT,
+  card: {
+    borderRadius: 16, borderWidth: 1,
+    overflow: 'hidden',
   },
-  readyText: { fontSize: Typography.fontSize.sm, fontWeight: Typography.fontWeight.medium },
+
+  /* Header */
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
+  avatar: {
+    width: 44, height: 44, borderRadius: 12, borderWidth: 1,
+    justifyContent: 'center', alignItems: 'center', flexShrink: 0,
+  },
+  avatarText:  { fontSize: 15, fontWeight: '900' },
+  headerMid:   { flex: 1 },
+  bizName:     { fontSize: 14, fontWeight: '800', marginBottom: 2 },
+  bizCat:      { fontSize: 11, fontWeight: '500' },
+  statusPill:  { borderWidth: 1, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
+  statusText:  { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+
+  divider: { height: 1, marginHorizontal: 16 },
+
+  /* Item */
+  itemRow:    { flexDirection: 'row', alignItems: 'flex-start', padding: 16, gap: 12 },
+  itemLeft:   { flex: 1 },
+  ticket:     { fontSize: 10, fontWeight: '700', letterSpacing: 1.5, marginBottom: 4 },
+  serviceName: { fontSize: 18, fontWeight: '900', letterSpacing: -0.5, marginBottom: 4 },
+  unitMeta:   { fontSize: 11, fontWeight: '500' },
+  totalBox:   { alignItems: 'flex-end' },
+  totalLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, marginBottom: 4 },
+  totalValue: { fontSize: 20, fontWeight: '900', letterSpacing: -0.5 },
+
+  /* Footer */
+  footer:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
+  footerItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  footerText: { fontSize: 11, fontWeight: '500' },
 });

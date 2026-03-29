@@ -8,24 +8,29 @@ export function useTheme(): {
   isDark: boolean;
 } {
   const systemColorScheme = useColorScheme();
-  const { theme } = useStore();
-  const resolved: ColorScheme = theme ?? (systemColorScheme === 'dark' ? 'dark' : 'light');
-  const colors = Colors[resolved];
-  const isDark = resolved === 'dark';
+  const { theme }         = useStore();
 
-  return {
-    colors,
-    colorScheme: resolved,
-    isDark,
-  };
+  // null  → follow system (dark or light)
+  // 'dark'  → force dark (#131313 surfaces)
+  // 'black' → force AMOLED black (#000000 surfaces)
+  // 'light' → force light
+  const resolved: ColorScheme =
+    theme === 'black' ? 'black'
+    : theme === 'dark'  ? 'dark'
+    : theme === 'light' ? 'light'
+    : systemColorScheme === 'dark' ? 'dark' : 'light';  // null = system
+
+  const colors = Colors[resolved];
+  const isDark  = resolved === 'dark' || resolved === 'black';
+
+  return { colors, colorScheme: resolved, isDark };
 }
 
-export function useThemeColor(
-  lightColor: string,
-  darkColor: string
-): string {
-  const { theme } = useStore();
-  if (theme) return theme === 'dark' ? darkColor : lightColor;
-  const colorScheme = useColorScheme();
-  return colorScheme === 'dark' ? darkColor : lightColor;
+export function useThemeColor(lightColor: string, darkColor: string): string {
+  const { theme }         = useStore();
+  const systemColorScheme = useColorScheme();
+  const isDark =
+    theme === 'dark' || theme === 'black' ||
+    (theme === null && systemColorScheme === 'dark');
+  return isDark ? darkColor : lightColor;
 }

@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { Typography, Spacing } from '@/constants/theme';
 import { useTranslation } from 'react-i18next';
 
 interface ActiveQueue {
@@ -15,28 +14,30 @@ interface ActiveQueue {
   businessCategory?: string;
 }
 
-interface ActiveQueueCardProps {
-  queue: ActiveQueue;
-}
-
-const STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  waiting:   { bg: '#FEF3C7', text: '#D97706', label: 'Waiting' },
-  serving:   { bg: '#D1FAE5', text: '#059669', label: 'Being Served' },
-  completed: { bg: '#DBEAFE', text: '#2563EB', label: 'Completed' },
-  cancelled: { bg: '#FEE2E2', text: '#DC2626', label: 'Cancelled' },
+const STATUS_LABELS: Record<string, string> = {
+  waiting:   'WAITING',
+  serving:   'BEING SERVED',
+  completed: 'COMPLETED',
+  cancelled: 'CANCELLED',
 };
 
-export function ActiveQueueCard({ queue }: ActiveQueueCardProps) {
-  const { colors, isDark } = useTheme();
-  const { t } = useTranslation();
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+export function ActiveQueueCard({ queue }: { queue: ActiveQueue }) {
+  const { colors } = useTheme();
+  const { t }      = useTranslation();
+  const pulseAnim  = useRef(new Animated.Value(1)).current;
+
+  const FG     = colors.foreground;
+  const MUTED  = colors.mutedForeground;
+  const CARD   = colors.card;
+  const SEC    = colors.secondary;
+  const BORDER = colors.border;
 
   useEffect(() => {
     if (queue.status === 'serving') {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.18, duration: 700, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1.3, duration: 600, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1,   duration: 600, useNativeDriver: true }),
         ])
       ).start();
     } else {
@@ -44,65 +45,55 @@ export function ActiveQueueCard({ queue }: ActiveQueueCardProps) {
     }
   }, [queue.status]);
 
-  const statusInfo = STATUS_COLORS[queue.status] ?? STATUS_COLORS.waiting;
-  const accentColor = queue.status === 'serving' ? '#10B981' : '#6366F1';
+  const isServing = queue.status === 'serving';
 
   return (
     <TouchableOpacity
-      style={styles.wrapper}
-      activeOpacity={0.93}
+      style={[styles.wrapper]}
+      activeOpacity={0.88}
       onPress={() => router.push(`/queue/${queue.id}`)}
     >
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: isDark ? '#1A1A2E' : '#FFFFFF',
-            shadowColor: accentColor,
-            borderColor: isDark ? '#2E2E50' : '#E8EAFF',
-          },
-        ]}
-      >
+      <View style={[styles.card, { backgroundColor: CARD, borderColor: BORDER }]}>
         {/* Left accent bar */}
-        <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
+        <View style={[styles.accentBar, { backgroundColor: FG }]} />
 
         <View style={styles.inner}>
           {/* Top row */}
           <View style={styles.topRow}>
             <View style={styles.titleBlock}>
-              <View style={styles.liveDot}>
+              {/* Live indicator */}
+              <View style={styles.liveRow}>
                 <Animated.View
-                  style={[
-                    styles.dot,
-                    { backgroundColor: accentColor, transform: [{ scale: pulseAnim }] },
-                  ]}
+                  style={[styles.liveDot, { backgroundColor: isServing ? colors.success : FG, transform: [{ scale: pulseAnim }] }]}
                 />
-                <Text style={[styles.liveLabel, { color: accentColor }]}>
+                <Text style={[styles.liveLabel, { color: MUTED }]}>
                   {t('home.active_queue.title')}
                 </Text>
               </View>
-              <Text style={[styles.businessName, { color: colors.foreground }]} numberOfLines={1}>
+              <Text style={[styles.businessName, { color: FG }]} numberOfLines={1}>
                 {queue.businessName}
               </Text>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
-              <Text style={[styles.statusText, { color: statusInfo.text }]}>
-                {statusInfo.label}
+
+            {/* Status badge */}
+            <View style={[styles.statusBadge, { backgroundColor: SEC, borderColor: BORDER }]}>
+              <Text style={[styles.statusText, { color: isServing ? colors.success : FG }]}>
+                {STATUS_LABELS[queue.status] ?? 'WAITING'}
               </Text>
             </View>
           </View>
 
           {/* Stats row */}
           <View style={styles.statsRow}>
-            <View style={[styles.statBox, { backgroundColor: isDark ? '#252540' : '#F0F1FF' }]}>
-              <Text style={[styles.statVal, { color: '#6366F1' }]}>#{queue.position}</Text>
-              <Text style={[styles.statLbl, { color: colors.mutedForeground }]}>
+            <View style={[styles.statBox, { backgroundColor: SEC, borderColor: BORDER }]}>
+              <Text style={[styles.statVal, { color: FG }]}>#{queue.position}</Text>
+              <Text style={[styles.statLbl, { color: MUTED }]}>
                 {t('home.active_queue.position')}
               </Text>
             </View>
-            <View style={[styles.statBox, { backgroundColor: isDark ? '#1E2E25' : '#F0FDF4' }]}>
-              <Text style={[styles.statVal, { color: '#10B981' }]}>{queue.estimatedWait}</Text>
-              <Text style={[styles.statLbl, { color: colors.mutedForeground }]}>
+            <View style={[styles.statBox, { backgroundColor: SEC, borderColor: BORDER }]}>
+              <Text style={[styles.statVal, { color: FG }]}>{queue.estimatedWait}</Text>
+              <Text style={[styles.statLbl, { color: MUTED }]}>
                 {t('home.active_queue.est_wait')}
               </Text>
             </View>
@@ -110,11 +101,10 @@ export function ActiveQueueCard({ queue }: ActiveQueueCardProps) {
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Ionicons name="information-circle-outline" size={14} color={colors.mutedForeground} />
-            <Text style={[styles.footerTip, { color: colors.mutedForeground }]}>
-              Tap for details & updates
+            <Text style={[styles.footerTip, { color: MUTED }]}>
+              Tap for details & live updates
             </Text>
-            <Ionicons name="chevron-forward" size={14} color={accentColor} style={styles.chevron} />
+            <Ionicons name="arrow-forward" size={13} color={MUTED} />
           </View>
         </View>
       </View>
@@ -123,40 +113,35 @@ export function ActiveQueueCard({ queue }: ActiveQueueCardProps) {
 }
 
 const styles = StyleSheet.create({
-  wrapper: { paddingHorizontal: Spacing[6], marginBottom: Spacing[5] },
+  wrapper: { paddingHorizontal: 24, marginBottom: 20 },
   card: {
-    borderRadius: 20,
-    borderWidth: 1.5,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    elevation: 6,
+    borderRadius: 16, borderWidth: 1,
+    flexDirection: 'row', overflow: 'hidden',
   },
-  accentBar: { width: 5, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 },
-  inner: { flex: 1, padding: Spacing[4], gap: Spacing[3] },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  titleBlock: { flex: 1, gap: Spacing[1.5] },
-  liveDot: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  liveLabel: { fontSize: Typography.fontSize.xs, fontWeight: Typography.fontWeight.semibold, letterSpacing: 0.5 },
-  businessName: { fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.bold },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  statusText: { fontSize: 11, fontWeight: '600' },
-  statsRow: { flexDirection: 'row', gap: Spacing[3] },
-  statBox: {
-    flex: 1,
-    paddingVertical: Spacing[3],
-    paddingHorizontal: Spacing[3],
-    borderRadius: 14,
-    alignItems: 'center',
-    gap: 2,
-  },
-  statVal: { fontSize: Typography.fontSize.xl, fontWeight: Typography.fontWeight.bold },
-  statLbl: { fontSize: Typography.fontSize.xs },
-  footer: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  footerTip: { fontSize: Typography.fontSize.xs, flex: 1 },
-  chevron: { marginLeft: 'auto' },
-});
+  accentBar: { width: 4 },
+  inner:     { flex: 1, padding: 16, gap: 14 },
 
+  topRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  titleBlock:  { flex: 1, gap: 6 },
+  liveRow:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  liveDot:     { width: 7, height: 7, borderRadius: 4 },
+  liveLabel:   { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+  businessName:{ fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
+
+  statusBadge: {
+    borderRadius: 8, borderWidth: 1,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  statusText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+
+  statsRow: { flexDirection: 'row', gap: 10 },
+  statBox: {
+    flex: 1, paddingVertical: 12, paddingHorizontal: 12,
+    borderRadius: 12, borderWidth: 1, alignItems: 'center', gap: 3,
+  },
+  statVal: { fontSize: 20, fontWeight: '900', letterSpacing: -0.5 },
+  statLbl: { fontSize: 10, fontWeight: '600', letterSpacing: 0.5 },
+
+  footer:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  footerTip: { fontSize: 11, fontWeight: '500' },
+});

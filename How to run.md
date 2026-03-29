@@ -6,7 +6,7 @@ The terminal is telling you it's in **Expo Go mode** — you can see `Using Expo
 
 ---
 
-### Option 1 — Press `s` right now (quickest)
+## Option 1 — Press `s` right now (quickest)
 
 In that same terminal, just press **`s`**. It switches to dev client mode. You'll see:
 
@@ -18,11 +18,12 @@ Then press **`a`** to open on Android. The already-installed APK on your Tecno w
 
 ---
 
-### Option 2 — Always start in dev client mode (better habit)
+## Option 2 — Always start in dev client mode (better habit)
 
 Stop the current server (`Ctrl+C`) and run:
 
 ```powershell
+adb reverse tcp:8081 tcp:8081
 npx expo start --dev-client
 ```
 

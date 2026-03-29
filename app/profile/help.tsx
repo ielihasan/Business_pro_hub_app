@@ -29,7 +29,6 @@ interface Category {
   id: string;
   label: string;
   icon: string;
-  color: string;
   faqs: FAQ[];
 }
 
@@ -38,7 +37,6 @@ const CATEGORIES: Category[] = [
     id: 'queue',
     label: 'Queue Management',
     icon: 'people-outline',
-    color: '#3B82F6',
     faqs: [
       {
         id: 'q1',
@@ -76,7 +74,6 @@ const CATEGORIES: Category[] = [
     id: 'orders',
     label: 'Orders',
     icon: 'bag-outline',
-    color: '#16A34A',
     faqs: [
       {
         id: 'o1',
@@ -104,7 +101,6 @@ const CATEGORIES: Category[] = [
     id: 'payments',
     label: 'Payments',
     icon: 'card-outline',
-    color: '#06B6D4',
     faqs: [
       {
         id: 'p1',
@@ -132,7 +128,6 @@ const CATEGORIES: Category[] = [
     id: 'loyalty',
     label: 'Loyalty & Rewards',
     icon: 'star-outline',
-    color: '#F59E0B',
     faqs: [
       {
         id: 'l1',
@@ -155,7 +150,6 @@ const CATEGORIES: Category[] = [
     id: 'account',
     label: 'Account & Profile',
     icon: 'person-outline',
-    color: '#8B5CF6',
     faqs: [
       {
         id: 'a1',
@@ -188,7 +182,6 @@ const CATEGORIES: Category[] = [
     id: 'technical',
     label: 'Technical Issues',
     icon: 'construct-outline',
-    color: '#EF4444',
     faqs: [
       {
         id: 't1',
@@ -217,7 +210,7 @@ const CATEGORIES: Category[] = [
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function HelpCenterScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   const [searchQuery, setSearchQuery]     = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -254,7 +247,7 @@ export default function HelpCenterScreen() {
     : CATEGORIES;
 
   // ── FAQ Item ──
-  const FAQItem = ({ faq, accentColor }: { faq: FAQ; accentColor: string }) => {
+  const FAQItem = ({ faq }: { faq: FAQ }) => {
     const isOpen = expandedId === faq.id;
     return (
       <View>
@@ -269,11 +262,11 @@ export default function HelpCenterScreen() {
           <Ionicons
             name={isOpen ? 'chevron-up' : 'chevron-down'}
             size={18}
-            color={isOpen ? accentColor : colors.mutedForeground}
+            color={isOpen ? colors.foreground : colors.mutedForeground}
           />
         </TouchableOpacity>
         {isOpen && (
-          <View style={[styles.faqAnswer, { backgroundColor: isDark ? '#111' : '#FAFAFA', borderTopColor: colors.border }]}>
+          <View style={[styles.faqAnswer, { backgroundColor: colors.secondary, borderTopColor: colors.border }]}>
             <Text style={[styles.faqAnswerText, { color: colors.mutedForeground }]}>{faq.answer}</Text>
           </View>
         )}
@@ -294,7 +287,7 @@ export default function HelpCenterScreen() {
 
       {/* Search bar */}
       <View style={[styles.searchContainer, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
-        <View style={[styles.searchBar, { backgroundColor: isDark ? '#1C1C1E' : '#F3F4F6', borderColor: colors.border }]}>
+        <View style={[styles.searchBar, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
           <Ionicons name="search-outline" size={18} color={colors.mutedForeground} />
           <TextInput
             style={[styles.searchInput, { color: colors.foreground }]}
@@ -322,7 +315,7 @@ export default function HelpCenterScreen() {
               {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for "{searchQuery}"
             </Text>
             {searchResults.length === 0 ? (
-              <View style={[styles.emptyBox, { backgroundColor: isDark ? '#1C1C1E' : '#F9FAFB', borderColor: colors.border }]}>
+              <View style={[styles.emptyBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
                 <Ionicons name="search-outline" size={40} color={colors.mutedForeground} style={{ marginBottom: Spacing[3] }} />
                 <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No results found</Text>
                 <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
@@ -337,10 +330,10 @@ export default function HelpCenterScreen() {
                     <View key={faq.id}>
                       {i > 0 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
                       <View style={styles.searchResultCategory}>
-                        <Ionicons name={cat.icon as any} size={12} color={cat.color} />
-                        <Text style={[styles.searchResultCategoryText, { color: cat.color }]}>{cat.label}</Text>
+                        <Ionicons name={cat.icon as any} size={12} color={colors.mutedForeground} />
+                        <Text style={[styles.searchResultCategoryText, { color: colors.mutedForeground }]}>{cat.label}</Text>
                       </View>
-                      <FAQItem faq={faq} accentColor={cat.color} />
+                      <FAQItem faq={faq} />
                     </View>
                   );
                 })}
@@ -350,11 +343,11 @@ export default function HelpCenterScreen() {
         ) : (
           <>
             {/* ── Hero banner ── */}
-            <View style={[styles.heroBanner, { backgroundColor: isDark ? '#1A2744' : '#EFF6FF', borderColor: isDark ? '#2563EB44' : '#BFDBFE' }]}>
-              <Ionicons name="help-buoy-outline" size={32} color="#3B82F6" />
+            <View style={[styles.heroBanner, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+              <Ionicons name="help-buoy-outline" size={32} color={colors.foreground} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.heroTitle, { color: isDark ? '#93C5FD' : '#1D4ED8' }]}>How can we help?</Text>
-                <Text style={[styles.heroDesc, { color: isDark ? '#93C5FD' : '#2563EB' }]}>
+                <Text style={[styles.heroTitle, { color: colors.foreground }]}>How can we help?</Text>
+                <Text style={[styles.heroDesc, { color: colors.mutedForeground }]}>
                   Browse topics below or search for a specific question.
                 </Text>
               </View>
@@ -375,15 +368,15 @@ export default function HelpCenterScreen() {
                     style={[
                       styles.pill,
                       {
-                        backgroundColor: isActive ? cat.color : (isDark ? '#1C1C1E' : '#F3F4F6'),
-                        borderColor: isActive ? cat.color : colors.border,
+                        backgroundColor: isActive ? colors.foreground : colors.secondary,
+                        borderColor: isActive ? colors.foreground : colors.border,
                       },
                     ]}
                     onPress={() => handleCategoryPress(cat.id)}
                     activeOpacity={0.7}
                   >
-                    <Ionicons name={cat.icon as any} size={14} color={isActive ? '#fff' : colors.mutedForeground} />
-                    <Text style={[styles.pillText, { color: isActive ? '#fff' : colors.foreground }]}>
+                    <Ionicons name={cat.icon as any} size={14} color={isActive ? colors.background : colors.mutedForeground} />
+                    <Text style={[styles.pillText, { color: isActive ? colors.background : colors.foreground }]}>
                       {cat.label}
                     </Text>
                   </TouchableOpacity>
@@ -395,8 +388,8 @@ export default function HelpCenterScreen() {
             {visibleCategories.map(cat => (
               <View key={cat.id} style={{ marginBottom: Spacing[4] }}>
                 <View style={styles.categoryHeader}>
-                  <View style={[styles.categoryIconBg, { backgroundColor: cat.color + '20' }]}>
-                    <Ionicons name={cat.icon as any} size={18} color={cat.color} />
+                  <View style={[styles.categoryIconBg, { backgroundColor: colors.secondary }]}>
+                    <Ionicons name={cat.icon as any} size={18} color={colors.foreground} />
                   </View>
                   <Text style={[styles.categoryTitle, { color: colors.foreground }]}>{cat.label}</Text>
                   <Text style={[styles.categoryCount, { color: colors.mutedForeground }]}>
@@ -407,7 +400,7 @@ export default function HelpCenterScreen() {
                   {cat.faqs.map((faq, i) => (
                     <View key={faq.id}>
                       {i > 0 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
-                      <FAQItem faq={faq} accentColor={cat.color} />
+                      <FAQItem faq={faq} />
                     </View>
                   ))}
                 </View>
@@ -426,15 +419,15 @@ export default function HelpCenterScreen() {
             onPress={() => Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=Support Request - BusinessHub Pro`)}
             activeOpacity={0.7}
           >
-            <View style={[styles.contactIcon, { backgroundColor: isDark ? '#14532D' : '#F0FDF4' }]}>
-              <Ionicons name="mail-outline" size={22} color="#16A34A" />
+            <View style={[styles.contactIcon, { backgroundColor: colors.secondary }]}>
+              <Ionicons name="mail-outline" size={22} color={colors.foreground} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.contactTitle, { color: colors.foreground }]}>Email Support</Text>
               <Text style={[styles.contactDesc, { color: colors.mutedForeground }]}>
                 We reply within 24 hours
               </Text>
-              <Text style={[styles.contactValue, { color: '#16A34A' }]}>{CONTACT_EMAIL}</Text>
+              <Text style={[styles.contactValue, { color: colors.foreground }]}>{CONTACT_EMAIL}</Text>
             </View>
             <Ionicons name="open-outline" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
@@ -447,8 +440,8 @@ export default function HelpCenterScreen() {
             onPress={() => router.push('/profile/feedback')}
             activeOpacity={0.7}
           >
-            <View style={[styles.contactIcon, { backgroundColor: isDark ? '#1A2744' : '#EFF6FF' }]}>
-              <Ionicons name="chatbubble-outline" size={22} color="#3B82F6" />
+            <View style={[styles.contactIcon, { backgroundColor: colors.secondary }]}>
+              <Ionicons name="chatbubble-outline" size={22} color={colors.foreground} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.contactTitle, { color: colors.foreground }]}>Send Feedback</Text>
@@ -467,8 +460,8 @@ export default function HelpCenterScreen() {
             onPress={() => router.push('/profile/terms')}
             activeOpacity={0.7}
           >
-            <View style={[styles.contactIcon, { backgroundColor: isDark ? '#2E1065' : '#F5F3FF' }]}>
-              <Ionicons name="document-text-outline" size={22} color="#8B5CF6" />
+            <View style={[styles.contactIcon, { backgroundColor: colors.secondary }]}>
+              <Ionicons name="document-text-outline" size={22} color={colors.foreground} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.contactTitle, { color: colors.foreground }]}>Terms & Privacy Policy</Text>
@@ -481,9 +474,9 @@ export default function HelpCenterScreen() {
         </View>
 
         {/* Response time note */}
-        <View style={[styles.noteBox, { backgroundColor: isDark ? '#1C1C1E' : '#FFFBEB', borderColor: isDark ? '#92400E44' : '#FDE68A' }]}>
-          <Ionicons name="time-outline" size={16} color="#F59E0B" />
-          <Text style={[styles.noteText, { color: isDark ? '#FCD34D' : '#92400E' }]}>
+        <View style={[styles.noteBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+          <Ionicons name="time-outline" size={16} color={colors.mutedForeground} />
+          <Text style={[styles.noteText, { color: colors.mutedForeground }]}>
             Our support team is available Mon–Sat, 9am–6pm (PKT). We aim to respond to all emails within 24 hours.
           </Text>
         </View>

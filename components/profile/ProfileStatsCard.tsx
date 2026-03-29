@@ -12,13 +12,13 @@ interface ProfileStatsCardProps {
 }
 
 const STAT_CONFIGS = [
-  { icon: 'star',        lightBg: '#FFFBEB', darkBg: '#422006', iconColor: '#D97706', key: 'points'  },
-  { icon: 'storefront', lightBg: '#EFF6FF', darkBg: '#1e3a5f', iconColor: '#3B82F6', key: 'visits'  },
-  { icon: 'calendar',   lightBg: '#F0FDF4', darkBg: '#052e16', iconColor: '#16A34A', key: 'since'   },
+  { icon: 'star',       key: 'points' },
+  { icon: 'storefront', key: 'visits' },
+  { icon: 'calendar',   key: 'since'  },
 ];
 
 export function ProfileStatsCard({ loyaltyPoints, totalVisits, memberSince }: ProfileStatsCardProps) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { t } = useTranslation();
 
   const values = [
@@ -40,8 +40,8 @@ export function ProfileStatsCard({ loyaltyPoints, totalVisits, memberSince }: Pr
             },
           ]}
         >
-          <View style={[styles.iconWrap, { backgroundColor: isDark ? cfg.darkBg : cfg.lightBg }]}>
-            <Ionicons name={cfg.icon as any} size={18} color={cfg.iconColor} />
+          <View style={[styles.iconWrap, { backgroundColor: colors.secondary }]}>
+            <Ionicons name={cfg.icon as any} size={18} color={colors.foreground} />
           </View>
           <Text style={[styles.value, { color: colors.foreground }]}>{values[i]}</Text>
           <Text style={[styles.label, { color: colors.mutedForeground }]}>{t(`profile.stats.${cfg.key}`)}</Text>

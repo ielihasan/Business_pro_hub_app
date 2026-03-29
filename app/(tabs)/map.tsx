@@ -1,269 +1,264 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  FlatList, ActivityIndicator,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
-import * as Location from 'expo-location';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
-import { fetchBusinesses, BusinessRecord, subscribeToBusinesses, createBusiness } from '@/lib/business';
-import { MapControls } from '@/components/map';
-import { useStore } from '@/store/useStore';
+import { fetchBusinesses, BusinessRecord } from '@/lib/business';
 
-export default function MapScreen() {
-  const { colors, isDark } = useTheme();
-  const { locationEnabled, toggleLocation } = useStore();
-  const [region, setRegion] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const [retryKey, setRetryKey] = useState(0);
-  const [businesses, setBusinesses] = useState<Array<BusinessRecord & { distanceKm: number }>>([]);
-  const [radiusKm, setRadiusKm] = useState(5);
-  const [adding, setAdding] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newCategory, setNewCategory] = useState('Food & Beverage');
-  const [newIsOpen, setNewIsOpen] = useState(true);
+const CITIES = [
+  'Karachi', 'Lahore', 'Islamabad', 'Rawalpindi',
+  'Peshawar', 'Quetta', 'Faisalabad', 'Multan',
+];
 
-  useEffect(() => {
-    if (!locationEnabled) {
-      setRegion(null);
-      setLoading(false);
-      return;
-    }
+type BizResult = BusinessRecord & { distanceKm: number; address?: string | null };
+
+export default function DiscoverScreen() {
+  const { colors } = useTheme();
+  const [query, setQuery]           = useState('');
+  const [activeCity, setActiveCity] = useState<string | null>(null);
+  const [results, setResults]       = useState<BizResult[]>([]);
+  const [loading, setLoading]       = useState(false);
+  const [searched, setSearched]     = useState(false);
+
+  const doSearch = async (city: string) => {
+    setActiveCity(city);
     setLoading(true);
-    setLocationError(null);
-    let unsubscribe: (() => Promise<void>) | null = null;
-
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setLocationError('permission');
-          setLoading(false);
-          return;
-        }
-
-        // Try balanced accuracy first, fall back to last known position
-        let pos: Location.LocationObject | null = null;
-        try {
-          pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        } catch {
-          pos = await Location.getLastKnownPositionAsync();
-        }
-
-        if (!pos) {
-          // No GPS fix — show map at a world-level default so map still renders.
-          // A small banner below will tell the user GPS is off.
-          setLocationError('unavailable');
-          setRegion({ latitude: 30.3753, longitude: 69.3451, latitudeDelta: 40, longitudeDelta: 40 });
-          setLoading(false);
-          return;
-        }
-
-        const { latitude, longitude } = pos.coords;
-        setRegion({ latitude, longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 });
-        const bs = await fetchBusinesses({ latitude, longitude, radiusKm });
-        setBusinesses(bs);
-
-        unsubscribe = subscribeToBusinesses(async () => {
-          const fresh = await fetchBusinesses({ latitude, longitude, radiusKm });
-          setBusinesses(fresh);
-        });
-      } catch (err) {
-        console.warn('Map load error', err);
-        setLocationError('unavailable');
-      } finally {
-        setLoading(false);
-      }
-    })();
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [radiusKm, locationEnabled, retryKey]);
-
-  const handleRefresh = useCallback(() => {
-    setLoading(true);
-    setLocationError(null);
-    setRegion(null);
-    setRetryKey(k => k + 1);
-  }, []);
-
-  const handleSaveBusiness = useCallback(async () => {
+    setSearched(true);
     try {
-      setLoading(true);
-      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      await createBusiness({
-        name: newName,
-        category: newCategory,
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-        is_open: newIsOpen,
-      });
-      setNewName('');
-      setNewCategory('Food & Beverage');
-      setNewIsOpen(true);
-      setAdding(false);
-      const bs = await fetchBusinesses({
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-        radiusKm,
-      });
-      setBusinesses(bs);
-    } catch (err) {
-      console.warn('Create business failed', err);
+      const [byName, all] = await Promise.all([
+        fetchBusinesses({ query: city, limit: 200 }) as Promise<BizResult[]>,
+        fetchBusinesses({ limit: 200 }) as Promise<BizResult[]>,
+      ]);
+      const seen = new Set(byName.map(b => b.id));
+      const merged = [...byName];
+      for (const b of all) {
+        if (!seen.has(b.id) && ((b as any).address ?? '').toLowerCase().includes(city.toLowerCase())) {
+          seen.add(b.id);
+          merged.push(b);
+        }
+      }
+      setResults(merged);
+    } catch {
+      setResults([]);
     } finally {
       setLoading(false);
     }
-  }, [newName, newCategory, newIsOpen, radiusKm]);
+  };
 
-  if (!locationEnabled) {
-    return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <View style={[styles.disabledIconBg, { backgroundColor: isDark ? '#1C1C1E' : '#F3F4F6' }]}>
-          <Ionicons name="location-outline" size={48} color={colors.mutedForeground} />
-        </View>
-        <Text style={[styles.disabledTitle, { color: colors.foreground }]}>Location Services Off</Text>
-        <Text style={[styles.disabledDesc, { color: colors.mutedForeground }]}>
-          Enable location services to see businesses near you on the map.
-        </Text>
-        <TouchableOpacity
-          style={[styles.enableBtn, { backgroundColor: colors.primary }]}
-          onPress={() => toggleLocation()}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="navigate-outline" size={18} color="#fff" />
-          <Text style={styles.enableBtnText}>Enable Location</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (loading) {
-    return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ color: colors.mutedForeground, marginTop: 12 }}>Loading map...</Text>
-      </View>
-    );
-  }
-
-  if (!region) {
-    // Still loading or permission denied — show spinner or permission message
-    if (locationError === 'permission') {
-      return (
-        <View style={[styles.center, { backgroundColor: colors.background }]}>
-          <View style={[styles.disabledIconBg, { backgroundColor: isDark ? '#1C1C1E' : '#F3F4F6' }]}>
-            <Ionicons name="location-outline" size={48} color={colors.mutedForeground} />
-          </View>
-          <Text style={[styles.disabledTitle, { color: colors.foreground }]}>Location Access Required</Text>
-          <Text style={[styles.disabledDesc, { color: colors.mutedForeground }]}>
-            Please allow location permission in your device settings, then tap Retry.
-          </Text>
-          <TouchableOpacity
-            style={[styles.enableBtn, { backgroundColor: colors.primary }]}
-            onPress={() => { setLocationError(null); setLoading(true); setRegion(null); setRetryKey(k => k + 1); }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="refresh-outline" size={18} color="#fff" />
-            <Text style={styles.enableBtnText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-    // Fallthrough — still waiting
-    return null;
-  }
-
-  // Show map. If GPS was unavailable, show a dismissible banner at the top.
-  const showGpsBanner = locationError === 'unavailable';
+  const clearSearch = () => {
+    setActiveCity(null);
+    setResults([]);
+    setSearched(false);
+    setQuery('');
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {showGpsBanner && (
-        <View style={[styles.gpsBanner, { backgroundColor: isDark ? '#2C1810' : '#FEF3C7' }]}>
-          <Ionicons name="navigate-circle-outline" size={16} color={isDark ? '#FCD34D' : '#D97706'} />
-          <Text style={[styles.gpsBannerText, { color: isDark ? '#FCD34D' : '#92400E' }]}>
-            GPS unavailable — enable Location Services for your position
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['top']} style={{ backgroundColor: colors.background }}>
+        {/* Header */}
+        <View style={styles.header}>
+          {activeCity ? (
+            <TouchableOpacity
+              onPress={clearSearch}
+              style={[styles.iconBtn, { backgroundColor: colors.secondary }]}
+            >
+              <Ionicons name="arrow-back" size={18} color={colors.foreground} />
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.iconBtn, { backgroundColor: colors.secondary }]}>
+              <Ionicons name="location-outline" size={18} color={colors.foreground} />
+            </View>
+          )}
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>
+            {activeCity ? activeCity.toUpperCase() : 'DISCOVER'}
           </Text>
-          <TouchableOpacity onPress={() => { setLocationError(null); setRetryKey(k => k + 1); }}>
-            <Ionicons name="refresh-outline" size={16} color={isDark ? '#FCD34D' : '#D97706'} />
+          <View style={{ width: 40 }} />
+        </View>
+
+        {/* Search bar */}
+        <View style={[styles.searchBar, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+          <Ionicons name="search-outline" size={16} color={colors.mutedForeground} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.foreground }]}
+            placeholder="Search by city or business…"
+            placeholderTextColor={colors.mutedForeground}
+            value={query}
+            onChangeText={setQuery}
+            onSubmitEditing={() => { if (query.trim()) doSearch(query.trim()); }}
+            returnKeyType="search"
+          />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => { setQuery(''); clearSearch(); }}>
+              <Ionicons name="close-circle" size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </SafeAreaView>
+
+      {/* ── City grid ── */}
+      {!searched ? (
+        <FlatList
+          data={CITIES}
+          keyExtractor={item => item}
+          numColumns={2}
+          contentContainerStyle={styles.cityGrid}
+          ListHeaderComponent={
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>POPULAR CITIES</Text>
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.cityCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => { setQuery(item); doSearch(item); }}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.cityIconWrap, { backgroundColor: colors.secondary }]}>
+                <Ionicons name="location-outline" size={22} color={colors.foreground} />
+              </View>
+              <Text style={[styles.cityName, { color: colors.foreground }]}>{item}</Text>
+              <Text style={[styles.cityCountry, { color: colors.mutedForeground }]}>Pakistan</Text>
+            </TouchableOpacity>
+          )}
+        />
+      ) : loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.foreground} />
+          <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Searching…</Text>
+        </View>
+      ) : results.length === 0 ? (
+        <View style={styles.center}>
+          <View style={[styles.emptyIcon, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+            <Ionicons name="storefront-outline" size={36} color={colors.foreground} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Businesses Found</Text>
+          <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
+            No businesses listed in {activeCity} yet.
+          </Text>
+          <TouchableOpacity
+            style={[styles.retryBtn, { backgroundColor: colors.foreground }]}
+            onPress={clearSearch}
+          >
+            <Text style={[styles.retryText, { color: colors.background }]}>Search Another City</Text>
           </TouchableOpacity>
         </View>
-      )}
-      <MapView provider={PROVIDER_GOOGLE} style={styles.map} region={region} showsUserLocation>
-        <Circle
-          center={{ latitude: region.latitude, longitude: region.longitude }}
-          radius={radiusKm * 1000}
-          fillColor={colors.primary + '20'}
-          strokeColor={colors.primary + '60'}
-        />
-        {businesses.map((b) =>
-          b.latitude && b.longitude ? (
-            <Marker
-              key={b.id}
-              coordinate={{ latitude: b.latitude as number, longitude: b.longitude as number }}
-              title={b.name}
-              description={b.category}
+      ) : (
+        /* ── Results list ── */
+        <FlatList
+          data={results}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.resultsList}
+          ListHeaderComponent={
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+              {results.length} BUSINESS{results.length !== 1 ? 'ES' : ''} IN {activeCity?.toUpperCase()}
+            </Text>
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.bizCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => router.push(`/business/${item.id}`)}
+              activeOpacity={0.75}
             >
-              <View style={[styles.markerContainer, { backgroundColor: colors.primary }]}>
-                <Ionicons name="location" size={20} color={colors.primaryForeground} />
+              <View style={[styles.bizAvatar, { backgroundColor: colors.secondary }]}>
+                <Text style={[styles.bizAvatarText, { color: colors.foreground }]}>
+                  {item.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+                </Text>
               </View>
-            </Marker>
-          ) : null
-        )}
-      </MapView>
-
-      <MapControls
-        radiusKm={radiusKm}
-        onRadiusChange={setRadiusKm}
-        onRefresh={handleRefresh}
-        adding={adding}
-        onToggleAdding={() => setAdding((s) => !s)}
-        newName={newName}
-        newCategory={newCategory}
-        newIsOpen={newIsOpen}
-        onNameChange={setNewName}
-        onCategoryChange={setNewCategory}
-        onIsOpenChange={setNewIsOpen}
-        onSave={handleSaveBusiness}
-      />
+              <View style={styles.bizInfo}>
+                <Text style={[styles.bizName, { color: colors.foreground }]} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={[styles.bizMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {item.category || 'Business'}
+                </Text>
+                {!!(item as any).address && (
+                  <Text style={[styles.bizMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    {(item as any).address}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.bizRight}>
+                {item.is_open != null && (
+                  <View style={[styles.openBadge, {
+                    backgroundColor: item.is_open ? colors.success + '20' : colors.secondary,
+                  }]}>
+                    <View style={[styles.openDot, {
+                      backgroundColor: item.is_open ? colors.success : colors.mutedForeground,
+                    }]} />
+                    <Text style={[styles.openText, {
+                      color: item.is_open ? colors.success : colors.mutedForeground,
+                    }]}>
+                      {item.is_open ? 'Open' : 'Closed'}
+                    </Text>
+                  </View>
+                )}
+                <Ionicons name="chevron-forward" size={14} color={colors.mutedForeground} style={{ marginTop: 6 }} />
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  map: { flex: 1 },
-  gpsBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    zIndex: 10,
+  root: { flex: 1 },
+
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12,
   },
-  gpsBannerText: { flex: 1, fontSize: 12, fontWeight: '500' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  disabledIconBg: {
-    width: 96, height: 96, borderRadius: 48,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 20,
+  iconBtn:     { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 17, fontWeight: '900', letterSpacing: -0.3 },
+
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginHorizontal: 20, marginBottom: 16,
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderRadius: 14, borderWidth: 1,
   },
-  disabledTitle: { fontSize: 20, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
-  disabledDesc: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 28 },
-  enableBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 24, paddingVertical: 14,
-    borderRadius: 12,
+  searchInput: { flex: 1, fontSize: 15, fontWeight: '500' },
+
+  sectionLabel: {
+    fontSize: 11, fontWeight: '700', letterSpacing: 1.5,
+    marginBottom: 14, paddingHorizontal: 20,
   },
-  enableBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  markerContainer: {
-    padding: 8,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#FFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+
+  cityGrid:    { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 20 },
+  cityCard: {
+    flex: 1, margin: 8, padding: 20, borderRadius: 16, borderWidth: 1,
+    alignItems: 'center', gap: 10,
   },
+  cityIconWrap: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  cityName:     { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
+  cityCountry:  { fontSize: 11, fontWeight: '500' },
+
+  center:      { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
+  loadingText: { fontSize: 14, marginTop: 14, fontWeight: '500' },
+  emptyIcon: {
+    width: 80, height: 80, borderRadius: 20, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+  },
+  emptyTitle: { fontSize: 20, fontWeight: '900', marginBottom: 8, letterSpacing: -0.3 },
+  emptyDesc:  { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 28 },
+  retryBtn:   { paddingHorizontal: 28, paddingVertical: 14, borderRadius: 12 },
+  retryText:  { fontSize: 15, fontWeight: '800' },
+
+  resultsList: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 },
+  bizCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    padding: 14, marginBottom: 10, borderRadius: 16, borderWidth: 1,
+  },
+  bizAvatar:     { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  bizAvatarText: { fontSize: 16, fontWeight: '900' },
+  bizInfo:       { flex: 1, gap: 2 },
+  bizName:       { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
+  bizMeta:       { fontSize: 12, fontWeight: '500' },
+  bizRight:      { alignItems: 'flex-end' },
+  openBadge:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  openDot:       { width: 6, height: 6, borderRadius: 3 },
+  openText:      { fontSize: 11, fontWeight: '700' },
 });

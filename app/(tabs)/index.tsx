@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Text,
   Image,
+  TextInput,
+  StatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,221 +16,234 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useNearbyBusinesses } from '@/hooks/useNearbyBusinesses';
 import { useStore } from '@/store/useStore';
-import { Spacing, Typography } from '@/constants/theme';
 import {
-  SearchBar,
   ActiveQueueCard,
   CategoryFilter,
-  RadiusFilter,
   NearbyBusinesses,
 } from '@/components/home';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
 
 function getGreeting() {
   const h = new Date().getHours();
-  if (h < 12) return 'Good Morning';
-  if (h < 17) return 'Good Afternoon';
-  return 'Good Evening';
+  if (h < 12) return 'Morning';
+  if (h < 17) return 'Afternoon';
+  return 'Evening';
 }
 
 export default function HomeScreen() {
   const { colors, isDark } = useTheme();
-  const user = useStore((s) => s.user);
-  const activeQueues = useStore((s) => s.activeQueues);
-  const unreadCount = useStore((s) => s.unreadCount);
+  const user                = useStore((s) => s.user);
+  const activeQueues        = useStore((s) => s.activeQueues);
+  const unreadCount         = useStore((s) => s.unreadCount);
 
-  const [refreshing, setRefreshing] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [radiusKm, setRadiusKm] = useState(5);
+  const [refreshing,                setRefreshing]                = useState(false);
+  const [selectedCategory,          setSelectedCategory]          = useState('all');
+  const [searchQuery,               setSearchQuery]               = useState('');
   const [notificationsPanelVisible, setNotificationsPanelVisible] = useState(false);
 
   const { businesses, refresh: refreshBusinesses } = useNearbyBusinesses({
-    radiusKm,
     category: selectedCategory,
     query: searchQuery,
   });
 
-  const activeQueue = activeQueues[0] ?? null;
-
+  const activeQueue            = activeQueues[0] ?? null;
   const syncQueuesFromSupabase = useStore((s) => s.syncQueuesFromSupabase);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([
-      refreshBusinesses(),
-      syncQueuesFromSupabase(),
-    ]);
+    await Promise.all([refreshBusinesses(), syncQueuesFromSupabase()]);
     setRefreshing(false);
   };
 
-  const firstName = user?.name?.split(' ')[0] ?? 'there';
-
+  const firstName    = user?.name?.split(' ')[0] ?? 'there';
   const avatarInitial = (user?.name ?? 'U')[0].toUpperCase();
 
+  const BG     = colors.background;
+  const FG     = colors.foreground;
+  const MUTED  = colors.mutedForeground;
+  const BORDER = colors.border;
+  const CARD   = colors.card;
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#0F0F1A' : '#F6F8FF' }]} edges={['top']}>
+    <View style={[styles.root, { backgroundColor: BG }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+
+      <SafeAreaView edges={['top']} style={{ backgroundColor: BG }}>
+        {/* ── Top Bar ── */}
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
+            {user?.avatar ? (
+              <Image source={{ uri: user.avatar }} style={styles.avatarImg} />
+            ) : (
+              <View style={[styles.avatarFallback, { backgroundColor: CARD, borderColor: BORDER }]}>
+                <Text style={[styles.avatarInitial, { color: FG }]}>{avatarInitial}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <Text style={[styles.wordmark, { color: FG }]}>BUSINESSHUB PRO</Text>
+
+          <TouchableOpacity
+            style={[styles.bellBtn, { backgroundColor: CARD, borderColor: BORDER }]}
+            onPress={() => setNotificationsPanelVisible(true)}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="notifications-outline" size={18} color={FG} />
+            {unreadCount > 0 && (
+              <View style={[styles.badge, { backgroundColor: colors.destructive }]}>
+                <Text style={[styles.badgeText, { color: colors.destructiveForeground }]}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#6366F1"
-            colors={['#6366F1']}
+            tintColor={FG}
+            colors={[FG]}
           />
         }
       >
-        {/* ── Header ── */}
-        <View style={[styles.header, { backgroundColor: isDark ? '#0F0F1A' : '#F6F8FF' }]}>
-          <View style={styles.headerLeft}>
-            <TouchableOpacity
-              style={[styles.avatarCircle, { backgroundColor: isDark ? '#1E1E2E' : '#EEF2FF', borderColor: '#6366F1' }]}
-              onPress={() => router.push('/(tabs)/profile')}
-            >
-              {user?.avatar ? (
-                <Image source={{ uri: user.avatar }} style={styles.avatarImage} />
-              ) : (
-                <Text style={[styles.avatarText, { color: '#6366F1' }]}>{avatarInitial}</Text>
-              )}
-            </TouchableOpacity>
-            <View>
-              <Text style={[styles.greetSmall, { color: colors.mutedForeground }]}>{getGreeting()} 👋</Text>
-              <Text style={[styles.greetName, { color: colors.foreground }]}>{firstName}</Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={[styles.bellBtn, { backgroundColor: isDark ? '#1E1E2E' : '#FFFFFF', borderColor: isDark ? '#2E2E40' : '#E2E8F0' }]}
-            onPress={() => setNotificationsPanelVisible(true)}
-          >
-            <Ionicons name="notifications-outline" size={20} color={colors.foreground} />
-            {unreadCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+        {/* ── Greeting ── */}
+        <View style={styles.greetSection}>
+          <Text style={[styles.greetSub, { color: MUTED }]}>
+            {`GOOD ${getGreeting().toUpperCase()}`}
+          </Text>
+          <Text style={[styles.greetName, { color: FG }]} numberOfLines={1}>
+            {firstName.toUpperCase()}.
+          </Text>
+          <Text style={[styles.greetTag, { color: MUTED }]}>Your queue status at a glance.</Text>
         </View>
 
-        {/* ── Search ── */}
-        <View style={styles.searchWrap}>
-          <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
-        </View>
-
-        {/* ── Active Queue ── */}
+        {/* ── Active Queue / Empty State ── */}
         {activeQueue ? (
           <ActiveQueueCard queue={activeQueue} />
         ) : (
           <TouchableOpacity
-            activeOpacity={0.9}
-            style={[styles.noQueueBox, { backgroundColor: isDark ? '#1A1A2E' : '#FAFBFF', borderColor: isDark ? '#2E2E50' : '#E0E7FF' }]}
+            activeOpacity={0.85}
+            style={[styles.noQueueCard, { backgroundColor: CARD, borderColor: BORDER }]}
             onPress={() => router.push('/(tabs)/scan')}
           >
-            <View style={[styles.noQueueIcon, { backgroundColor: '#EEF2FF' }]}>
-              <Ionicons name="qr-code-outline" size={22} color="#6366F1" />
+            <View style={[styles.noQueueIconWrap, { borderColor: BORDER }]}>
+              <Ionicons name="qr-code-outline" size={26} color={FG} />
             </View>
-            <View style={styles.noQueueText}>
-              <Text style={[styles.noQueueTitle, { color: colors.foreground }]}>No active queue</Text>
-              <Text style={[styles.noQueueSub, { color: colors.mutedForeground }]}>Scan a QR code to join a queue</Text>
+            <View style={styles.noQueueTextWrap}>
+              <Text style={[styles.noQueueTitle, { color: FG }]}>NO ACTIVE QUEUE</Text>
+              <Text style={[styles.noQueueSub, { color: MUTED }]}>Scan a QR to join a queue</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#6366F1" />
+            <Ionicons name="arrow-forward" size={16} color={MUTED} />
           </TouchableOpacity>
         )}
+
+        {/* ── Search ── */}
+        <View style={[styles.searchWrap, { backgroundColor: CARD, borderColor: BORDER }]}>
+          <Ionicons name="search-outline" size={16} color={MUTED} />
+          <TextInput
+            style={[styles.searchInput, { color: FG }]}
+            placeholder="Search businesses…"
+            placeholderTextColor={MUTED}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={16} color={MUTED} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* ── Section Label ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: FG }]}>NEARBY</Text>
+          <View style={[styles.sectionLine, { backgroundColor: BORDER }]} />
+        </View>
 
         {/* ── Categories ── */}
         <CategoryFilter selected={selectedCategory} onSelect={setSelectedCategory} />
 
-        {/* ── Radius ── */}
-        <RadiusFilter selected={radiusKm} onSelect={setRadiusKm} />
-
         {/* ── Nearby Businesses ── */}
         <NearbyBusinesses businesses={businesses} />
 
-        <View style={{ height: Spacing[20] }} />
+        <View style={{ height: 96 }} />
       </ScrollView>
 
       <NotificationsPanel
         visible={notificationsPanelVisible}
         onClose={() => setNotificationsPanelVisible(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  root: { flex: 1 },
 
-  /* Header */
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing[6],
-    paddingTop: Spacing[4],
-    paddingBottom: Spacing[3],
+  /* ── Top bar ── */
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 24, paddingTop: 8, paddingBottom: 12,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing[3] },
-  avatarCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
+  wordmark: { fontSize: 16, fontWeight: '900', letterSpacing: -0.5 },
+
+  avatarImg: { width: 36, height: 36, borderRadius: 18 },
+  avatarFallback: {
+    width: 36, height: 36, borderRadius: 18,
+    borderWidth: 1, justifyContent: 'center', alignItems: 'center',
   },
-  avatarText: { fontSize: 18, fontWeight: '700', color: '#6366F1' },
-  avatarImage: { width: 40, height: 40, borderRadius: 20 },
-  greetSmall: { fontSize: Typography.fontSize.xs },
-  greetName: { fontSize: Typography.fontSize.lg, fontWeight: Typography.fontWeight.bold },
+  avatarInitial: { fontSize: 14, fontWeight: '800' },
+
   bellBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    width: 36, height: 36, borderRadius: 18,
+    borderWidth: 1, justifyContent: 'center', alignItems: 'center',
   },
   badge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#EF4444',
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'absolute', top: 4, right: 4,
+    width: 14, height: 14, borderRadius: 7,
+    justifyContent: 'center', alignItems: 'center',
   },
-  badgeText: { fontSize: 9, color: '#fff', fontWeight: '700' },
+  badgeText: { fontSize: 8, fontWeight: '800' },
 
-  /* Search */
-  searchWrap: { paddingTop: Spacing[2] },
+  /* ── Greeting ── */
+  greetSection: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 24 },
+  greetSub: {
+    fontSize: 10, fontWeight: '700', letterSpacing: 2,
+    textTransform: 'uppercase', marginBottom: 6,
+  },
+  greetName: { fontSize: 44, fontWeight: '900', letterSpacing: -1.5, lineHeight: 46, marginBottom: 8 },
+  greetTag:  { fontSize: 14, lineHeight: 20 },
 
-  /* No Queue nudge */
-  noQueueBox: {
-    marginHorizontal: Spacing[6],
-    marginBottom: Spacing[5],
-    borderRadius: 16,
-    borderWidth: 1.5,
-    padding: Spacing[4],
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing[3],
+  /* ── No-queue card ── */
+  noQueueCard: {
+    marginHorizontal: 24, marginBottom: 20, borderRadius: 16, borderWidth: 1,
+    padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16,
   },
-  noQueueIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
+  noQueueIconWrap: {
+    width: 54, height: 54, borderRadius: 14, borderWidth: 1,
+    justifyContent: 'center', alignItems: 'center',
   },
-  noQueueText: { flex: 1 },
-  noQueueTitle: { fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.semibold },
-  noQueueSub: { fontSize: Typography.fontSize.xs, marginTop: 2 },
+  noQueueTextWrap: { flex: 1 },
+  noQueueTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8, marginBottom: 4 },
+  noQueueSub:   { fontSize: 13, lineHeight: 18 },
+
+  /* ── Search ── */
+  searchWrap: {
+    marginHorizontal: 24, marginBottom: 20, borderRadius: 12, borderWidth: 1,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 14, paddingVertical: 13, gap: 10,
+  },
+  searchInput: { flex: 1, fontSize: 14, padding: 0 },
+
+  /* ── Section header ── */
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 24, marginBottom: 8, gap: 12,
+  },
+  sectionTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 2 },
+  sectionLine:  { flex: 1, height: 1 },
 });
-

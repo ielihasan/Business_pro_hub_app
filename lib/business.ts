@@ -11,6 +11,9 @@ export type BusinessRecord = {
   wait_time?: string | null;
   rating?: number | null;
   is_open?: boolean | null;
+  address?: string | null;
+  phone?: string | null;
+  description?: string | null;
 };
 
 export async function fetchBusinesses(opts: {
@@ -20,139 +23,163 @@ export async function fetchBusinesses(opts: {
   category?: string;
   query?: string;
   limit?: number;
-}): Promise<Array<BusinessRecord & { distanceKm: number }>> {
+}): Promise<Array<BusinessRecord & { distanceKm: number | null }>> {
 
   const {
     latitude,
     longitude,
-    radiusKm = 5,
+    radiusKm = 10,
     category,
     query: searchQuery,
-    limit = 200
+    limit = 200,
   } = opts;
 
   const hasLocation = typeof latitude === 'number' && typeof longitude === 'number';
 
-  // ── Fetch from both tables in parallel ──────────────────────────────────────
-  const [bizResult, adminsResult] = await Promise.all([
+  // ── Fetch from all three sources in parallel ─────────────────────────────────
+  const [bizResult, adminsResult, appsResult] = await Promise.all([
+    // 1. legacy businesses table
     supabase.from('businesses').select('*').limit(limit),
+
+    // 2. admin-registered business owners (already approved)
     supabase
       .from('admins')
-      .select('id, business_name, business_type, business_address, business_phone, business_description, is_approved, latitude, longitude')
+      .select('id, business_name, business_type, business_address, business_phone, business_description')
       .eq('role', 'business_owner')
+      .eq('is_approved', true)
+      .limit(limit),
+
+    // 3. business_applications — the primary approved-business source
+    supabase
+      .from('business_applications')
+      .select('id, business_name, business_type, business_address, business_phone, business_description')
+      .eq('is_approved', true)
+      .eq('is_rejected', false)
       .limit(limit),
   ]);
 
   if (bizResult.error) {
-    console.error('[fetchBusinesses] businesses error:', JSON.stringify(bizResult.error));
+    console.warn('[fetchBusinesses] businesses table error:', bizResult.error.message);
+  }
+  if (adminsResult.error) {
+    console.warn('[fetchBusinesses] admins table error:', adminsResult.error.message);
+  }
+  if (appsResult.error) {
+    console.warn('[fetchBusinesses] business_applications error:', appsResult.error.message);
   }
 
-  // Normalise businesses table rows
-  const fromBusinesses: Array<BusinessRecord & { distanceKm: number | null }> = (bizResult.data ?? []).map((b: any) => {
-    const name: string          = b.name         ?? b.business_name  ?? b.business_title ?? '';
-    const category: string      = b.category     ?? b.business_type  ?? b.type          ?? '';
-    const isOpen: boolean       = b.is_open      ?? b.isOpen         ?? true;
-    const lat: number | null    = b.latitude     ?? b.lat            ?? null;
-    const lon: number | null    = b.longitude    ?? b.lng            ?? b.lon           ?? null;
-    return {
-      ...b,
-      id: b.id,
-      name, category,
-      is_open: isOpen,
-      latitude: lat, longitude: lon,
-      queue_length: b.queue_length ?? b.queueLength ?? null,
-      wait_time:    b.wait_time   ?? b.waitTime     ?? null,
-      rating:       b.rating      ?? null,
-      distanceKm: (hasLocation && lat !== null && lon !== null)
-        ? haversineDistance(latitude as number, longitude as number, lat, lon)
-        : null,
-    };
-  });
+  // ── Normalise: businesses table ───────────────────────────────────────────────
+  const fromBusinesses: Array<BusinessRecord & { distanceKm: number | null }> =
+    (bizResult.data ?? []).map((b: any) => {
+      const lat: number | null = b.latitude ?? b.lat ?? null;
+      const lon: number | null = b.longitude ?? b.lng ?? b.lon ?? null;
+      return {
+        ...b,
+        id:           b.id,
+        name:         b.name         ?? b.business_name  ?? '',
+        category:     b.category     ?? b.business_type  ?? '',
+        is_open:      b.is_open      ?? b.isOpen         ?? true,
+        latitude:     lat,
+        longitude:    lon,
+        queue_length: b.queue_length ?? b.queueLength    ?? null,
+        wait_time:    b.wait_time    ?? b.waitTime       ?? null,
+        rating:       b.rating       ?? null,
+        address:      b.address      ?? b.business_address ?? null,
+        phone:        b.phone        ?? b.business_phone   ?? null,
+        description:  b.description  ?? b.business_description ?? null,
+        distanceKm: (hasLocation && lat !== null && lon !== null)
+          ? haversineDistance(latitude!, longitude!, lat, lon)
+          : null,
+      };
+    });
 
-  // Normalise admins table rows (business_owner registrations)
-  const fromAdmins: Array<BusinessRecord & { distanceKm: number | null }> = (adminsResult.data ?? []).map((a: any) => {
-    const lat: number | null = a.latitude  ?? null;
-    const lon: number | null = a.longitude ?? null;
-    return {
+  // ── Normalise: admins table ───────────────────────────────────────────────────
+  const fromAdmins: Array<BusinessRecord & { distanceKm: number | null }> =
+    (adminsResult.data ?? []).map((a: any) => ({
       id:           a.id,
       name:         a.business_name        ?? 'Unnamed Business',
       category:     a.business_type        ?? '',
-      is_open:      a.is_approved          ?? true,
-      latitude:     lat,
-      longitude:    lon,
+      is_open:      true,
+      latitude:     null,
+      longitude:    null,
       queue_length: null,
       wait_time:    null,
       rating:       null,
-      // Extra fields surfaced for the detail page
       address:      a.business_address     ?? null,
       phone:        a.business_phone       ?? null,
       description:  a.business_description ?? null,
-      distanceKm: (hasLocation && lat !== null && lon !== null)
-        ? haversineDistance(latitude as number, longitude as number, lat, lon)
-        : null,
-    };
-  });
+      distanceKm:   null,
+    }));
 
-  // Merge — deduplicate by id
+  // ── Normalise: business_applications table ────────────────────────────────────
+  // No lat/lon on this table — businesses are shown regardless of radius
+  // but sorted to the end when location is available.
+  const fromApplications: Array<BusinessRecord & { distanceKm: number | null }> =
+    (appsResult.data ?? []).map((a: any) => ({
+      id:           a.id,
+      name:         a.business_name        ?? 'Unnamed Business',
+      category:     a.business_type        ?? '',
+      is_open:      true,
+      latitude:     null,
+      longitude:    null,
+      queue_length: null,
+      wait_time:    null,
+      rating:       null,
+      address:      a.business_address     ?? null,
+      phone:        a.business_phone       ?? null,
+      description:  a.business_description ?? null,
+      distanceKm:   null, // no coordinates available
+    }));
+
+  // ── Merge — deduplicate by id ─────────────────────────────────────────────────
+  // Priority: businesses > admins > applications (first wins)
   const seen = new Set<string>();
   const allItems: Array<BusinessRecord & { distanceKm: number | null }> = [];
-  for (const b of [...fromBusinesses, ...fromAdmins]) {
+  for (const b of [...fromBusinesses, ...fromAdmins, ...fromApplications]) {
     if (!seen.has(b.id)) { seen.add(b.id); allItems.push(b); }
   }
 
-  // JS-side radius filter — businesses with no coordinates are always included
-  let filtered = hasLocation
-    ? allItems.filter((b) => b.distanceKm === null || b.distanceKm <= radiusKm)
-    : allItems;
-
-  // DB-side bounding box removed — JS-side radius applied above
-  // Category filter
-
-  // DB-side bounding box removed — JS-side radius applied above
-  // Category filter
+  // ── Category filter ───────────────────────────────────────────────────────────
+  let filtered = allItems;
   if (category && category !== 'all') {
     filtered = filtered.filter((b) =>
-      b.category.toLowerCase().includes(category.toLowerCase())
+      (b.category ?? '').toLowerCase().includes(category.toLowerCase())
     );
   }
 
-  // Text search
+  // ── Text search ───────────────────────────────────────────────────────────────
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
     filtered = filtered.filter((b) =>
       b.name.toLowerCase().includes(q) ||
-      b.category.toLowerCase().includes(q)
+      (b.category ?? '').toLowerCase().includes(q) ||
+      (b.address ?? '').toLowerCase().includes(q)
     );
   }
 
+  // ── Sort: by distance when available, address-only businesses go last ─────────
   if (hasLocation) {
-    filtered.sort((a, b) => a.distanceKm - b.distanceKm);
+    filtered.sort((a, b) => {
+      if (a.distanceKm !== null && b.distanceKm !== null) return a.distanceKm - b.distanceKm;
+      if (a.distanceKm !== null) return -1;
+      if (b.distanceKm !== null) return 1;
+      return 0;
+    });
   }
 
   return filtered;
 }
 
-export function subscribeToBusinesses(
-  onChange: (payload: any) => void
-) {
+export function subscribeToBusinesses(onChange: (payload: any) => void) {
   try {
     const channel = supabase
-      .channel('public:businesses')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'businesses' },
-        (payload) => {
-          onChange(payload);
-        }
-      )
+      .channel('public:businesses-and-applications')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'businesses' }, onChange)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'business_applications' }, onChange)
       .subscribe();
 
     return async () => {
-      try {
-        await supabase.removeChannel(channel);
-      } catch {
-        // ignore
-      }
+      try { await supabase.removeChannel(channel); } catch { /* ignore */ }
     };
   } catch (err) {
     console.warn('Realtime subscribe failed', err);
@@ -177,6 +204,5 @@ export async function createBusiness(record: {
     .limit(1);
 
   if (error) throw error;
-
   return data?.[0] ?? null;
 }

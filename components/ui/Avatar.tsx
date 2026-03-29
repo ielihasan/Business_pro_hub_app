@@ -30,16 +30,13 @@ function getInitials(name: string): string {
 }
 
 function getBackgroundColor(name: string): string {
-  if (!name) return '#737373';
-  const colors = [
-    '#404040', '#5C5C5C', '#787878', '#949494', '#B0B0B0',
-    '#2563EB', '#7C3AED', '#DC2626', '#059669', '#D97706',
-  ];
+  if (!name) return '#5C5C5C';
+  const grays = ['#2a2a2a', '#363636', '#404040', '#4a4a4a', '#5C5C5C', '#6e6e6e', '#787878'];
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return colors[Math.abs(hash) % colors.length];
+  return grays[Math.abs(hash) % grays.length];
 }
 
 export function Avatar({ source, name = '', size = 'md', style }: AvatarProps) {

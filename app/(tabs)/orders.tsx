@@ -1,61 +1,225 @@
-import { useState, useMemo } from 'react';
-import { View, ScrollView, RefreshControl, StyleSheet } from 'react-native';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  RefreshControl,
+  StyleSheet,
+  StatusBar,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { Spacing } from '@/constants/theme';
-import { OrderCard, EmptyOrdersState, OrderFilterTabs } from '@/components/orders';
+import { OrderCard } from '@/components/orders';
 import { useStore } from '@/store/useStore';
+import { fetchUserQueueHistory, OrderHistoryEntry } from '@/lib/queue';
+
+type Filter = 'all' | 'active' | 'completed';
+
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: 'all',       label: 'ALL'       },
+  { key: 'active',    label: 'ACTIVE'    },
+  { key: 'completed', label: 'COMPLETED' },
+];
 
 export default function OrdersScreen() {
-  const { colors } = useTheme();
-  const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+  const { colors, isDark } = useTheme();
+  const user = useStore((s) => s.user);
 
-  const orders = useStore((s) => s.orders);
+  const [orders, setOrders]       = useState<OrderHistoryEntry[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter]       = useState<Filter>('all');
+
+  const loadOrders = useCallback(async () => {
+    if (!user?.id) return;
+    const { data } = await fetchUserQueueHistory(user.id);
+    setOrders(data);
+  }, [user?.id]);
+
+  useEffect(() => {
+    setLoading(true);
+    loadOrders().finally(() => setLoading(false));
+  }, [loadOrders]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // Orders are derived from the persisted store; a brief delay gives
-    // any background Supabase update time to propagate before the spinner clears.
-    await new Promise((r) => setTimeout(r, 600));
+    await loadOrders();
     setRefreshing(false);
   };
 
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      if (filter === 'active') return ['pending', 'in_progress', 'ready'].includes(order.status);
-      if (filter === 'completed') return ['completed', 'cancelled'].includes(order.status);
-      return true;
-    });
-  }, [filter, orders]);
+  const filtered = useMemo(() => {
+    if (filter === 'active')    return orders.filter(o => ['waiting', 'in_progress'].includes(o.status));
+    if (filter === 'completed') return orders.filter(o => ['completed', 'cancelled'].includes(o.status));
+    return orders;
+  }, [orders, filter]);
+
+  // Summary stats
+  const totalSpent = useMemo(() =>
+    orders
+      .filter(o => o.status === 'completed')
+      .reduce((sum, o) => sum + (o.total_price ?? o.total_amount ?? 0), 0),
+    [orders]
+  );
+  const completedCount = orders.filter(o => o.status === 'completed').length;
+
+  const BG    = colors.background;
+  const FG    = colors.foreground;
+  const MUTED = colors.mutedForeground;
+  const BORDER = colors.border;
+  const CARD  = colors.card;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <OrderFilterTabs selected={filter} onSelect={setFilter} />
+    <View style={[styles.root, { backgroundColor: BG }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+
+      <SafeAreaView edges={['top']} style={{ backgroundColor: BG }}>
+        {/* ── Header ── */}
+        <View style={[styles.header, { borderBottomColor: BORDER }]}>
+          <View>
+            <Text style={[styles.headerLabel, { color: MUTED }]}>TRANSACTION HISTORY</Text>
+            <Text style={[styles.headerTitle, { color: FG }]}>ORDERS</Text>
+          </View>
+        </View>
+      </SafeAreaView>
+
+      {/* ── Stats strip ── */}
+      {!loading && orders.length > 0 && (
+        <View style={[styles.statsStrip, { borderBottomColor: BORDER, backgroundColor: CARD }]}>
+          <View style={styles.statItem}>
+            <Text style={[styles.statVal, { color: FG }]}>{orders.length}</Text>
+            <Text style={[styles.statLbl, { color: MUTED }]}>TOTAL QUEUES</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: BORDER }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statVal, { color: FG }]}>{completedCount}</Text>
+            <Text style={[styles.statLbl, { color: MUTED }]}>COMPLETED</Text>
+          </View>
+          {totalSpent > 0 && (
+            <>
+              <View style={[styles.statDivider, { backgroundColor: BORDER }]} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statVal, { color: FG }]}>Rs {totalSpent.toLocaleString()}</Text>
+                <Text style={[styles.statLbl, { color: MUTED }]}>TOTAL SPENT</Text>
+              </View>
+            </>
+          )}
+        </View>
+      )}
+
+      {/* ── Filter tabs ── */}
+      <View style={[styles.filterRow, { borderBottomColor: BORDER }]}>
+        {FILTERS.map(({ key, label }) => {
+          const active = filter === key;
+          return (
+            <TouchableOpacity
+              key={key}
+              style={[styles.filterTab, active && { borderBottomColor: FG, borderBottomWidth: 2 }]}
+              onPress={() => setFilter(key)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterText, { color: active ? FG : MUTED }]}>
+                {label}
+              </Text>
+              {key !== 'all' && (
+                <View style={[styles.filterCount, { backgroundColor: active ? FG : BORDER }]}>
+                  <Text style={[styles.filterCountText, { color: active ? CARD : MUTED }]}>
+                    {key === 'active'
+                      ? orders.filter(o => ['waiting', 'in_progress'].includes(o.status)).length
+                      : orders.filter(o => ['completed', 'cancelled'].includes(o.status)).length}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={FG} colors={[FG]} />
         }
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.scroll}
       >
-        {filteredOrders.length > 0 ? (
-          <View style={styles.ordersList}>
-            {filteredOrders.map((order) => (
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={FG} />
+          </View>
+        ) : filtered.length === 0 ? (
+          <View style={styles.empty}>
+            <View style={[styles.emptyIcon, { borderColor: BORDER }]}>
+              <Ionicons name="receipt-outline" size={32} color={MUTED} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: FG }]}>NO ORDERS YET</Text>
+            <Text style={[styles.emptySub, { color: MUTED }]}>
+              {filter === 'active'
+                ? 'You have no active queues right now.'
+                : filter === 'completed'
+                ? 'No completed orders to show.'
+                : 'Scan a QR code to join your first queue.'}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.list}>
+            {filtered.map((order) => (
               <OrderCard key={order.id} order={order} />
             ))}
           </View>
-        ) : (
-          <EmptyOrdersState filter={filter} />
         )}
+
+        <View style={{ height: 100 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scrollContent: { padding: Spacing[6], paddingTop: 0, flexGrow: 1 },
-  ordersList: { gap: Spacing[4] },
+  root: { flex: 1 },
+
+  /* Header */
+  header: {
+    paddingHorizontal: 24, paddingTop: 8, paddingBottom: 16,
+    borderBottomWidth: 1,
+  },
+  headerLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 2, marginBottom: 4 },
+  headerTitle: { fontSize: 36, fontWeight: '900', letterSpacing: -1.5 },
+
+  /* Stats */
+  statsStrip: {
+    flexDirection: 'row', alignItems: 'center',
+    borderBottomWidth: 1,
+  },
+  statItem:   { flex: 1, alignItems: 'center', paddingVertical: 14 },
+  statVal:    { fontSize: 16, fontWeight: '900', marginBottom: 2 },
+  statLbl:    { fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
+  statDivider: { width: 1, height: 32 },
+
+  /* Filters */
+  filterRow: {
+    flexDirection: 'row', borderBottomWidth: 1,
+  },
+  filterTab: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 14, marginBottom: -1,
+  },
+  filterText:      { fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
+  filterCount:     { borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, minWidth: 18, alignItems: 'center' },
+  filterCountText: { fontSize: 9, fontWeight: '800' },
+
+  /* Content */
+  scroll: { paddingHorizontal: 16, paddingTop: 16, flexGrow: 1 },
+  list:   { gap: 12 },
+
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },
+
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
+  emptyIcon: {
+    width: 72, height: 72, borderRadius: 20, borderWidth: 1,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 8,
+  },
+  emptyTitle: { fontSize: 13, fontWeight: '800', letterSpacing: 2 },
+  emptySub:   { fontSize: 13, textAlign: 'center', lineHeight: 20, maxWidth: 260 },
 });

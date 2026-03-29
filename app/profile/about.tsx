@@ -10,18 +10,18 @@ const BUILD_NUMBER  = '2026.02.25';
 const CONTACT_EMAIL = 'support@businesshubpro.app';
 
 const FEATURES = [
-  { icon: 'people-outline',           color: '#3B82F6',  label: 'Virtual Queue Management',   desc: 'Join & track queues remotely — no physical waiting' },
-  { icon: 'qr-code-outline',          color: '#8B5CF6',  label: 'QR Code Scanner',            desc: 'Scan a business QR code to instantly join their queue' },
-  { icon: 'time-outline',             color: '#F59E0B',  label: 'Real-Time Wait Updates',     desc: 'Live queue position & estimated wait time notifications' },
-  { icon: 'location-outline',         color: '#EF4444',  label: 'Nearby Business Discovery',  desc: 'Find open businesses around you with ratings & info' },
-  { icon: 'bag-outline',              color: '#16A34A',  label: 'Order Tracking',             desc: 'Place orders and track them from preparation to pickup' },
-  { icon: 'star-outline',             color: '#F59E0B',  label: 'Loyalty & Rewards',          desc: 'Earn points on every visit and feedback, redeem rewards' },
-  { icon: 'card-outline',             color: '#06B6D4',  label: 'Multiple Payment Methods',   desc: 'Pay via JazzCash, Easypaisa, or Bank Transfer' },
-  { icon: 'notifications-outline',    color: '#EC4899',  label: 'Smart Notifications',        desc: 'Get alerted when it is your turn or order is ready' },
-  { icon: 'map-outline',              color: '#10B981',  label: 'Interactive Map',            desc: 'View and navigate to businesses on a live map' },
-  { icon: 'language-outline',         color: '#6366F1',  label: '10 Languages Supported',     desc: 'English, Urdu, Arabic, Hindi, French, and more' },
-  { icon: 'moon-outline',             color: '#64748B',  label: 'Dark Mode',                  desc: 'Automatic system theme detection with manual toggle' },
-  { icon: 'shield-checkmark-outline', color: '#16A34A',  label: 'Secure Authentication',     desc: 'Email verification, OAuth (Google/Apple), encrypted data' },
+  { icon: 'people-outline',           label: 'Virtual Queue Management',   desc: 'Join & track queues remotely — no physical waiting' },
+  { icon: 'qr-code-outline',          label: 'QR Code Scanner',            desc: 'Scan a business QR code to instantly join their queue' },
+  { icon: 'time-outline',             label: 'Real-Time Wait Updates',     desc: 'Live queue position & estimated wait time notifications' },
+  { icon: 'location-outline',         label: 'Nearby Business Discovery',  desc: 'Find open businesses around you with ratings & info' },
+  { icon: 'bag-outline',              label: 'Order Tracking',             desc: 'Place orders and track them from preparation to pickup' },
+  { icon: 'star-outline',             label: 'Loyalty & Rewards',          desc: 'Earn points on every visit and feedback, redeem rewards' },
+  { icon: 'card-outline',             label: 'Multiple Payment Methods',   desc: 'Pay via JazzCash, Easypaisa, or Bank Transfer' },
+  { icon: 'notifications-outline',    label: 'Smart Notifications',        desc: 'Get alerted when it is your turn or order is ready' },
+  { icon: 'map-outline',              label: 'Interactive Map',            desc: 'View and navigate to businesses on a live map' },
+  { icon: 'language-outline',         label: '10 Languages Supported',     desc: 'English, Urdu, Arabic, Hindi, French, and more' },
+  { icon: 'moon-outline',             label: 'Dark & Black Themes',        desc: 'System adaptive, dark (#131313), or AMOLED black mode' },
+  { icon: 'shield-checkmark-outline', label: 'Secure Authentication',      desc: 'Email verification, OAuth (Google/Apple), encrypted data' },
 ];
 
 const TECH_STACK = [
@@ -54,7 +54,7 @@ const CHANGELOG = [
 ];
 
 export default function AboutScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   const open = (url: string) => {
     Linking.openURL(url).catch(() => {});
@@ -78,7 +78,7 @@ export default function AboutScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
 
         {/* ── App Hero ── */}
-        <View style={[styles.hero, { backgroundColor: isDark ? '#0A0A0A' : '#F9FAFB', borderColor: colors.border }]}>
+        <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={[styles.appIconBg, { backgroundColor: colors.foreground }]}>
             <Ionicons name="business" size={36} color={colors.background} />
           </View>
@@ -87,10 +87,10 @@ export default function AboutScreen() {
             Skip the line. Save your time.
           </Text>
           <View style={styles.versionRow}>
-            <View style={[styles.versionBadge, { backgroundColor: isDark ? '#1C1C1E' : '#F3F4F6', borderColor: colors.border }]}>
+            <View style={[styles.versionBadge, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
               <Text style={[styles.versionText, { color: colors.mutedForeground }]}>v{APP_VERSION}</Text>
             </View>
-            <View style={[styles.versionBadge, { backgroundColor: isDark ? '#1C1C1E' : '#F3F4F6', borderColor: colors.border }]}>
+            <View style={[styles.versionBadge, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
               <Text style={[styles.versionText, { color: colors.mutedForeground }]}>Build {BUILD_NUMBER}</Text>
             </View>
           </View>
@@ -98,9 +98,9 @@ export default function AboutScreen() {
 
         {/* ── Mission ── */}
         {sectionTitle('OUR MISSION')}
-        <View style={[styles.card, { backgroundColor: isDark ? '#1C1C1E' : '#F0FDF4', borderColor: isDark ? '#14532D' : '#BBF7D0' }]}>
-          <Ionicons name="rocket-outline" size={24} color="#16A34A" style={{ marginBottom: Spacing[2] }} />
-          <Text style={[styles.missionText, { color: isDark ? '#4ADE80' : '#15803D' }]}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Ionicons name="rocket-outline" size={24} color={colors.foreground} style={{ marginBottom: Spacing[2] }} />
+          <Text style={[styles.missionText, { color: colors.mutedForeground }]}>
             BusinessHub Pro eliminates physical queues by connecting customers with local businesses digitally. We believe your time is valuable — so whether you're waiting at a salon, clinic, restaurant, or repair shop, you should be able to wait from wherever you want and arrive only when it's your turn.
           </Text>
         </View>
@@ -112,8 +112,8 @@ export default function AboutScreen() {
             <View key={i}>
               {i > 0 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
               <View style={styles.featureRow}>
-                <View style={[styles.featureIcon, { backgroundColor: f.color + '20' }]}>
-                  <Ionicons name={f.icon as any} size={20} color={f.color} />
+                <View style={[styles.featureIcon, { backgroundColor: colors.secondary }]}>
+                  <Ionicons name={f.icon as any} size={20} color={colors.foreground} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.featureLabel, { color: colors.foreground }]}>{f.label}</Text>
@@ -141,17 +141,17 @@ export default function AboutScreen() {
         {/* ── Changelog ── */}
         {sectionTitle("WHAT'S NEW")}
         {CHANGELOG.map((entry) => (
-          <View key={entry.version} style={[styles.card, { backgroundColor: isDark ? '#1C1C1E' : '#EFF6FF', borderColor: isDark ? '#1D4ED8' + '44' : '#BFDBFE' }]}>
+          <View key={entry.version} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.changelogHeader}>
-              <Text style={[styles.changelogVersion, { color: isDark ? '#60A5FA' : '#1D4ED8' }]}>
+              <Text style={[styles.changelogVersion, { color: colors.foreground }]}>
                 Version {entry.version}
               </Text>
               <Text style={[styles.changelogDate, { color: colors.mutedForeground }]}>{entry.date}</Text>
             </View>
             {entry.notes.map((note, i) => (
               <View key={i} style={styles.changelogRow}>
-                <Ionicons name="checkmark-circle" size={14} color={isDark ? '#60A5FA' : '#3B82F6'} />
-                <Text style={[styles.changelogNote, { color: isDark ? '#93C5FD' : '#1E40AF' }]}>{note}</Text>
+                <Ionicons name="checkmark-circle" size={14} color={colors.foreground} />
+                <Text style={[styles.changelogNote, { color: colors.mutedForeground }]}>{note}</Text>
               </View>
             ))}
           </View>
@@ -164,12 +164,12 @@ export default function AboutScreen() {
             <View key={i}>
               {i > 0 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
               <TouchableOpacity style={styles.linkRow} onPress={() => open(link.url)} activeOpacity={0.7}>
-                <View style={[styles.linkIcon, { backgroundColor: isDark ? '#1C1C1E' : '#F3F4F6' }]}>
+                <View style={[styles.linkIcon, { backgroundColor: colors.secondary }]}>
                   <Ionicons name={link.icon as any} size={20} color={colors.foreground} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.linkLabel, { color: colors.mutedForeground }]}>{link.label}</Text>
-                  <Text style={[styles.linkValue, { color: '#3B82F6' }]}>{link.value}</Text>
+                  <Text style={[styles.linkValue, { color: colors.foreground }]}>{link.value}</Text>
                 </View>
                 <Ionicons name="open-outline" size={16} color={colors.mutedForeground} />
               </TouchableOpacity>
@@ -181,7 +181,7 @@ export default function AboutScreen() {
         {sectionTitle('LEGAL')}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <TouchableOpacity style={styles.linkRow} onPress={() => router.push('/profile/terms')} activeOpacity={0.7}>
-            <View style={[styles.linkIcon, { backgroundColor: isDark ? '#1C1C1E' : '#F3F4F6' }]}>
+            <View style={[styles.linkIcon, { backgroundColor: colors.secondary }]}>
               <Ionicons name="document-text-outline" size={20} color={colors.foreground} />
             </View>
             <Text style={[styles.featureLabel, { color: colors.foreground, flex: 1 }]}>

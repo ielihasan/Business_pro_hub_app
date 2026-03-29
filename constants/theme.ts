@@ -1,161 +1,148 @@
 /**
- * BusinessHub Pro Theme Configuration
- * Matching the dashboard's black/white theme using similar color values
- * Converted from OKLCH to HEX for React Native compatibility
+ * BusinessHub Pro — Monolith Design System
+ * Pure black/white editorial theme matching the Stitch design spec.
  */
 
 export const Colors = {
-  light: {
-    // Core colors - matching dashboard's neutral black/white theme
-    background: '#FFFFFF',        // oklch(1 0 0) - Pure White
-    foreground: '#242424',        // oklch(0.145 0 0) - Near Black
-
-    // Primary - Dark gray/black for main actions
-    primary: '#1A1A1A',           // oklch(0.205 0 0) - Dark Gray/Black
-    primaryForeground: '#FCFCFC', // oklch(0.985 0 0) - Off-White
-
-    // Secondary - Light gray for secondary elements
-    secondary: '#F7F7F7',         // oklch(0.97 0 0) - Very Light Gray
-    secondaryForeground: '#1A1A1A', // oklch(0.205 0 0)
-
-    // Muted - For less prominent elements
-    muted: '#F7F7F7',             // oklch(0.97 0 0)
-    mutedForeground: '#737373',   // oklch(0.556 0 0) - Medium Gray
-
-    // Accent - Same as secondary in default theme
-    accent: '#F7F7F7',
-    accentForeground: '#1A1A1A',
-
-    // Destructive - Red for errors/warnings
-    destructive: '#DC2626',       // oklch(0.577 0.245 27.325) - Red
-    destructiveForeground: '#FFFFFF',
-
-    // Success - Green for success states
-    success: '#16A34A',           // Green
+  black: {
+    // AMOLED pure black — deepest possible surfaces
+    background: '#000000',
+    foreground: '#e8e8e8',
+    primary: '#ffffff',
+    primaryForeground: '#000000',
+    secondary: '#111111',
+    secondaryForeground: '#e8e8e8',
+    muted: '#080808',
+    mutedForeground: '#a0a0a0',
+    accent: '#191919',
+    accentForeground: '#e8e8e8',
+    destructive: '#ffb4ab',
+    destructiveForeground: '#690005',
+    success: '#22c55e',
     successForeground: '#FFFFFF',
-
-    // Warning - Yellow/Amber for warnings
-    warning: '#F59E0B',           // Amber
-    warningForeground: '#000000',
-
-    // Info - Blue for information
-    info: '#3B82F6',              // Blue
-    infoForeground: '#FFFFFF',
-
-    // Border & Input
-    border: '#E5E5E5',            // oklch(0.922 0 0) - Very Light Gray
-    input: '#E5E5E5',
-    ring: '#A3A3A3',              // oklch(0.708 0 0) - Medium-Dark Gray
-
-    // Card
-    card: '#FFFFFF',
-    cardForeground: '#242424',
-
-    // Popover/Modal
-    popover: '#FFFFFF',
-    popoverForeground: '#242424',
-
-    // Chart colors (grayscale)
-    chart1: '#404040',            // oklch(0.3211 0 0)
-    chart2: '#5C5C5C',            // oklch(0.4495 0 0)
-    chart3: '#787878',            // oklch(0.5693 0 0)
-    chart4: '#949494',            // oklch(0.6830 0 0)
-    chart5: '#B0B0B0',            // oklch(0.7921 0 0)
-
-    // Status colors for queue
-    statusWaiting: '#F59E0B',     // Yellow/Amber
-    statusInProgress: '#3B82F6',  // Blue
-    statusCompleted: '#16A34A',   // Green
-    statusCancelled: '#DC2626',   // Red
-  },
-
-  dark: {
-    // Core colors - Dark mode
-    background: '#0A0A0A',        // oklch(0.145 0 0) - Near Black
-    foreground: '#FAFAFA',        // oklch(0.985 0 0) - Off-White
-
-    // Primary - Light gray for main actions in dark mode
-    primary: '#E5E5E5',           // oklch(0.922 0 0) - Light Gray
-    primaryForeground: '#1A1A1A', // oklch(0.205 0 0) - Dark
-
-    // Secondary
-    secondary: '#262626',         // Dark gray
-    secondaryForeground: '#FAFAFA',
-
-    // Muted
-    muted: '#262626',
-    mutedForeground: '#A3A3A3',
-
-    // Accent
-    accent: '#262626',
-    accentForeground: '#FAFAFA',
-
-    // Destructive
-    destructive: '#DC2626',
-    destructiveForeground: '#FFFFFF',
-
-    // Success
-    success: '#16A34A',
-    successForeground: '#FFFFFF',
-
-    // Warning
     warning: '#F59E0B',
     warningForeground: '#000000',
-
-    // Info
     info: '#3B82F6',
     infoForeground: '#FFFFFF',
-
-    // Border & Input
-    border: '#262626',
-    input: '#262626',
-    ring: '#D4D4D4',
-
-    // Card
-    card: '#171717',
-    cardForeground: '#FAFAFA',
-
-    // Popover/Modal
-    popover: '#171717',
-    popoverForeground: '#FAFAFA',
-
-    // Chart colors (grayscale - inverted for dark)
+    border: '#1a1a1a',
+    input: '#0a0a0a',
+    ring: '#707070',
+    card: '#0d0d0d',
+    cardForeground: '#e8e8e8',
+    popover: '#0d0d0d',
+    popoverForeground: '#e8e8e8',
     chart1: '#B0B0B0',
     chart2: '#949494',
     chart3: '#787878',
     chart4: '#5C5C5C',
     chart5: '#404040',
+    statusWaiting: '#F59E0B',
+    statusInProgress: '#3B82F6',
+    statusCompleted: '#22c55e',
+    statusCancelled: '#ffb4ab',
+  },
 
-    // Status colors
+  light: {
+    background: '#FFFFFF',
+    foreground: '#0a0a0a',
+    primary: '#000000',
+    primaryForeground: '#FFFFFF',
+    secondary: '#F5F5F5',
+    secondaryForeground: '#0a0a0a',
+    muted: '#F0F0F0',
+    mutedForeground: '#737373',
+    accent: '#E5E5E5',
+    accentForeground: '#0a0a0a',
+    destructive: '#DC2626',
+    destructiveForeground: '#FFFFFF',
+    success: '#16A34A',
+    successForeground: '#FFFFFF',
+    warning: '#F59E0B',
+    warningForeground: '#000000',
+    info: '#3B82F6',
+    infoForeground: '#FFFFFF',
+    border: '#E5E5E5',
+    input: '#F5F5F5',
+    ring: '#A3A3A3',
+    card: '#FFFFFF',
+    cardForeground: '#0a0a0a',
+    popover: '#FFFFFF',
+    popoverForeground: '#0a0a0a',
+    chart1: '#404040',
+    chart2: '#5C5C5C',
+    chart3: '#787878',
+    chart4: '#949494',
+    chart5: '#B0B0B0',
     statusWaiting: '#F59E0B',
     statusInProgress: '#3B82F6',
     statusCompleted: '#16A34A',
     statusCancelled: '#DC2626',
   },
+
+  dark: {
+    // Surfaces — from Stitch design token spec
+    background: '#131313',          // surface / surface-dim
+    foreground: '#e2e2e2',          // on-surface
+    primary: '#ffffff',             // primary (white)
+    primaryForeground: '#1a1c1c',   // on-primary (near-black)
+    secondary: '#2a2a2a',           // surface-container-high
+    secondaryForeground: '#e2e2e2',
+    muted: '#1b1b1b',               // surface-container-low
+    mutedForeground: '#c6c6c6',     // on-surface-variant
+    accent: '#353535',              // surface-container-highest
+    accentForeground: '#e2e2e2',
+    destructive: '#ffb4ab',         // error
+    destructiveForeground: '#690005',
+    success: '#22c55e',
+    successForeground: '#FFFFFF',
+    warning: '#F59E0B',
+    warningForeground: '#000000',
+    info: '#3B82F6',
+    infoForeground: '#FFFFFF',
+    border: '#2e2e2e',              // subtle border
+    input: '#1b1b1b',
+    ring: '#919191',
+    card: '#1f1f1f',                // surface-container
+    cardForeground: '#e2e2e2',
+    popover: '#1f1f1f',
+    popoverForeground: '#e2e2e2',
+    chart1: '#B0B0B0',
+    chart2: '#949494',
+    chart3: '#787878',
+    chart4: '#5C5C5C',
+    chart5: '#404040',
+    statusWaiting: '#F59E0B',
+    statusInProgress: '#3B82F6',
+    statusCompleted: '#22c55e',
+    statusCancelled: '#ffb4ab',
+  },
 };
 
-// Typography - matching Inter font styling
 export const Typography = {
   fontFamily: {
     regular: 'System',
     medium: 'System',
     semibold: 'System',
     bold: 'System',
+    extrabold: 'System',
+    black: 'System',
   },
   fontSize: {
-    xs: 12,
-    sm: 14,
+    xs: 11,
+    sm: 13,
     base: 16,
     lg: 18,
     xl: 20,
     '2xl': 24,
     '3xl': 30,
     '4xl': 36,
+    '5xl': 48,
+    '6xl': 60,
   },
   lineHeight: {
     none: 1,
-    tight: 1.25,
-    snug: 1.375,
+    tight: 1.1,
+    snug: 1.25,
     normal: 1.5,
     relaxed: 1.625,
     loose: 2,
@@ -165,10 +152,20 @@ export const Typography = {
     medium: '500' as const,
     semibold: '600' as const,
     bold: '700' as const,
+    extrabold: '800' as const,
+    black: '900' as const,
+  },
+  letterSpacing: {
+    tighter: -1,
+    tight: -0.5,
+    normal: 0,
+    wide: 0.5,
+    wider: 1,
+    widest: 2,
   },
 };
 
-// Spacing - consistent with Tailwind defaults
+// Spacing — Tailwind-compatible scale
 export const Spacing = {
   0: 0,
   0.5: 2,
@@ -193,20 +190,19 @@ export const Spacing = {
   24: 96,
 };
 
-// Border Radius - matching dashboard's default theme
+// Border Radius — matching Stitch design spec (1rem = 16px base)
 export const BorderRadius = {
   none: 0,
-  sm: 4,       // ~0.225rem
-  md: 7,       // ~0.425rem
-  DEFAULT: 10, // ~0.625rem
-  lg: 10,      // ~0.625rem
-  xl: 16,      // ~1.025rem
-  '2xl': 20,
-  '3xl': 24,
+  sm: 6,
+  md: 10,
+  DEFAULT: 16,   // 1rem
+  lg: 24,        // 1.5rem
+  xl: 32,        // 2rem
+  '2xl': 40,
+  '3xl': 48,
   full: 9999,
 };
 
-// Shadows - subtle shadows matching dashboard
 export const Shadows = {
   none: {
     shadowColor: 'transparent',
@@ -218,46 +214,53 @@ export const Shadows = {
   sm: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
     elevation: 1,
   },
   DEFAULT: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
   },
   md: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    elevation: 5,
   },
   lg: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowOpacity: 0.20,
+    shadowRadius: 16,
+    elevation: 8,
   },
   xl: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  white: {
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
     elevation: 8,
   },
 };
 
-// Animation durations
 export const Animation = {
   fast: 150,
   normal: 300,
   slow: 500,
 };
 
-export type ColorScheme = 'light' | 'dark';
+export type ColorScheme = 'light' | 'dark' | 'black';
+export type AppTheme = ColorScheme | null;   // null = follow system
 export type ThemeColors = typeof Colors.light;

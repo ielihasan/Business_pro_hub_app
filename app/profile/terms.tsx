@@ -127,7 +127,7 @@ const PRIVACY_SECTIONS: Section[] = [
 ];
 
 export default function TermsScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<Tab>('terms');
 
   const sections = activeTab === 'terms' ? TERMS_SECTIONS : PRIVACY_SECTIONS;
@@ -144,7 +144,7 @@ export default function TermsScreen() {
       </View>
 
       {/* Tab switcher */}
-      <View style={[styles.tabBar, { backgroundColor: isDark ? '#111' : '#F3F4F6', borderBottomColor: colors.border }]}>
+      <View style={[styles.tabBar, { backgroundColor: colors.secondary, borderBottomColor: colors.border }]}>
         {(['terms', 'privacy'] as Tab[]).map((tab) => (
           <TouchableOpacity
             key={tab}
@@ -174,7 +174,7 @@ export default function TermsScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Effective date */}
-        <View style={[styles.dateRow, { backgroundColor: isDark ? '#1C1C1E' : '#F9FAFB', borderColor: colors.border }]}>
+        <View style={[styles.dateRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
           <Ionicons name="calendar-outline" size={14} color={colors.mutedForeground} />
           <Text style={[styles.dateText, { color: colors.mutedForeground }]}>
             Effective Date: {EFFECTIVE_DATE}
@@ -182,13 +182,13 @@ export default function TermsScreen() {
         </View>
 
         {/* Intro banner */}
-        <View style={[styles.introBanner, { backgroundColor: isDark ? '#1A2744' : '#EFF6FF', borderColor: isDark ? '#2563EB44' : '#BFDBFE' }]}>
-          <Ionicons name={activeTab === 'terms' ? 'document-text' : 'shield-checkmark'} size={28} color="#3B82F6" />
+        <View style={[styles.introBanner, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+          <Ionicons name={activeTab === 'terms' ? 'document-text' : 'shield-checkmark'} size={28} color={colors.foreground} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.introBannerTitle, { color: isDark ? '#93C5FD' : '#1D4ED8' }]}>
+            <Text style={[styles.introBannerTitle, { color: colors.foreground }]}>
               {activeTab === 'terms' ? 'Terms of Service' : 'Privacy Policy'}
             </Text>
-            <Text style={[styles.introBannerDesc, { color: isDark ? '#93C5FD' : '#1E40AF' }]}>
+            <Text style={[styles.introBannerDesc, { color: colors.mutedForeground }]}>
               {activeTab === 'terms'
                 ? `Please read these terms carefully before using ${APP_NAME}.`
                 : `Your privacy matters to us. Here's how we collect, use, and protect your data.`}
@@ -212,12 +212,12 @@ export default function TermsScreen() {
         ))}
 
         {/* Contact footer */}
-        <View style={[styles.footer, { backgroundColor: isDark ? '#1C1C1E' : '#F9FAFB', borderColor: colors.border }]}>
+        <View style={[styles.footer, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
           <Ionicons name="mail-outline" size={20} color={colors.mutedForeground} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.footerTitle, { color: colors.foreground }]}>Questions?</Text>
             <TouchableOpacity onPress={() => Linking.openURL(`mailto:${CONTACT_EMAIL}`)}>
-              <Text style={[styles.footerEmail, { color: '#3B82F6' }]}>{CONTACT_EMAIL}</Text>
+              <Text style={[styles.footerEmail, { color: colors.foreground }]}>{CONTACT_EMAIL}</Text>
             </TouchableOpacity>
           </View>
         </View>

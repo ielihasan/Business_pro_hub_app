@@ -1,14 +1,14 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Dimensions, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, TouchableOpacity, Dimensions, StyleSheet, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/hooks/useTheme';
-import { Card, CardContent } from '@/components/ui';
-import { Typography, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 
 const { width } = Dimensions.get('window');
-const SCAN_AREA_SIZE = width * 0.7;
+const SCAN_AREA_SIZE = width * 0.68;
+// Reserve space for the bottom action buttons (~ gallery + enter ID row)
+const BOTTOM_BUTTON_CLEARANCE = 120;
 
 interface ScannerOverlayProps {
   flashOn: boolean;
@@ -16,7 +16,26 @@ interface ScannerOverlayProps {
 }
 
 export function ScannerOverlay({ flashOn, onToggleFlash }: ScannerOverlayProps) {
-  const { colors } = useTheme();
+  const scanLineY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animate = () => {
+      Animated.sequence([
+        Animated.timing(scanLineY, {
+          toValue: SCAN_AREA_SIZE - 2,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scanLineY, {
+          toValue: 0,
+          duration: 1800,
+          useNativeDriver: true,
+        }),
+      ]).start(animate);
+    };
+    animate();
+    return () => scanLineY.stopAnimation();
+  }, [scanLineY]);
 
   return (
     <View style={styles.overlay}>
@@ -30,38 +49,24 @@ export function ScannerOverlay({ flashOn, onToggleFlash }: ScannerOverlayProps) 
         </TouchableOpacity>
       </SafeAreaView>
 
-      {/* Scan Area */}
+      {/* Scan Area — centered in remaining space, cleared above buttons */}
       <View style={styles.scanAreaContainer}>
         <View style={styles.scanArea}>
+          {/* Corner brackets */}
           <View style={[styles.corner, styles.topLeft]} />
           <View style={[styles.corner, styles.topRight]} />
           <View style={[styles.corner, styles.bottomLeft]} />
           <View style={[styles.corner, styles.bottomRight]} />
+
+          {/* Animated scan line */}
+          <Animated.View
+            style={[styles.scanLine, { transform: [{ translateY: scanLineY }] }]}
+          />
         </View>
       </View>
 
-      {/* Bottom Info */}
-      <View style={styles.bottomContainer}>
-        <Card style={styles.infoCard}>
-          <CardContent style={styles.infoCardContent}>
-            <Ionicons name="qr-code-outline" size={24} color={colors.foreground} />
-            <View style={styles.infoTextContainer}>
-              <Text style={[styles.infoTitle, { color: colors.foreground }]}>Scan QR Code</Text>
-              <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
-                Point your camera at a BusinessHub Pro QR code to join the queue instantly
-              </Text>
-            </View>
-          </CardContent>
-        </Card>
-        <TouchableOpacity style={styles.manualEntry}>
-          <Text style={[styles.manualEntryText, { color: colors.mutedForeground }]}>
-            Can't scan?{' '}
-            <Text style={{ color: colors.primary, fontWeight: Typography.fontWeight.semibold }}>
-              Enter code manually
-            </Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Spacer so scan area centers above the button row */}
+      <View style={{ height: BOTTOM_BUTTON_CLEARANCE }} />
     </View>
   );
 }
@@ -82,19 +87,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scanAreaContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  scanArea: { width: SCAN_AREA_SIZE, height: SCAN_AREA_SIZE, position: 'relative' },
+  scanAreaContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanArea: {
+    width: SCAN_AREA_SIZE,
+    height: SCAN_AREA_SIZE,
+    position: 'relative',
+    overflow: 'hidden',
+  },
   corner: { position: 'absolute', width: 40, height: 40, borderColor: '#FFFFFF' },
-  topLeft: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 8 },
-  topRight: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 8 },
-  bottomLeft: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 8 },
-  bottomRight: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 8 },
-  bottomContainer: { paddingHorizontal: Spacing[6], paddingBottom: Spacing[8] },
-  infoCard: { marginBottom: Spacing[4] },
-  infoCardContent: { flexDirection: 'row', alignItems: 'center', padding: Spacing[4], gap: Spacing[4] },
-  infoTextContainer: { flex: 1 },
-  infoTitle: { fontSize: Typography.fontSize.base, fontWeight: Typography.fontWeight.semibold, marginBottom: Spacing[1] },
-  infoText: { fontSize: Typography.fontSize.sm, lineHeight: Typography.fontSize.sm * Typography.lineHeight.relaxed },
-  manualEntry: { alignItems: 'center' },
-  manualEntryText: { fontSize: Typography.fontSize.sm },
+  topLeft:     { top: 0,    left: 0,   borderTopWidth: 4,    borderLeftWidth: 4,  borderTopLeftRadius: 8 },
+  topRight:    { top: 0,    right: 0,  borderTopWidth: 4,    borderRightWidth: 4, borderTopRightRadius: 8 },
+  bottomLeft:  { bottom: 0, left: 0,   borderBottomWidth: 4, borderLeftWidth: 4,  borderBottomLeftRadius: 8 },
+  bottomRight: { bottom: 0, right: 0,  borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 8 },
+  scanLine: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+  },
 });

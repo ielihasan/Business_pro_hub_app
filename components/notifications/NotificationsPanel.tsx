@@ -20,25 +20,12 @@ interface NotificationsPanelProps {
   onClose: () => void;
 }
 
-// Icon & color config per notification type
-const TYPE_CONFIG: Record<
-  Notification['type'],
-  { icon: string; color: string; bg: string }
-> = {
-  queue_update: { icon: 'people-outline',         color: '#3B82F6', bg: '#EFF6FF' },
-  order_ready:  { icon: 'bag-check-outline',       color: '#16A34A', bg: '#F0FDF4' },
-  loyalty:      { icon: 'star-outline',            color: '#F59E0B', bg: '#FFFBEB' },
-  promo:        { icon: 'megaphone-outline',        color: '#8B5CF6', bg: '#F5F3FF' },
-};
-
-const TYPE_CONFIG_DARK: Record<
-  Notification['type'],
-  { icon: string; color: string; bg: string }
-> = {
-  queue_update: { icon: 'people-outline',         color: '#60A5FA', bg: '#1E3A5F' },
-  order_ready:  { icon: 'bag-check-outline',       color: '#4ADE80', bg: '#14532D' },
-  loyalty:      { icon: 'star-outline',            color: '#FCD34D', bg: '#451A03' },
-  promo:        { icon: 'megaphone-outline',        color: '#A78BFA', bg: '#2E1065' },
+// Icon config per notification type — B&W, colors applied dynamically from theme
+const TYPE_ICONS: Record<Notification['type'], string> = {
+  queue_update: 'people-outline',
+  order_ready:  'bag-check-outline',
+  loyalty:      'star-outline',
+  promo:        'megaphone-outline',
 };
 
 function formatRelativeTime(dateStr: string): string {
@@ -56,24 +43,21 @@ function formatRelativeTime(dateStr: string): string {
 
 function NotificationItem({
   item,
-  isDark,
   onPress,
   onDelete,
 }: {
   item: Notification;
-  isDark: boolean;
   onPress: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
   const { colors } = useTheme();
-  const typeConfig = isDark ? TYPE_CONFIG_DARK[item.type] : TYPE_CONFIG[item.type];
 
   return (
     <TouchableOpacity
       style={[
         styles.notifItem,
         {
-          backgroundColor: item.read ? colors.background : (isDark ? '#1C1C1E' : '#F8FAFF'),
+          backgroundColor: item.read ? colors.background : colors.card,
           borderBottomColor: colors.border,
         },
       ]}
@@ -82,12 +66,12 @@ function NotificationItem({
     >
       {/* Unread dot */}
       {!item.read && (
-        <View style={[styles.unreadDot, { backgroundColor: '#3B82F6' }]} />
+        <View style={[styles.unreadDot, { backgroundColor: colors.foreground }]} />
       )}
 
       {/* Icon */}
-      <View style={[styles.notifIcon, { backgroundColor: typeConfig.bg }]}>
-        <Ionicons name={typeConfig.icon as any} size={22} color={typeConfig.color} />
+      <View style={[styles.notifIcon, { backgroundColor: colors.secondary }]}>
+        <Ionicons name={TYPE_ICONS[item.type] as any} size={22} color={colors.foreground} />
       </View>
 
       {/* Content */}
@@ -122,14 +106,14 @@ function NotificationItem({
         activeOpacity={0.7}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <Ionicons name="trash-outline" size={17} color={isDark ? '#6B7280' : '#9CA3AF'} />
+        <Ionicons name="trash-outline" size={17} color={colors.mutedForeground} />
       </TouchableOpacity>
     </TouchableOpacity>
   );
 }
 
 export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   const { notifications, unreadCount, markNotificationRead, markAllNotificationsRead, deleteNotification, clearAllNotifications, notificationsEnabled } = useStore();
 
@@ -149,7 +133,7 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      <View style={[styles.emptyIconBg, { backgroundColor: isDark ? '#1C1C1E' : '#F3F4F6' }]}>
+      <View style={[styles.emptyIconBg, { backgroundColor: colors.secondary }]}>
         <Ionicons name="notifications-off-outline" size={48} color={colors.mutedForeground} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Notifications</Text>
@@ -162,7 +146,7 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
   );
 
   const renderItem = ({ item }: { item: Notification }) => (
-    <NotificationItem item={item} isDark={isDark} onPress={handleItemPress} onDelete={handleDelete} />
+    <NotificationItem item={item} onPress={handleItemPress} onDelete={handleDelete} />
   );
 
   return (
@@ -181,8 +165,8 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
           <View style={styles.headerLeft}>
             <Text style={[styles.headerTitle, { color: colors.foreground }]}>Notifications</Text>
             {unreadCount > 0 && (
-              <View style={styles.headerBadge}>
-                <Text style={styles.headerBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              <View style={[styles.headerBadge, { backgroundColor: colors.foreground }]}>
+                <Text style={[styles.headerBadgeText, { color: colors.background }]}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
               </View>
             )}
           </View>
@@ -190,7 +174,7 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
           <View style={styles.headerActions}>
             {unreadCount > 0 && (
               <TouchableOpacity
-                style={[styles.markAllBtn, { backgroundColor: isDark ? '#1C1C1E' : '#F3F4F6' }]}
+                style={[styles.markAllBtn, { backgroundColor: colors.secondary }]}
                 onPress={markAllNotificationsRead}
                 activeOpacity={0.7}
               >
@@ -200,12 +184,12 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
             )}
             {notifications.length > 0 && (
               <TouchableOpacity
-                style={[styles.markAllBtn, { backgroundColor: isDark ? '#2C1010' : '#FEF2F2' }]}
+                style={[styles.markAllBtn, { backgroundColor: colors.secondary }]}
                 onPress={clearAllNotifications}
                 activeOpacity={0.7}
               >
-                <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                <Text style={[styles.markAllText, { color: '#EF4444' }]}>Clear all</Text>
+                <Ionicons name="trash-outline" size={16} color={colors.destructive} />
+                <Text style={[styles.markAllText, { color: colors.destructive }]}>Clear all</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
@@ -216,11 +200,10 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
 
         {/* Notification type filter pills */}
         {notifications.length > 0 && (
-          <View style={[styles.summaryBar, { borderBottomColor: colors.border, backgroundColor: isDark ? '#111' : '#FAFAFA' }]}>
+          <View style={[styles.summaryBar, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
             {(['queue_update', 'order_ready', 'loyalty', 'promo'] as const).map((type) => {
               const count = notifications.filter((n) => n.type === type).length;
               if (count === 0) return null;
-              const cfg = isDark ? TYPE_CONFIG_DARK[type] : TYPE_CONFIG[type];
               const labels: Record<string, string> = {
                 queue_update: 'Queue',
                 order_ready: 'Orders',
@@ -228,9 +211,9 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
                 promo: 'Promos',
               };
               return (
-                <View key={type} style={[styles.summaryPill, { backgroundColor: cfg.bg }]}>
-                  <Ionicons name={cfg.icon as any} size={12} color={cfg.color} />
-                  <Text style={[styles.summaryPillText, { color: cfg.color }]}>
+                <View key={type} style={[styles.summaryPill, { backgroundColor: colors.secondary }]}>
+                  <Ionicons name={TYPE_ICONS[type] as any} size={12} color={colors.foreground} />
+                  <Text style={[styles.summaryPillText, { color: colors.foreground }]}>
                     {labels[type]} {count}
                   </Text>
                 </View>
@@ -268,7 +251,6 @@ const styles = StyleSheet.create({
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing[2] },
   headerTitle: { fontSize: Typography.fontSize['2xl'], fontWeight: '700' },
   headerBadge: {
-    backgroundColor: '#3B82F6',
     borderRadius: 12,
     minWidth: 24,
     height: 24,
@@ -276,7 +258,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  headerBadgeText: { fontSize: 12, fontWeight: '700' },
 
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing[2] },
   markAllBtn: {

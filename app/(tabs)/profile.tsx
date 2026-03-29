@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Alert, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  StatusBar,
+} from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,10 +15,10 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/hooks/useTheme';
 import { useProfilePhoto } from '@/hooks/useProfilePhoto';
 import { ImageViewer, ProfilePhotoModal } from '@/components/ui';
-import { Spacing } from '@/constants/theme';
 import { useStore } from '@/store/useStore';
 import { ProfileHeader, ProfileStatsCard, ProfileMenuSection } from '@/components/profile';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
+import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 
 type MenuItem = {
   id: string;
@@ -24,14 +31,15 @@ type MenuItem = {
 };
 
 export default function ProfileScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark }                                   = useTheme();
   const { user, logout, isLoading, notificationsEnabled, unreadCount } = useStore();
-  const { t } = useTranslation();
-  const { isUploading, handleEditPhoto } = useProfilePhoto();
+  const { t }                                                = useTranslation();
+  const { isUploading, handleEditPhoto }                     = useProfilePhoto();
 
-  const [photoModalVisible, setPhotoModalVisible] = useState(false);
-  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [photoModalVisible,         setPhotoModalVisible]         = useState(false);
+  const [imageViewerVisible,        setImageViewerVisible]        = useState(false);
   const [notificationsPanelVisible, setNotificationsPanelVisible] = useState(false);
+  const [dialog,                    setDialog]                    = useState<DialogConfig | null>(null);
 
   const displayUser = user || {
     name: t('profile.guest'),
@@ -64,7 +72,7 @@ export default function ProfileScreen() {
     {
       title: t('profile.sections.support'),
       items: [
-        { id: 'help',     icon: 'help-circle-outline', label: t('profile.menu.help'),     subtitle: 'FAQs & support',    type: 'link' },
+        { id: 'help',     icon: 'help-circle-outline', label: t('profile.menu.help'),     subtitle: 'FAQs & support',      type: 'link' },
         { id: 'feedback', icon: 'chatbubble-outline',  label: t('profile.menu.feedback'), subtitle: 'Share your thoughts', type: 'link' },
       ],
     },
@@ -78,60 +86,70 @@ export default function ProfileScreen() {
       case 'feedback':     router.push('/profile/feedback'); break;
       case 'help':         router.push('/profile/help');     break;
       case 'loyalty':
-        Alert.alert(
-          `⭐ ${loyaltyBadge}`,
-          `You have ${displayUser.loyaltyPoints.toLocaleString()} loyalty points.\n\nEarn points by:\n• Joining queues (+10 pts per visit)\n• Submitting feedback (+50 pts)\n• Completing orders (+25 pts)\n\nPoints can be redeemed for discounts at participating businesses.`,
-          [{ text: 'Got It' }]
-        );
+        setDialog({
+          title: loyaltyBadge,
+          message: `You have ${displayUser.loyaltyPoints.toLocaleString()} loyalty points.\n\nEarn points by joining queues (+10 pts), submitting feedback (+50 pts), and completing orders (+25 pts).\n\nPoints can be redeemed for discounts at participating businesses.`,
+          icon: 'star',
+          iconVariant: 'warning',
+          actions: [{ label: 'Got It', variant: 'primary', onPress: () => setDialog(null) }],
+        });
         break;
       default: break;
     }
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      t('profile.logout_title'),
-      t('profile.logout_message'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('profile.logout_title'),
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/(auth)/welcome');
-          },
-        },
-      ]
-    );
+    setDialog({
+      title: t('profile.logout_title'),
+      message: t('profile.logout_message'),
+      icon: 'log-out-outline',
+      iconVariant: 'destructive',
+      actions: [
+        { label: t('common.cancel'),          variant: 'secondary',    onPress: () => setDialog(null) },
+        { label: t('profile.logout_title'),   variant: 'destructive',  onPress: async () => { setDialog(null); await logout(); router.replace('/(auth)/welcome'); } },
+      ],
+    });
   };
 
+  const BG     = colors.background;
+  const FG     = colors.foreground;
+  const MUTED  = colors.mutedForeground;
+  const BORDER = colors.border;
+  const CARD   = colors.card;
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* ── Top bar ── */}
-      <View style={[styles.topBar, { borderBottomColor: colors.border }]}>
-        <Text style={[styles.topTitle, { color: colors.foreground }]}>{t('profile.title')}</Text>
-        <TouchableOpacity
-          style={[styles.bellWrap, { backgroundColor: colors.secondary }]}
-          onPress={() => setNotificationsPanelVisible(true)}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name={notificationsEnabled ? 'notifications' : 'notifications-off-outline'}
-            size={20}
-            color={notificationsEnabled ? colors.foreground : colors.mutedForeground}
-          />
-          {notificationsEnabled && unreadCount > 0 && (
-            <View style={styles.bellDot}>
-              <Text style={styles.bellDotText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+    <View style={[styles.root, { backgroundColor: BG }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+
+      <SafeAreaView edges={['top']} style={{ backgroundColor: BG }}>
+        {/* ── Top Bar ── */}
+        <View style={styles.topBar}>
+          <View>
+            <Text style={[styles.screenLabel, { color: MUTED }]}>ACCOUNT</Text>
+            <Text style={[styles.screenTitle, { color: FG }]}>PROFILE</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.bellBtn, { backgroundColor: CARD, borderColor: BORDER }]}
+            onPress={() => setNotificationsPanelVisible(true)}
+            activeOpacity={0.75}
+          >
+            <Ionicons
+              name={notificationsEnabled ? 'notifications' : 'notifications-off-outline'}
+              size={18}
+              color={FG}
+            />
+            {notificationsEnabled && unreadCount > 0 && (
+              <View style={[styles.bellDot, { backgroundColor: colors.destructive }]}>
+                <Text style={[styles.bellDotText, { color: colors.destructiveForeground }]}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
-        {/* Hero card */}
+        {/* ── Profile Hero Card ── */}
         <ProfileHeader
           name={displayUser.name}
           email={displayUser.email}
@@ -142,14 +160,14 @@ export default function ProfileScreen() {
           onAvatarPress={() => setPhotoModalVisible(true)}
         />
 
-        {/* Stats row */}
+        {/* ── Stats Bento ── */}
         <ProfileStatsCard
           loyaltyPoints={displayUser.loyaltyPoints}
           totalVisits={displayUser.totalVisits}
           memberSince={displayUser.memberSince}
         />
 
-        {/* Menu sections */}
+        {/* ── Menu Sections ── */}
         {menuSections.map((section) => (
           <ProfileMenuSection
             key={section.title}
@@ -161,27 +179,31 @@ export default function ProfileScreen() {
           />
         ))}
 
-        {/* Logout row */}
+        {/* ── Logout ── */}
         <View style={styles.logoutWrap}>
           <TouchableOpacity
-            style={[styles.logoutBtn, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
+            style={[styles.logoutBtn, { borderColor: BORDER }]}
             onPress={handleLogout}
             disabled={isLoading}
             activeOpacity={0.75}
           >
-            <View style={styles.logoutIconWrap}>
-              <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+            <View style={[styles.logoutIconWrap, { backgroundColor: CARD }]}>
+              <Ionicons name="log-out-outline" size={18} color={colors.destructive} />
             </View>
-            <Text style={styles.logoutText}>
+            <Text style={[styles.logoutText, { color: colors.destructive }]}>
               {isLoading ? 'Signing out…' : t('profile.logout_title')}
             </Text>
-            <Ionicons name="chevron-forward" size={16} color="#DC2626" />
+            <Ionicons name="chevron-forward" size={14} color={colors.destructive} />
           </TouchableOpacity>
         </View>
 
-        {/* Footer */}
-        <Text style={[styles.version, { color: colors.mutedForeground }]}>{t('profile.version')}</Text>
-        <View style={{ height: Spacing[8] }} />
+        {/* ── Footer ── */}
+        <View style={styles.footer}>
+          <Ionicons name="shield-checkmark-outline" size={12} color={MUTED} />
+          <Text style={[styles.versionText, { color: MUTED }]}>{t('profile.version')}</Text>
+        </View>
+
+        <View style={{ height: 96 }} />
       </ScrollView>
 
       <ProfilePhotoModal
@@ -204,64 +226,61 @@ export default function ProfileScreen() {
         visible={notificationsPanelVisible}
         onClose={() => setNotificationsPanelVisible(false)}
       />
-    </SafeAreaView>
+
+      {dialog && (
+        <Dialog
+          visible
+          {...dialog}
+          onDismiss={() => setDialog(null)}
+        />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  root: { flex: 1 },
 
+  /* ── Top bar ── */
   topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing[4],
-    paddingVertical: Spacing[3],
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between',
+    paddingHorizontal: 24, paddingTop: 8, paddingBottom: 16,
   },
-  topTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
-  bellWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: 'center',
-    alignItems: 'center',
+  screenLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 2, marginBottom: 4 },
+  screenTitle: { fontSize: 32, fontWeight: '900', letterSpacing: -1 },
+
+  bellBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    borderWidth: 1, justifyContent: 'center', alignItems: 'center',
   },
   bellDot: {
-    position: 'absolute',
-    top: 5,
-    right: 5,
-    backgroundColor: '#EF4444',
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    paddingHorizontal: 3,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'absolute', top: 5, right: 5,
+    borderRadius: 7,
+    minWidth: 14, height: 14, paddingHorizontal: 2,
+    justifyContent: 'center', alignItems: 'center',
   },
-  bellDotText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  bellDotText: { fontSize: 8, fontWeight: '800' },
 
-  scroll: { paddingTop: Spacing[4] },
+  /* ── Scroll ── */
+  scroll: { paddingTop: 4 },
 
-  logoutWrap: { paddingHorizontal: Spacing[4], marginBottom: Spacing[4] },
+  /* ── Logout ── */
+  logoutWrap: { paddingHorizontal: 16, marginTop: 8, marginBottom: 8 },
   logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 13,
-    paddingHorizontal: Spacing[4],
-    gap: Spacing[3],
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 16, borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 14, paddingHorizontal: 16, gap: 12,
   },
   logoutIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    backgroundColor: '#FEE2E2',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 36, height: 36, borderRadius: 10,
+    justifyContent: 'center', alignItems: 'center',
   },
-  logoutText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#DC2626' },
+  logoutText: { flex: 1, fontSize: 15, fontWeight: '700' },
 
-  version: { textAlign: 'center', fontSize: 12, marginTop: Spacing[2] },
+  /* ── Footer ── */
+  footer: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, marginTop: 8,
+  },
+  versionText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.5 },
 });

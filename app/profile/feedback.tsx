@@ -31,7 +31,7 @@ const CATEGORIES = [
 type SubmitState = 'idle' | 'loading' | 'success' | 'error';
 
 export default function FeedbackScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { user, submitFeedback } = useStore();
 
   const [rating, setRating]       = useState(0);
@@ -71,8 +71,8 @@ export default function FeedbackScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.successContainer}>
-          <View style={[styles.successIconBg, { backgroundColor: isDark ? '#14532D' : '#F0FDF4' }]}>
-            <Ionicons name="checkmark-circle" size={72} color="#16A34A" />
+          <View style={[styles.successIconBg, { backgroundColor: colors.secondary }]}>
+            <Ionicons name="checkmark-circle" size={72} color={colors.foreground} />
           </View>
           <Text style={[styles.successTitle, { color: colors.foreground }]}>Thank You!</Text>
           <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
@@ -80,13 +80,13 @@ export default function FeedbackScreen() {
           </Text>
 
           {/* Points earned banner */}
-          <View style={[styles.pointsBanner, { backgroundColor: isDark ? '#451A03' : '#FFFBEB', borderColor: isDark ? '#92400E' : '#FDE68A' }]}>
-            <Ionicons name="star" size={24} color="#F59E0B" />
+          <View style={[styles.pointsBanner, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+            <Ionicons name="star" size={24} color={colors.foreground} />
             <View>
-              <Text style={[styles.pointsEarnedLabel, { color: isDark ? '#FCD34D' : '#92400E' }]}>
+              <Text style={[styles.pointsEarnedLabel, { color: colors.mutedForeground }]}>
                 You earned
               </Text>
-              <Text style={[styles.pointsEarnedValue, { color: isDark ? '#FCD34D' : '#92400E' }]}>
+              <Text style={[styles.pointsEarnedValue, { color: colors.foreground }]}>
                 +{FEEDBACK_POINTS} Loyalty Points!
               </Text>
             </View>
@@ -132,9 +132,9 @@ export default function FeedbackScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Points reward banner */}
-          <View style={[styles.rewardBanner, { backgroundColor: isDark ? '#1C1C1E' : '#FFFBEB', borderColor: isDark ? '#92400E44' : '#FDE68A' }]}>
-            <Ionicons name="star" size={20} color="#F59E0B" />
-            <Text style={[styles.rewardText, { color: isDark ? '#FCD34D' : '#92400E' }]}>
+          <View style={[styles.rewardBanner, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+            <Ionicons name="star" size={20} color={colors.foreground} />
+            <Text style={[styles.rewardText, { color: colors.mutedForeground }]}>
               Submit feedback and earn <Text style={{ fontWeight: '800' }}>+{FEEDBACK_POINTS} loyalty points</Text>!
             </Text>
           </View>
@@ -154,13 +154,13 @@ export default function FeedbackScreen() {
                   <Ionicons
                     name={star <= rating ? 'star' : 'star-outline'}
                     size={38}
-                    color={star <= rating ? '#F59E0B' : colors.border}
+                    color={star <= rating ? colors.foreground : colors.border}
                   />
                 </TouchableOpacity>
               ))}
             </View>
             {rating > 0 && (
-              <Text style={[styles.ratingLabel, { color: '#F59E0B' }]}>
+              <Text style={[styles.ratingLabel, { color: colors.foreground }]}>
                 {['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'][rating]}
               </Text>
             )}
@@ -180,7 +180,7 @@ export default function FeedbackScreen() {
                     style={[
                       styles.categoryChip,
                       {
-                        backgroundColor: isSelected ? colors.primary : (isDark ? '#1C1C1E' : '#F3F4F6'),
+                        backgroundColor: isSelected ? colors.primary : colors.secondary,
                         borderColor: isSelected ? colors.primary : colors.border,
                       },
                     ]}
@@ -210,7 +210,7 @@ export default function FeedbackScreen() {
               style={[
                 styles.textarea,
                 {
-                  backgroundColor: isDark ? '#1C1C1E' : '#F9FAFB',
+                  backgroundColor: colors.secondary,
                   borderColor: errors.message ? colors.destructive : colors.border,
                   color: colors.foreground,
                 },
@@ -232,7 +232,7 @@ export default function FeedbackScreen() {
 
           {/* ── Error banner ── */}
           {submitState === 'error' && (
-            <View style={[styles.errorBanner, { backgroundColor: isDark ? '#450A0A' : '#FEF2F2', borderColor: colors.destructive + '44' }]}>
+            <View style={[styles.errorBanner, { backgroundColor: colors.secondary, borderColor: colors.destructive + '44' }]}>
               <Ionicons name="alert-circle-outline" size={18} color={colors.destructive} />
               <Text style={[styles.errorBannerText, { color: colors.destructive }]}>{errorMsg}</Text>
             </View>
