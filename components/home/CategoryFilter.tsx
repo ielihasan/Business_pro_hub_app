@@ -51,9 +51,9 @@ export function CategoryFilter({ selected, onSelect }: CategoryFilterProps) {
               <Ionicons
                 name={cat.icon}
                 size={14}
-                color={active ? '#000' : MUTED}
+                color={active ? colors.background : MUTED}
               />
-              <Text style={[styles.chipText, { color: active ? '#000' : MUTED }]}>
+              <Text style={[styles.chipText, { color: active ? colors.background : MUTED }]}>
                 {t(cat.labelKey)}
               </Text>
             </TouchableOpacity>

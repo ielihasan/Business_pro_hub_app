@@ -22,17 +22,19 @@ const TAB_CONFIG: Record<string, { filled: IconName; outline: IconName; label: s
 const BAR_H = 64;
 
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-  const { isDark }  = useTheme();
+  const { colors, isDark } = useTheme();
   const insets      = useSafeAreaInsets();
   const bottomInset = insets.bottom;
 
-  const BAR_BG     = isDark ? 'rgba(10,10,10,0.96)'      : 'rgba(255,255,255,0.96)';
-  const BORDER_CLR = isDark ? 'rgba(255,255,255,0.12)'   : 'rgba(0,0,0,0.10)';
-  const ACTIVE_CLR = isDark ? '#ffffff'                  : '#000000';
-  const MUTED_CLR  = isDark ? 'rgba(255,255,255,0.32)'   : 'rgba(0,0,0,0.25)';
-  const CENTER_BG  = isDark ? '#ffffff'                  : '#000000';
-  const CENTER_ICO = isDark ? '#000000'                  : '#ffffff';
-  const RING_CLR   = isDark ? 'rgba(255,255,255,0.15)'   : 'rgba(0,0,0,0.10)';
+  const BAR_BG     = isDark
+    ? colors.background + 'f5'   // slight transparency
+    : colors.background + 'f5';
+  const BORDER_CLR = colors.border;
+  const ACTIVE_CLR = colors.foreground;
+  const MUTED_CLR  = colors.mutedForeground;
+  const CENTER_BG  = colors.foreground;
+  const CENTER_ICO = colors.background;
+  const RING_CLR   = colors.border;
 
   return (
     <View style={[styles.wrapper, { paddingBottom: bottomInset }]}>
@@ -53,7 +55,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             return (
               <TouchableOpacity key={route.key} onPress={onPress} style={styles.centerWrap} activeOpacity={0.82}>
                 {/* Outer ring */}
-                <View style={[styles.centerRing, { borderColor: RING_CLR, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
+                <View style={[styles.centerRing, { borderColor: RING_CLR, backgroundColor: colors.secondary }]}>
                   <View style={[styles.centerCircle, { backgroundColor: CENTER_BG }]}>
                     <Ionicons name={focused ? cfg.filled : cfg.outline} size={24} color={CENTER_ICO} />
                   </View>

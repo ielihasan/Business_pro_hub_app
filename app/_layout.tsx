@@ -18,8 +18,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { theme, initializeAuth } = useStore();
   const resolvedTheme =
-    theme === 'black' ? 'black'
-    : theme === 'dark'  ? 'dark'
+    theme === 'dark'  ? 'dark'
     : theme === 'light' ? 'light'
     : colorScheme === 'dark' ? 'dark' : 'light';
   const colors = Colors[resolvedTheme];
@@ -109,7 +108,7 @@ export default function RootLayout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar style={(resolvedTheme === 'dark' || resolvedTheme === 'black') ? 'light' : 'dark'} />
+      <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerShown: false,

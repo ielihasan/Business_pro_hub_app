@@ -1,47 +1,9 @@
 /**
- * BusinessHub Pro — Monolith Design System
- * Pure black/white editorial theme matching the Stitch design spec.
+ * BusinessHub Pro — Design System
+ * Light and Dark themes.
  */
 
 export const Colors = {
-  black: {
-    // AMOLED pure black — deepest possible surfaces
-    background: '#000000',
-    foreground: '#e8e8e8',
-    primary: '#ffffff',
-    primaryForeground: '#000000',
-    secondary: '#111111',
-    secondaryForeground: '#e8e8e8',
-    muted: '#080808',
-    mutedForeground: '#a0a0a0',
-    accent: '#191919',
-    accentForeground: '#e8e8e8',
-    destructive: '#ffb4ab',
-    destructiveForeground: '#690005',
-    success: '#22c55e',
-    successForeground: '#FFFFFF',
-    warning: '#F59E0B',
-    warningForeground: '#000000',
-    info: '#3B82F6',
-    infoForeground: '#FFFFFF',
-    border: '#1a1a1a',
-    input: '#0a0a0a',
-    ring: '#707070',
-    card: '#0d0d0d',
-    cardForeground: '#e8e8e8',
-    popover: '#0d0d0d',
-    popoverForeground: '#e8e8e8',
-    chart1: '#B0B0B0',
-    chart2: '#949494',
-    chart3: '#787878',
-    chart4: '#5C5C5C',
-    chart5: '#404040',
-    statusWaiting: '#F59E0B',
-    statusInProgress: '#3B82F6',
-    statusCompleted: '#22c55e',
-    statusCancelled: '#ffb4ab',
-  },
-
   light: {
     background: '#FFFFFF',
     foreground: '#0a0a0a',
@@ -261,6 +223,6 @@ export const Animation = {
   slow: 500,
 };
 
-export type ColorScheme = 'light' | 'dark' | 'black';
+export type ColorScheme = 'light' | 'dark';
 export type AppTheme = ColorScheme | null;   // null = follow system
 export type ThemeColors = typeof Colors.light;

@@ -137,7 +137,7 @@ interface AppState {
   notificationsEnabled: boolean;
   locationEnabled: boolean;
   darkMode: boolean;
-  theme: 'light' | 'dark' | 'black' | null;  // null = follow system
+  theme: 'light' | 'dark' | null;  // null = follow system
   // Granular notification settings
   soundEnabled: boolean;
   vibrationEnabled: boolean;
@@ -201,7 +201,7 @@ interface AppState {
   toggleNotifications: () => Promise<void>;
   toggleLocation: () => Promise<void>;
   toggleDarkMode: () => void;
-  setTheme: (theme: 'light' | 'dark' | 'black' | null) => void;
+  setTheme: (theme: 'light' | 'dark' | null) => void;
   toggleSound: () => void;
   toggleVibration: () => void;
   toggleQueueNotifications: () => void;
@@ -890,8 +890,8 @@ export const useStore = create<AppState>()(
         // If disabling, we can't revoke the OS grant — just disable in-app usage
         set({ locationEnabled: !current });
       },
-      setTheme: (theme) => set({ theme, darkMode: theme === 'dark' || theme === 'black' }),
-      toggleDarkMode: () => set((state) => { const newTheme = (state.theme === 'dark' || state.theme === 'black') ? 'light' : 'dark'; return { theme: newTheme, darkMode: newTheme !== 'light' }; }),
+      setTheme: (theme) => set({ theme, darkMode: theme === 'dark' }),
+      toggleDarkMode: () => set((state) => { const newTheme = state.theme === 'dark' ? 'light' : 'dark'; return { theme: newTheme, darkMode: newTheme !== 'light' }; }),
       toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),
       toggleVibration: () => set((s) => ({ vibrationEnabled: !s.vibrationEnabled })),
       toggleQueueNotifications: () => set((s) => ({ queueNotificationsEnabled: !s.queueNotificationsEnabled })),

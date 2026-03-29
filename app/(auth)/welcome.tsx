@@ -45,23 +45,24 @@ const grid = StyleSheet.create({
   dot:  { width: 2.5, height: 2.5, borderRadius: 1.25, opacity: 0.15 },
 });
 
-// Feature card — inverts contrast per theme (dark: white card; light: black card)
+// Feature card — inverts contrast per theme (dark mode: light card; light mode: dark card)
 function FeatureCard({
-  item, index, scrollX, isDark,
+  item, index, scrollX,
 }: {
   item: typeof FEATURES[number];
   index: number;
   scrollX: Animated.Value;
-  isDark: boolean;
 }) {
+  const { colors, isDark } = useTheme();
   const inputRange = [(index - 1) * STEP, index * STEP, (index + 1) * STEP];
   const scale   = scrollX.interpolate({ inputRange, outputRange: [0.94, 1, 0.94], extrapolate: 'clamp' });
   const opacity = scrollX.interpolate({ inputRange, outputRange: [0.55, 1, 0.55], extrapolate: 'clamp' });
 
-  const cardBg   = isDark ? '#ffffff' : '#0a0a0a';
-  const cardFg   = isDark ? '#0a0a0a' : '#ffffff';
-  const cardMuted = isDark ? '#555555' : '#aaaaaa';
-  const cardNum   = isDark ? '#aaaaaa' : '#666666';
+  // Intentionally inverted: foreground bg with background-colored text for contrast
+  const cardBg    = colors.foreground;
+  const cardFg    = colors.background;
+  const cardMuted = isDark ? '#666666' : '#999999';
+  const cardNum   = isDark ? '#888888' : '#777777';
 
   return (
     <Animated.View style={[card.root, { backgroundColor: cardBg, transform: [{ scale }], opacity }]}>
@@ -159,7 +160,7 @@ export default function WelcomeScreen() {
             { useNativeDriver: false }
           )}
           renderItem={({ item, index }) => (
-            <FeatureCard item={item} index={index} scrollX={scrollX} isDark={isDark} />
+            <FeatureCard item={item} index={index} scrollX={scrollX} />
           )}
         />
 

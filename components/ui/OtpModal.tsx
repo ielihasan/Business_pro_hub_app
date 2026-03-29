@@ -12,11 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-const SURFACE = '#141414';
-const BORDER  = '#2a2a2a';
-const FG      = '#ffffff';
-const MUTED   = '#919191';
+import { useTheme } from '@/hooks/useTheme';
 
 type Props = {
   visible: boolean;
@@ -28,12 +24,20 @@ type Props = {
 };
 
 export function OtpModal({ visible, email, onVerify, onResend, onClose }: Props) {
+  const { colors, isDark } = useTheme();
   const [code, setCode]             = useState('');
   const [verifying, setVerifying]   = useState(false);
   const [resending, setResending]   = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [timer, setTimer]           = useState(60);
   const inputRef = useRef<TextInput>(null);
+
+  const BG     = colors.card;
+  const FG     = colors.foreground;
+  const MUTED  = colors.mutedForeground;
+  const BORDER = colors.border;
+  const SEC    = colors.secondary;
+  const DESTR  = colors.destructive;
 
   const startTimer = () => {
     setTimer(60);
@@ -51,7 +55,6 @@ export function OtpModal({ visible, email, onVerify, onResend, onClose }: Props)
     setCode('');
     setLocalError(null);
     const id = startTimer();
-    // Delay focus so the Modal animation finishes before keyboard opens
     const focusId = setTimeout(() => inputRef.current?.focus(), 400);
     return () => { clearInterval(id); clearTimeout(focusId); };
   }, [visible]);
@@ -64,7 +67,6 @@ export function OtpModal({ visible, email, onVerify, onResend, onClose }: Props)
     const err = await onVerify(code);
     setVerifying(false);
     if (err) { setLocalError(err); setCode(''); }
-    // on null (success), parent navigates away → modal becomes invisible
   };
 
   const handleResend = async () => {
@@ -84,14 +86,14 @@ export function OtpModal({ visible, email, onVerify, onResend, onClose }: Props)
       >
         <TouchableOpacity style={StyleSheet.absoluteFillObject} onPress={Keyboard.dismiss} activeOpacity={1} />
 
-        <View style={[styles.sheet, { backgroundColor: SURFACE, borderColor: BORDER }]}>
+        <View style={[styles.sheet, { backgroundColor: BG, borderColor: BORDER }]}>
           {onClose && (
             <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
               <Ionicons name="close" size={22} color={MUTED} />
             </TouchableOpacity>
           )}
 
-          <View style={[styles.iconWrap, { backgroundColor: '#1f1f1f' }]}>
+          <View style={[styles.iconWrap, { backgroundColor: SEC }]}>
             <Ionicons name="mail-outline" size={28} color={FG} />
           </View>
 
@@ -101,7 +103,7 @@ export function OtpModal({ visible, email, onVerify, onResend, onClose }: Props)
             <Text style={{ color: FG, fontWeight: '700' }}>{email}</Text>
           </Text>
 
-          {/* OTP Boxes — tap to focus hidden input */}
+          {/* OTP Boxes */}
           <TouchableOpacity
             style={styles.otpRow}
             onPress={() => { inputRef.current?.blur(); setTimeout(() => inputRef.current?.focus(), 50); }}
@@ -112,10 +114,11 @@ export function OtpModal({ visible, email, onVerify, onResend, onClose }: Props)
                 key={i}
                 style={[
                   styles.otpBox,
+                  { backgroundColor: colors.input },
                   {
                     borderColor: localError
-                      ? '#ffb4ab'
-                      : code[i] ? FG : (code.length === i ? '#666' : BORDER),
+                      ? DESTR
+                      : code[i] ? FG : (code.length === i ? colors.ring : BORDER),
                   },
                 ]}
               >
@@ -124,7 +127,7 @@ export function OtpModal({ visible, email, onVerify, onResend, onClose }: Props)
             ))}
           </TouchableOpacity>
 
-          {/* Invisible input captures keyboard input — positioned off-screen for reliable Android keyboard */}
+          {/* Hidden input captures keyboard */}
           <TextInput
             ref={inputRef}
             style={{ position: 'absolute', width: 1, height: 1, opacity: 0.01, top: 0, left: 0 }}
@@ -133,10 +136,11 @@ export function OtpModal({ visible, email, onVerify, onResend, onClose }: Props)
             keyboardType="number-pad"
             maxLength={6}
             caretHidden
+            keyboardAppearance={isDark ? 'dark' : 'light'}
           />
 
           {!!localError && (
-            <Text style={[styles.errorText, { color: '#ffb4ab' }]}>{localError}</Text>
+            <Text style={[styles.errorText, { color: DESTR }]}>{localError}</Text>
           )}
 
           <TouchableOpacity
@@ -150,8 +154,8 @@ export function OtpModal({ visible, email, onVerify, onResend, onClose }: Props)
             activeOpacity={0.85}
           >
             {verifying
-              ? <ActivityIndicator color={code.length === 6 ? '#000' : MUTED} />
-              : <Text style={[styles.btnVerifyText, { color: code.length === 6 ? '#000' : MUTED }]}>
+              ? <ActivityIndicator color={code.length === 6 ? colors.background : MUTED} />
+              : <Text style={[styles.btnVerifyText, { color: code.length === 6 ? colors.background : MUTED }]}>
                   Verify Email
                 </Text>
             }
@@ -179,7 +183,7 @@ export function OtpModal({ visible, email, onVerify, onResend, onClose }: Props)
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-end',
   },
   sheet: {

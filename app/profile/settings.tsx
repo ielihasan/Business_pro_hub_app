@@ -12,7 +12,7 @@ export default function SettingsScreen() {
   const { i18n } = useTranslation();
 
   const themeLabel =
-    theme === 'dark' ? 'Dark' : theme === 'black' ? 'Black (AMOLED)' : 'System';
+    theme === 'dark' ? 'Dark' : theme === 'light' ? 'Light' : 'System';
   const langLabel =
     ({ en: 'English', ur: 'Urdu', ar: 'Arabic', hi: 'Hindi', fr: 'French', de: 'German', es: 'Spanish', zh: 'Chinese' } as any)
     [i18n.language?.slice(0, 2)] ?? 'English';

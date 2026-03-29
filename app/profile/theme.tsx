@@ -6,14 +6,14 @@ import { useTheme } from '@/hooks/useTheme';
 import { useStore } from '@/store/useStore';
 
 const OPTIONS: Array<{
-  value: 'light' | 'dark' | 'black' | null;
+  value: 'light' | 'dark' | null;
   label: string;
   subtitle: string;
   icon: string;
 }> = [
   { value: null,    label: 'System Default', subtitle: 'Follows your device light/dark setting', icon: 'phone-portrait-outline' },
-  { value: 'dark',  label: 'Dark',           subtitle: 'Dark grey surfaces, easier on the eyes', icon: 'moon-outline' },
-  { value: 'black', label: 'Black (AMOLED)', subtitle: 'Pure black — saves battery on OLED screens', icon: 'ellipse' },
+  { value: 'light', label: 'Light',           subtitle: 'Bright white surfaces, clear and crisp', icon: 'sunny-outline' },
+  { value: 'dark',  label: 'Dark',            subtitle: 'Dark surfaces, easier on the eyes',       icon: 'moon-outline' },
 ];
 
 export default function ThemeScreen() {
@@ -67,10 +67,7 @@ export default function ThemeScreen() {
                   </Text>
                   <Text style={[styles.rowSub, { color: MUTED }]}>{opt.subtitle}</Text>
                 </View>
-                <View style={[
-                  styles.radio,
-                  { borderColor: active ? FG : BORDER },
-                ]}>
+                <View style={[styles.radio, { borderColor: active ? FG : BORDER }]}>
                   {active && <View style={[styles.radioDot, { backgroundColor: FG }]} />}
                 </View>
               </TouchableOpacity>

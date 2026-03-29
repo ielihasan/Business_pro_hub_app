@@ -29,25 +29,30 @@ function getInitials(name: string): string {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 }
 
-function getBackgroundColor(name: string): string {
-  if (!name) return '#5C5C5C';
-  const grays = ['#2a2a2a', '#363636', '#404040', '#4a4a4a', '#5C5C5C', '#6e6e6e', '#787878'];
+/** Pick a consistent index from a name string (0–4). */
+function nameIndex(name: string): number {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return grays[Math.abs(hash) % grays.length];
+  return Math.abs(hash) % 5;
 }
 
 export function Avatar({ source, name = '', size = 'md', style }: AvatarProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const dimensions = sizeMap[size];
+
+  // Theme-adaptive avatar backgrounds: dark shades for dark mode, tinted neutrals for light
+  const darkBgs  = ['#2a2a2a', '#333333', '#3d3d3d', '#282828', '#303030'];
+  const lightBgs = ['#e8e8e8', '#dde0e6', '#e4dff0', '#d9e8df', '#e8ddd9'];
+  const bgs = isDark ? darkBgs : lightBgs;
+  const avatarBg = name ? bgs[nameIndex(name)] : (isDark ? '#2a2a2a' : '#e8e8e8');
 
   const containerStyle: ViewStyle = {
     width: dimensions.container,
     height: dimensions.container,
     borderRadius: dimensions.container / 2,
-    backgroundColor: source ? colors.muted : getBackgroundColor(name),
+    backgroundColor: source ? colors.muted : avatarBg,
   };
 
   if (source) {
@@ -75,7 +80,7 @@ export function Avatar({ source, name = '', size = 'md', style }: AvatarProps) {
           styles.initials,
           {
             fontSize: dimensions.text,
-            color: '#FFFFFF',
+            color: isDark ? '#e2e2e2' : '#1a1a1a',
           },
         ]}
       >
