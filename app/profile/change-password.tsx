@@ -40,11 +40,11 @@ export default function ChangePasswordScreen() {
     if (/[0-9]/.test(pwd))                        score++;
     if (/[^A-Za-z0-9]/.test(pwd))                score++;
     const map = [
-      { label: 'Very Weak',  width: '25%'  },
-      { label: 'Weak',       width: '40%'  },
-      { label: 'Fair',       width: '60%'  },
-      { label: 'Strong',     width: '85%'  },
-      { label: 'Very Strong',width: '100%' },
+      { label: 'Very Weak',  color: '#ef4444', width: '25%'  },
+      { label: 'Weak',       color: '#f97316', width: '40%'  },
+      { label: 'Fair',       color: '#eab308', width: '60%'  },
+      { label: 'Strong',     color: '#22c55e', width: '85%'  },
+      { label: 'Very Strong',color: '#16a34a', width: '100%' },
     ];
     return map[score] ?? map[0];
   };

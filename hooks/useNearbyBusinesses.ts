@@ -12,7 +12,7 @@ function useDebounce<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-type BusinessWithDistance = BusinessRecord & { distanceKm: number };
+type BusinessWithDistance = BusinessRecord & { distanceKm: number | null };
 
 const DEFAULT_RADIUS_KM = 10;
 

@@ -15,7 +15,7 @@ interface ActiveQueue {
   position: number;
   totalInQueue: number;
   estimatedWait: string;
-  status: 'waiting' | 'serving' | 'completed' | 'cancelled';
+  status: 'waiting' | 'in_progress' | 'serving' | 'completed' | 'cancelled';
   joinedAt: string;
   ticketNumber: string;
 }

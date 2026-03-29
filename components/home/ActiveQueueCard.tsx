@@ -10,7 +10,7 @@ interface ActiveQueue {
   businessName: string;
   position: number;
   estimatedWait: string;
-  status: 'waiting' | 'serving' | 'completed' | 'cancelled';
+  status: 'waiting' | 'in_progress' | 'serving' | 'completed' | 'cancelled';
   businessCategory?: string;
 }
 

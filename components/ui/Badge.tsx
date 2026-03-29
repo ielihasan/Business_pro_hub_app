@@ -112,7 +112,7 @@ export function Badge({
 
 // Queue status specific badge
 interface QueueStatusBadgeProps {
-  status: 'waiting' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'waiting' | 'in_progress' | 'serving' | 'completed' | 'cancelled';
   style?: ViewStyle;
 }
 

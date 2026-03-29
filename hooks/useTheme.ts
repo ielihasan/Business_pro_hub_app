@@ -6,6 +6,7 @@ export function useTheme(): {
   colors: ThemeColors;
   colorScheme: ColorScheme;
   isDark: boolean;
+  theme: 'light' | 'dark' | 'black' | null;
 } {
   const systemColorScheme = useColorScheme();
   const { theme }         = useStore();
@@ -23,7 +24,7 @@ export function useTheme(): {
   const colors = Colors[resolved];
   const isDark  = resolved === 'dark' || resolved === 'black';
 
-  return { colors, colorScheme: resolved, isDark };
+  return { colors, colorScheme: resolved, isDark, theme };
 }
 
 export function useThemeColor(lightColor: string, darkColor: string): string {

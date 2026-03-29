@@ -899,7 +899,7 @@ const styles = StyleSheet.create({
   quantityModalContent: {
     width: '100%',
     maxWidth: 420,
-    borderRadius: BorderRadius.LG,
+    borderRadius: BorderRadius.lg,
     padding: Spacing[6],
     gap: Spacing[4],
     borderWidth: 1,
