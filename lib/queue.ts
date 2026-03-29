@@ -475,7 +475,7 @@ export async function fetchUserActiveQueues(
 }
 
 /** Returns true if the string is a UUID */
-function isUuidFormat(s: string) {
+export function isUuidFormat(s: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 }
 

@@ -20,7 +20,7 @@ const sizeMap: Record<AvatarSize, { container: number; text: number }> = {
   xl: { container: 80, text: 28 },
 };
 
-function getInitials(name: string): string {
+export function getInitials(name: string): string {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/);
   if (parts.length === 1) {
@@ -30,7 +30,7 @@ function getInitials(name: string): string {
 }
 
 /** Pick a consistent index from a name string (0–4). */
-function nameIndex(name: string): number {
+export function nameIndex(name: string): number {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);

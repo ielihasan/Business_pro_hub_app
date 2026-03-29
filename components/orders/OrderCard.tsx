@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { OrderHistoryEntry, ticketLabel } from '@/lib/queue';
 
-function statusColor(status: string, colors: any) {
+export function statusColor(status: string, colors: any) {
   if (status === 'waiting')     return { fg: colors.statusWaiting  ?? '#F59E0B', bg: (colors.statusWaiting  ?? '#F59E0B') + '18' };
   if (status === 'in_progress') return { fg: colors.statusInProgress ?? '#3B82F6', bg: (colors.statusInProgress ?? '#3B82F6') + '18' };
   if (status === 'completed')   return { fg: colors.success,     bg: colors.success     + '18' };
@@ -12,17 +12,17 @@ function statusColor(status: string, colors: any) {
   return { fg: colors.mutedForeground, bg: colors.card };
 }
 
-function statusLabel(status: string) {
+export function statusLabel(status: string) {
   if (status === 'in_progress') return 'IN PROGRESS';
   return status.toUpperCase();
 }
 
-function formatDate(iso: string) {
+export function formatDate(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function formatTime(iso: string) {
+export function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
