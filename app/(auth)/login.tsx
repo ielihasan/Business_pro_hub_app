@@ -172,19 +172,13 @@ export default function LoginScreen() {
           {/* Top bar */}
           <View style={styles.topBar}>
             <Text style={[styles.wordmark, { color: colors.foreground }]}>BUSINESSHUB PRO</Text>
-            <View style={styles.topRight}>
-              <Ionicons name="notifications-outline" size={22} color={colors.foreground} />
-              <View style={[styles.avatar, { backgroundColor: colors.secondary }]}>
-                <Text style={[styles.avatarText, { color: colors.mutedForeground }]}>PH</Text>
-              </View>
-            </View>
           </View>
 
           {/* Hero headline */}
           <View style={styles.heroSection}>
             <Text style={[styles.heroTitle, { color: colors.foreground }]}>WELCOME{'\n'}BACK.</Text>
             <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>
-              Access your premium business dashboard and manage your queues with professional precision.
+              Find businesses near you, scan a QR code and skip the wait from your phone.
             </Text>
           </View>
 
@@ -328,11 +322,8 @@ const styles = StyleSheet.create({
   root:   { flex: 1 },
   scroll: { flexGrow: 1, paddingBottom: 48 },
 
-  topBar:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 8, paddingBottom: 8 },
-  wordmark:   { fontSize: 17, fontWeight: '900', letterSpacing: -0.5 },
-  topRight:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar:     { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontSize: 10, fontWeight: '700' },
+  topBar:   { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 8 },
+  wordmark: { fontSize: 17, fontWeight: '900', letterSpacing: -0.5 },
 
   heroSection: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 32 },
   heroTitle: { fontSize: 54, fontWeight: '900', letterSpacing: -2, lineHeight: 56, marginBottom: 16 },
