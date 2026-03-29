@@ -317,7 +317,7 @@ export default function RegisterScreen() {
 
             {/* Full Name */}
             <View style={styles.fieldWrap}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>FULL NAME</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>FULL NAME <Text style={{ color: '#ff4444' }}>*</Text></Text>
               <TextInput
                 style={[styles.input, { borderColor: errors.fullName ? '#ffb4ab' : colors.border, color: colors.foreground, backgroundColor: colors.input }]}
                 placeholder="Your full name"
@@ -335,7 +335,7 @@ export default function RegisterScreen() {
 
             {/* Email */}
             <View style={styles.fieldWrap}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>EMAIL ADDRESS</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>EMAIL ADDRESS <Text style={{ color: '#ff4444' }}>*</Text></Text>
               <TextInput
                 style={[styles.input, { borderColor: errors.email ? '#ffb4ab' : colors.border, color: colors.foreground, backgroundColor: colors.input }]}
                 placeholder="name@business.pk"
@@ -354,7 +354,7 @@ export default function RegisterScreen() {
 
             {/* Phone */}
             <View style={styles.fieldWrap}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>PHONE NUMBER</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>PHONE NUMBER <Text style={{ color: '#ff4444' }}>*</Text></Text>
               <TextInput
                 style={[styles.input, { borderColor: errors.phone ? '#ffb4ab' : colors.border, color: colors.foreground, backgroundColor: colors.input }]}
                 placeholder="+92 300 1234567"
@@ -373,11 +373,11 @@ export default function RegisterScreen() {
             {!googlePrefilled && (
               <>
                 <View style={styles.fieldWrap}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>PASSWORD</Text>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>PASSWORD <Text style={{ color: '#ff4444' }}>*</Text></Text>
                   <View style={[styles.inputWrap, { borderColor: errors.password ? '#ffb4ab' : colors.border, backgroundColor: colors.input }]}>
                     <TextInput
                       style={[styles.inputInner, { color: colors.foreground }]}
-                      placeholder="••••••••"
+                      placeholder="Enter your password"
                       placeholderTextColor={colors.mutedForeground}
                       value={formData.password}
                       onChangeText={(v) => updateField('password', v)}
@@ -394,11 +394,11 @@ export default function RegisterScreen() {
                 </View>
 
                 <View style={styles.fieldWrap}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>CONFIRM PASSWORD</Text>
+                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>CONFIRM PASSWORD <Text style={{ color: '#ff4444' }}>*</Text></Text>
                   <View style={[styles.inputWrap, { borderColor: errors.confirmPassword ? '#ffb4ab' : colors.border, backgroundColor: colors.input }]}>
                     <TextInput
                       style={[styles.inputInner, { color: colors.foreground }]}
-                      placeholder="••••••••"
+                      placeholder="Re-enter your password"
                       placeholderTextColor={colors.mutedForeground}
                       value={formData.confirmPassword}
                       onChangeText={(v) => updateField('confirmPassword', v)}

@@ -193,10 +193,10 @@ export default function LoginScreen() {
 
             {/* Email */}
             <View style={styles.fieldWrap}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>PROFESSIONAL EMAIL</Text>
+              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>EMAIL <Text style={{ color: '#ff4444' }}>*</Text></Text>
               <TextInput
                 style={[styles.input, { borderColor: errors.email ? '#ffb4ab' : colors.border, color: colors.foreground, backgroundColor: colors.input }]}
-                placeholder="name@business.pro"
+                placeholder="your@email.com"
                 placeholderTextColor={colors.mutedForeground}
                 value={email}
                 onChangeText={(v) => { setEmail(v); setErrors(p => ({ ...p, email: '' })); }}
@@ -212,7 +212,7 @@ export default function LoginScreen() {
             {/* Password */}
             <View style={styles.fieldWrap}>
               <View style={styles.fieldLabelRow}>
-                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>SECURITY KEY</Text>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>PASSWORD <Text style={{ color: '#ff4444' }}>*</Text></Text>
                 <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')} disabled={busy}>
                   <Text style={[styles.forgotLink, { color: colors.foreground }]}>FORGOT PASSWORD</Text>
                 </TouchableOpacity>
@@ -220,7 +220,7 @@ export default function LoginScreen() {
               <View style={[styles.inputWrap, { borderColor: errors.password ? '#ffb4ab' : colors.border, backgroundColor: colors.input }]}>
                 <TextInput
                   style={[styles.inputInner, { color: colors.foreground }]}
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   placeholderTextColor={colors.mutedForeground}
                   value={password}
                   onChangeText={(v) => { setPassword(v); setErrors(p => ({ ...p, password: '' })); }}
