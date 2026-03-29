@@ -4,7 +4,8 @@ import { router } from 'expo-router';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraView, Camera, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/hooks/useTheme';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { CameraPermissionView, ScannerOverlay } from '@/components/scan';
@@ -305,6 +306,51 @@ export default function ScanScreen() {
     await processBusinessId(businessId, serviceType, payload, unitPrice);
   };
 
+  // Pick a QR code image from the gallery
+  const handleGalleryPick = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 1,
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    try {
+      const barcodes = await Camera.scanFromURLAsync(result.assets[0].uri, ['qr']);
+      if (!barcodes.length) {
+        setDialog({
+          title: 'No QR Code Found',
+          message: 'No QR code was detected in the selected image.',
+          icon: 'image-outline',
+          iconVariant: 'warning',
+          actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+        });
+        return;
+      }
+      const parsed = parseQrData(barcodes[0].data);
+      if (!parsed) {
+        setDialog({
+          title: 'Invalid QR Code',
+          message: 'This QR code is not a valid BusinessHub Pro queue code.',
+          icon: 'alert-circle-outline',
+          iconVariant: 'destructive',
+          actions: [{ label: 'OK', onPress: () => { setDialog(null); setScanned(false); } }],
+        });
+        return;
+      }
+      setScanned(true);
+      await processBusinessId(parsed.businessId, parsed.serviceType, parsed.payload, parsed.unitPrice);
+    } catch {
+      setDialog({
+        title: 'Scan Failed',
+        message: 'Could not read a QR code from this image. Try a clearer photo.',
+        icon: 'alert-circle-outline',
+        iconVariant: 'destructive',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
+    }
+  };
+
   // Manual entry function
   const handleManualEntry = () => {
     setManualBusinessId('');
@@ -389,7 +435,7 @@ export default function ScanScreen() {
                   style={[styles.modalButton, { backgroundColor: colors.primary }]}
                   onPress={handleManualSubmit}
                 >
-                  <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>Join Queue</Text>
+                  <Text style={[styles.modalButtonText, { color: colors.primaryForeground }]}>Join Queue</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -423,7 +469,7 @@ export default function ScanScreen() {
                   <Text style={[styles.modalButtonText, { color: colors.foreground }]}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={handleConfirmJoinWithQuantity}>
-                  <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>Join Queue</Text>
+                  <Text style={[styles.modalButtonText, { color: colors.primaryForeground }]}>Join Queue</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -472,14 +518,23 @@ export default function ScanScreen() {
         </View>
       )}
 
-      {/* Manual Entry Button */}
+      {/* Bottom action buttons */}
       <View style={styles.bottomButtons}>
         <TouchableOpacity
-          style={[styles.manualButton, { backgroundColor: colors.primary }]}
+          style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
+          onPress={handleGalleryPick}
+          disabled={busy}
+        >
+          <Ionicons name="images-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.actionBtnText}>Gallery</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtn, { backgroundColor: colors.primary, flex: 2 }]}
           onPress={handleManualEntry}
           disabled={busy}
         >
-          <Text style={styles.manualButtonText}>Enter Business ID Manually</Text>
+          <Ionicons name="keypad-outline" size={20} color={colors.primaryForeground} />
+          <Text style={[styles.actionBtnText, { color: colors.primaryForeground }]}>Enter ID Manually</Text>
         </TouchableOpacity>
       </View>
 
@@ -618,7 +673,7 @@ export default function ScanScreen() {
                 style={[styles.modalButton, { backgroundColor: colors.primary }]}
                 onPress={handleConfirmJoinWithQuantity}
               >
-                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>Join Queue</Text>
+                <Text style={[styles.modalButtonText, { color: colors.primaryForeground }]}>Join Queue</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -678,7 +733,25 @@ const styles = StyleSheet.create({
     right: 0,
     padding: Spacing[4],
     paddingBottom: Spacing[6],
+    flexDirection: 'row',
+    gap: Spacing[3],
   },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing[2],
+    paddingVertical: Spacing[4],
+    paddingHorizontal: Spacing[4],
+    borderRadius: BorderRadius.DEFAULT,
+  },
+  actionBtnText: {
+    color: '#FFFFFF',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '600',
+  },
+  // kept for web fallback path
   manualButton: {
     paddingVertical: Spacing[4],
     paddingHorizontal: Spacing[6],
