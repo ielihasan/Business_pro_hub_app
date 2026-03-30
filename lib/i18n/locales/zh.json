@@ -23,11 +23,16 @@
             "categories": {
                 "title": "分类",
                 "all": "全部",
-                "food": "美食",
-                "print": "打印",
-                "health": "健康",
-                "repair": "维修",
-                "salon": "美容"
+                "coffee_shop": "咖啡店",
+                "restaurant": "餐厅",
+                "retail": "零售",
+                "clinic": "诊所",
+                "salon": "美发",
+                "bank": "银行",
+                "government": "政府",
+                "pharmacy": "药房",
+                "bakery": "烘焙",
+                "other": "其他"
             },
             "active_queue": {
                 "title": "当前正在排队",

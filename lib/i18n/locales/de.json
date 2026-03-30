@@ -23,11 +23,16 @@
             "categories": {
                 "title": "Kategorien",
                 "all": "Alle",
-                "food": "Essen",
-                "print": "Drucken",
-                "health": "Gesundheit",
-                "repair": "Reparatur",
-                "salon": "Salon"
+                "coffee_shop": "Café",
+                "restaurant": "Restaurant",
+                "retail": "Einzelhandel",
+                "clinic": "Klinik",
+                "salon": "Salon",
+                "bank": "Bank",
+                "government": "Behörde",
+                "pharmacy": "Apotheke",
+                "bakery": "Bäckerei",
+                "other": "Sonstiges"
             },
             "active_queue": {
                 "title": "Aktuell in der Warteschlange",

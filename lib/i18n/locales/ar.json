@@ -23,11 +23,16 @@
             "categories": {
                 "title": "الفئات",
                 "all": "الكل",
-                "food": "طعام",
-                "print": "طباعة",
-                "health": "صحة",
-                "repair": "إصلاح",
-                "salon": "صالون"
+                "coffee_shop": "مقهى",
+                "restaurant": "مطعم",
+                "retail": "متجر",
+                "clinic": "عيادة",
+                "salon": "صالون",
+                "bank": "بنك",
+                "government": "حكومي",
+                "pharmacy": "صيدلية",
+                "bakery": "مخبزة",
+                "other": "أخرى"
             },
             "active_queue": {
                 "title": "حاليا في قائمة الانتظار",

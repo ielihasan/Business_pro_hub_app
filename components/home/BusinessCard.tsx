@@ -5,18 +5,37 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslation } from 'react-i18next';
 
+// Maps business_type values (synced from dashboard) to Ionicons names
 const CATEGORY_ICONS: Record<string, string> = {
-  food:    'restaurant-outline',
-  health:  'medical-outline',
-  salon:   'cut-outline',
-  repair:  'construct-outline',
-  print:   'print-outline',
-  default: 'storefront-outline',
+  'coffee shop':       'cafe-outline',
+  'restaurant':        'restaurant-outline',
+  'retail store':      'bag-handle-outline',
+  'clinic':            'medical-outline',
+  'healthcare':        'medical-outline',
+  'salon':             'cut-outline',
+  'barbershop':        'cut-outline',
+  'bank':              'card-outline',
+  'finance':           'card-outline',
+  'government office': 'business-outline',
+  'government':        'business-outline',
+  'pharmacy':          'medkit-outline',
+  'bakery':            'storefront-outline',
+  'other':             'ellipsis-horizontal-outline',
+  // legacy short-form ids
+  'food':              'restaurant-outline',
+  'health':            'medical-outline',
+  'repair':            'construct-outline',
+  'print':             'print-outline',
+  'default':           'storefront-outline',
 };
 
 function getCategoryIcon(cat?: string): string {
   if (!cat) return CATEGORY_ICONS.default;
-  return CATEGORY_ICONS[cat.toLowerCase()] ?? CATEGORY_ICONS.default;
+  const lower = cat.toLowerCase();
+  if (CATEGORY_ICONS[lower]) return CATEGORY_ICONS[lower];
+  // partial match for compound types like "Clinic / Healthcare"
+  const key = Object.keys(CATEGORY_ICONS).find((k) => lower.includes(k));
+  return key ? CATEGORY_ICONS[key] : CATEGORY_ICONS.default;
 }
 
 interface BusinessCardProps {

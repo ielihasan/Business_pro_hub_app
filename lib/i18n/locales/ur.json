@@ -24,11 +24,16 @@
             "categories": {
                 "title": "زمرہ جات",
                 "all": "سب",
-                "food": "کھانا",
-                "print": "پرنٹ",
-                "health": "صحت",
-                "repair": "مرمت",
-                "salon": "سیلون"
+                "coffee_shop": "کافی شاپ",
+                "restaurant": "ریستوران",
+                "retail": "دکان",
+                "clinic": "کلینک",
+                "salon": "سیلون",
+                "bank": "بینک",
+                "government": "سرکاری",
+                "pharmacy": "فارمیسی",
+                "bakery": "بیکری",
+                "other": "دیگر"
             },
             "active_queue": {
                 "title": "فی الحال قطار میں",

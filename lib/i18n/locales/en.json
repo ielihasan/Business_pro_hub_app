@@ -24,11 +24,16 @@
             "categories": {
                 "title": "Categories",
                 "all": "All",
-                "food": "Food",
-                "print": "Print",
-                "health": "Health",
-                "repair": "Repair",
-                "salon": "Salon"
+                "coffee_shop": "Coffee Shop",
+                "restaurant": "Restaurant",
+                "retail": "Retail",
+                "clinic": "Clinic",
+                "salon": "Salon",
+                "bank": "Bank",
+                "government": "Govt",
+                "pharmacy": "Pharmacy",
+                "bakery": "Bakery",
+                "other": "Other"
             },
             "active_queue": {
                 "title": "Currently in queue",

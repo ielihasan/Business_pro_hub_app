@@ -23,11 +23,16 @@
             "categories": {
                 "title": "Категории",
                 "all": "Все",
-                "food": "Еда",
-                "print": "Печать",
-                "health": "Здоровье",
-                "repair": "Ремонт",
-                "salon": "Салон"
+                "coffee_shop": "Кофейня",
+                "restaurant": "Ресторан",
+                "retail": "Магазин",
+                "clinic": "Клиника",
+                "salon": "Салон",
+                "bank": "Банк",
+                "government": "Гос. офис",
+                "pharmacy": "Аптека",
+                "bakery": "Пекарня",
+                "other": "Другое"
             },
             "active_queue": {
                 "title": "Сейчас в очереди",

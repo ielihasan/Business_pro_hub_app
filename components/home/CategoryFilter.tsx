@@ -4,13 +4,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslation } from 'react-i18next';
 
+// Business types synced from dashboard (Business_pro_hub_dashboard)
 const CATEGORIES = [
-  { id: 'all',    labelKey: 'home.categories.all',    icon: 'grid-outline'       as const },
-  { id: 'food',   labelKey: 'home.categories.food',   icon: 'restaurant-outline' as const },
-  { id: 'print',  labelKey: 'home.categories.print',  icon: 'print-outline'      as const },
-  { id: 'health', labelKey: 'home.categories.health', icon: 'medical-outline'    as const },
-  { id: 'repair', labelKey: 'home.categories.repair', icon: 'construct-outline'  as const },
-  { id: 'salon',  labelKey: 'home.categories.salon',  icon: 'cut-outline'        as const },
+  { id: 'all',                  labelKey: 'home.categories.all',        icon: 'grid-outline'               as const },
+  { id: 'Coffee Shop',          labelKey: 'home.categories.coffee_shop', icon: 'cafe-outline'              as const },
+  { id: 'Restaurant',           labelKey: 'home.categories.restaurant', icon: 'restaurant-outline'         as const },
+  { id: 'Retail Store',         labelKey: 'home.categories.retail',     icon: 'bag-handle-outline'         as const },
+  { id: 'Clinic / Healthcare',  labelKey: 'home.categories.clinic',     icon: 'medical-outline'            as const },
+  { id: 'Salon / Barbershop',   labelKey: 'home.categories.salon',      icon: 'cut-outline'                as const },
+  { id: 'Bank / Finance',       labelKey: 'home.categories.bank',       icon: 'card-outline'               as const },
+  { id: 'Government Office',    labelKey: 'home.categories.government', icon: 'business-outline'           as const },
+  { id: 'Pharmacy',             labelKey: 'home.categories.pharmacy',   icon: 'medkit-outline'             as const },
+  { id: 'Bakery',               labelKey: 'home.categories.bakery',     icon: 'storefront-outline'         as const },
+  { id: 'Other',                labelKey: 'home.categories.other',      icon: 'ellipsis-horizontal-outline' as const },
 ];
 
 interface CategoryFilterProps {

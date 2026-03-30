@@ -23,11 +23,16 @@
             "categories": {
                 "title": "श्रेणियाँ",
                 "all": "सभी",
-                "food": "खाना",
-                "print": "प्रिंट",
-                "health": "स्वास्थ्य",
-                "repair": "मरम्मत",
-                "salon": "सैलून"
+                "coffee_shop": "कॉफ़ी शॉप",
+                "restaurant": "रेस्तरां",
+                "retail": "खुदरा",
+                "clinic": "क्लिनिक",
+                "salon": "सैलून",
+                "bank": "बैंक",
+                "government": "सरकारी",
+                "pharmacy": "फार्मेसी",
+                "bakery": "बेकरी",
+                "other": "अन्य"
             },
             "active_queue": {
                 "title": "वर्तमान में कतार में",

@@ -23,11 +23,16 @@
             "categories": {
                 "title": "Categorías",
                 "all": "Todo",
-                "food": "Comida",
-                "print": "Impresión",
-                "health": "Salud",
-                "repair": "Reparación",
-                "salon": "Salón"
+                "coffee_shop": "Cafetería",
+                "restaurant": "Restaurante",
+                "retail": "Tienda",
+                "clinic": "Clínica",
+                "salon": "Salón",
+                "bank": "Banco",
+                "government": "Gobierno",
+                "pharmacy": "Farmacia",
+                "bakery": "Panadería",
+                "other": "Otro"
             },
             "active_queue": {
                 "title": "Actualmente en cola",
