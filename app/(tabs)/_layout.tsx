@@ -26,6 +26,10 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets      = useSafeAreaInsets();
   const bottomInset = insets.bottom;
 
+  const unreadCount    = useStore((s) => s.unreadCount);
+  const paymentMethods = useStore((s) => s.paymentMethods);
+  const totalBadge     = unreadCount + (paymentMethods.length === 0 ? 1 : 0);
+
   const BAR_BG     = isDark
     ? colors.background + 'f5'   // slight transparency
     : colors.background + 'f5';
@@ -98,15 +102,24 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             );
           }
 
+          const showBadge = route.name === 'profile' && totalBadge > 0;
+
           return (
             <TouchableOpacity key={route.key} onPress={onPress} style={styles.tab} activeOpacity={0.65}>
-              <Animated.View style={{ transform: [{ scale: scaleAnims[index] }] }}>
-                <Ionicons
-                  name={focused ? cfg.filled : cfg.outline}
-                  size={21}
-                  color={focused ? ACTIVE_CLR : MUTED_CLR}
-                />
-              </Animated.View>
+              <View style={styles.iconWrap}>
+                <Animated.View style={{ transform: [{ scale: scaleAnims[index] }] }}>
+                  <Ionicons
+                    name={focused ? cfg.filled : cfg.outline}
+                    size={21}
+                    color={focused ? ACTIVE_CLR : MUTED_CLR}
+                  />
+                </Animated.View>
+                {showBadge && (
+                  <View style={[styles.tabBadge, { backgroundColor: colors.destructive }]}>
+                    <Text style={styles.tabBadgeText}>{totalBadge > 9 ? '9+' : totalBadge}</Text>
+                  </View>
+                )}
+              </View>
               <Text style={[styles.tabLabel, { color: focused ? ACTIVE_CLR : MUTED_CLR }, focused && styles.tabLabelActive]}>
                 {cfg.label}
               </Text>
@@ -138,6 +151,14 @@ const styles = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'flex-end',
     gap: 3, paddingBottom: 2,
   },
+  iconWrap: { position: 'relative' },
+  tabBadge: {
+    position: 'absolute', top: -5, right: -8,
+    minWidth: 16, height: 16, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  tabBadgeText: { fontSize: 9, fontWeight: '900', color: '#fff' },
   tabLabel:       { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   tabLabelActive: { fontWeight: '800' },
   tabIndicator: {

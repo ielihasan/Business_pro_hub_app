@@ -21,6 +21,12 @@ import { resolveBusinessById } from '@/lib/queue';
 import { useStore } from '@/store/useStore';
 import { COMMITMENT_RATE, calculateCommitmentFee } from '@/lib/wallet';
 
+const METHOD_LABEL: Record<string, string> = {
+  easypaisa: 'Easypaisa',
+  jazzcash:  'JazzCash',
+  bank:      'Bank Account',
+};
+
 export default function BusinessDetailScreen() {
   const { id }     = useLocalSearchParams<{ id: string }>();
   const { colors, isDark } = useTheme();
@@ -36,7 +42,9 @@ export default function BusinessDetailScreen() {
   const favoriteBusinesses  = useStore((s) => s.favoriteBusinesses);
   const isAuthenticated     = useStore((s) => s.isAuthenticated);
   const user                = useStore((s) => s.user);
+  const paymentMethods      = useStore((s) => s.paymentMethods);
   const walletBalance       = user?.walletBalance ?? null;
+  const defaultMethod       = paymentMethods.find(m => m.isDefault) ?? paymentMethods[0] ?? null;
   const isFavorite          = !!(business?.id && favoriteBusinesses.includes(business.id));
 
   useEffect(() => {
@@ -70,34 +78,53 @@ export default function BusinessDetailScreen() {
       return;
     }
 
-    // ── Wallet check only when a service amount is entered ───────────────────
-    if (advanceFee > 0 && (walletBalance === null || walletBalance < advanceFee)) {
+    // ── No payment method set up yet ────────────────────────────────────────
+    if (advanceFee > 0 && paymentMethods.length === 0) {
       setDialog({
-        title:   'Insufficient Wallet Balance',
-        message: `Your ${advancePct}% advance for Rs ${parsedAmount} service is Rs ${advanceFee}.\n\nYour wallet: Rs ${walletBalance ?? 0}\n\nPlease add funds to continue.`,
-        icon:    'wallet-outline',
+        title:   'Payment Method Required',
+        message: `A ${advancePct}% advance (Rs ${advanceFee}) is needed to join this queue.\n\nPlease add a payment method to your wallet first.`,
+        icon:    'card-outline',
         iconVariant: 'warning',
         actions: [
-          { label: 'Cancel',    variant: 'secondary', onPress: () => setDialog(null) },
-          { label: 'Add Funds', variant: 'primary',   onPress: () => { setDialog(null); router.push('/profile/payment'); } },
+          { label: 'Cancel',  variant: 'secondary', onPress: () => setDialog(null) },
+          { label: 'Set Up',  variant: 'primary',   onPress: () => { setDialog(null); router.push('/profile/payment'); } },
         ],
       });
       return;
     }
 
+    // ── Insufficient wallet balance ──────────────────────────────────────────
+    if (advanceFee > 0 && (walletBalance === null || walletBalance < advanceFee)) {
+      setDialog({
+        title:   'Insufficient Balance',
+        message: `Required: Rs ${advanceFee} (${advancePct}% of Rs ${parsedAmount})\nYour wallet: Rs ${walletBalance ?? 0}\n\nTop up your wallet to continue.`,
+        icon:    'wallet-outline',
+        iconVariant: 'warning',
+        actions: [
+          { label: 'Cancel',   variant: 'secondary', onPress: () => setDialog(null) },
+          { label: 'Top Up',   variant: 'primary',   onPress: () => { setDialog(null); router.push('/profile/payment'); } },
+        ],
+      });
+      return;
+    }
+
+    // ── Confirm dialog ───────────────────────────────────────────────────────
+    const methodLine = advanceFee > 0 && defaultMethod
+      ? `Paid via: ${METHOD_LABEL[defaultMethod.type] ?? defaultMethod.type}  •••${defaultMethod.accountNumber.slice(-4)}`
+      : '';
     const feeText = advanceFee > 0
-      ? `Rs ${advanceFee} (${advancePct}% of Rs ${parsedAmount}) will be deducted as advance.`
-      : 'No advance payment required for this visit.';
+      ? `Advance: Rs ${advanceFee}  (${advancePct}% of Rs ${parsedAmount})\nWallet after: Rs ${(walletBalance ?? 0) - advanceFee}`
+      : 'No advance payment required.';
 
     setDialog({
-      title:   'Confirm Queue Join',
-      message: `${business.name}\n\nQueue: ${business.queue_length ?? 0} waiting  ·  Wait: ${business.wait_time ?? 'N/A'}\n\n${feeText}\nWallet: Rs ${walletBalance ?? '—'}`,
-      icon: 'people-outline',
+      title:   advanceFee > 0 ? `Pay Rs ${advanceFee} & Join` : 'Confirm Queue Join',
+      message: `${business.name}\n\nQueue: ${business.queue_length ?? 0} waiting  ·  Wait: ${business.wait_time ?? 'N/A'}\n\n${feeText}${methodLine ? `\n${methodLine}` : ''}`,
+      icon:    advanceFee > 0 ? 'wallet-outline' : 'people-outline',
       iconVariant: 'default',
       actions: [
         { label: 'Cancel', variant: 'secondary', onPress: () => setDialog(null) },
         {
-          label: advanceFee > 0 ? `Join & Pay Rs ${advanceFee}` : 'Join Queue',
+          label: advanceFee > 0 ? `Pay Rs ${advanceFee} & Join` : 'Join Queue',
           variant: 'primary',
           onPress: async () => {
             setDialog(null);
@@ -105,20 +132,26 @@ export default function BusinessDetailScreen() {
             const result = await joinQueueInSupabase(
               business.id,
               undefined,
-              parsedAmount > 0
-                ? { totalAmount: parsedAmount }
-                : undefined,
+              parsedAmount > 0 ? { totalAmount: parsedAmount } : undefined,
             );
             setLoading(false);
             if (!result.success || !result.queueEntryId) {
-              const isBalanceError = result.error?.startsWith('INSUFFICIENT_BALANCE');
+              const isBalErr    = result.error?.startsWith('INSUFFICIENT_BALANCE');
+              const isNoMethod  = result.error === 'NO_PAYMENT_METHOD';
               setDialog({
-                title:   isBalanceError ? 'Insufficient Balance' : 'Could Not Join',
-                message: isBalanceError
-                  ? `Your wallet balance is too low to cover the ${advancePct}% advance. Please top up and try again.`
-                  : (result.error ?? 'An error occurred.'),
+                title: isBalErr   ? 'Insufficient Balance'
+                     : isNoMethod ? 'No Payment Method'
+                     : 'Could Not Join',
+                message: isBalErr
+                  ? `Your wallet balance is too low. Please top up and try again.`
+                  : isNoMethod
+                  ? 'Please add a payment method before joining a priced queue.'
+                  : (result.error ?? 'An error occurred. Please try again.'),
                 icon: 'alert-circle-outline', iconVariant: 'destructive',
-                actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+                actions: [
+                  ...(isBalErr || isNoMethod ? [{ label: 'Set Up', variant: 'primary' as const, onPress: () => { setDialog(null); router.push('/profile/payment'); } }] : []),
+                  { label: 'OK', variant: 'secondary' as const, onPress: () => setDialog(null) },
+                ],
               });
               return;
             }

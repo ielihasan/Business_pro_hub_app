@@ -35,7 +35,8 @@ type MenuItem = {
 export default function ProfileScreen() {
   const { colors, isDark }                                   = useTheme();
   const { entranceStyle }                                    = useScreenEntrance();
-  const { user, logout, isLoading, notificationsEnabled, unreadCount } = useStore();
+  const { user, logout, isLoading, notificationsEnabled, unreadCount, paymentMethods } = useStore();
+  const totalBadge = unreadCount + (paymentMethods.length === 0 ? 1 : 0);
   const { t }                                                = useTranslation();
   const { isUploading, handleEditPhoto }                     = useProfilePhoto();
 
@@ -141,9 +142,9 @@ export default function ProfileScreen() {
               size={18}
               color={FG}
             />
-            {notificationsEnabled && unreadCount > 0 && (
+            {totalBadge > 0 && (
               <View style={[styles.bellDot, { backgroundColor: colors.destructive }]}>
-                <Text style={[styles.bellDotText, { color: colors.destructiveForeground }]}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                <Text style={[styles.bellDotText, { color: colors.destructiveForeground }]}>{totalBadge > 9 ? '9+' : totalBadge}</Text>
               </View>
             )}
           </TouchableOpacity>

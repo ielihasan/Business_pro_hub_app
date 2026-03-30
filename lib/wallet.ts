@@ -60,78 +60,155 @@ export interface SavedPaymentMethod {
   createdAt: string;
 }
 
+/** Full wallet record as stored in the `wallets` table. */
+export interface WalletInfo {
+  id: string;
+  userId: string;
+  balance: number;
+  currency: string;
+  isActive: boolean;
+  totalCredited: number;
+  totalDebited: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── Wallet Initialization ────────────────────────────────────────────────────
 
 /**
- * Initializes wallet balance for a new user with a random amount Rs 500–2000
- * (in Rs 50 increments). No-op if wallet_balance is already set.
- * Returns the final balance.
+ * Ensures a wallet row exists for this user in the `wallets` table.
+ * - If the row already exists → returns the current balance (no-op).
+ * - Otherwise creates a new row with a random Rs 500–2000 starting balance
+ *   and mirrors it back to `users.wallet_balance` for backward compat.
  */
 export async function initializeWallet(userId: string): Promise<number> {
+  // 1. Check wallets table first (new source of truth)
   const { data: existing } = await supabase
+    .from('wallets')
+    .select('balance')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (existing != null) return Number(existing.balance);
+
+  // 2. Check if there's already a balance on users (migration path)
+  const { data: userRow } = await supabase
     .from('users')
     .select('wallet_balance')
     .eq('id', userId)
     .single();
 
-  if (existing?.wallet_balance != null) {
-    return Number(existing.wallet_balance);
-  }
+  const balance = userRow?.wallet_balance != null
+    ? Number(userRow.wallet_balance)
+    : 500 + Math.floor(Math.random() * 31) * 50; // Rs 500–2000
 
-  // Random Rs 500–2000 in Rs 50 increments → 31 possible values
-  const steps   = Math.floor(Math.random() * 31); // 0..30
-  const balance = 500 + steps * 50;               // Rs 500 → Rs 2000
+  // 3. Create the wallet row
+  await supabase.from('wallets').upsert(
+    { user_id: userId, balance, currency: 'PKR', is_active: false },
+    { onConflict: 'user_id' },
+  );
 
-  await supabase
-    .from('users')
-    .update({ wallet_balance: balance })
-    .eq('id', userId);
+  // 4. Keep users.wallet_balance in sync (backward compat)
+  await supabase.from('users').update({ wallet_balance: balance }).eq('id', userId);
 
   return balance;
 }
 
-// ─── Wallet Balance ───────────────────────────────────────────────────────────
+// ─── Wallet Read ──────────────────────────────────────────────────────────────
 
-/** Fetch current wallet balance from DB. Returns null if not yet initialized. */
+/** Fetch current balance from `wallets` table. Returns null if wallet not found. */
 export async function getWalletBalance(userId: string): Promise<number | null> {
   const { data, error } = await supabase
-    .from('users')
-    .select('wallet_balance')
-    .eq('id', userId)
-    .single();
+    .from('wallets')
+    .select('balance')
+    .eq('user_id', userId)
+    .maybeSingle();
 
-  if (error || data?.wallet_balance == null) return null;
-  return Number(data.wallet_balance);
+  if (error || data == null) return null;
+  return Number(data.balance);
 }
 
+/** Fetch the full wallet record (balance + stats + metadata). */
+export async function getWalletInfo(userId: string): Promise<WalletInfo | null> {
+  const { data, error } = await supabase
+    .from('wallets')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  return {
+    id:            data.id,
+    userId:        data.user_id,
+    balance:       Number(data.balance),
+    currency:      data.currency,
+    isActive:      data.is_active,
+    totalCredited: Number(data.total_credited),
+    totalDebited:  Number(data.total_debited),
+    createdAt:     data.created_at,
+    updatedAt:     data.updated_at,
+  };
+}
+
+// ─── Internal helpers ─────────────────────────────────────────────────────────
+
+/** Sync wallets.is_active based on whether the user has any saved payment methods. */
+async function _syncWalletActive(userId: string): Promise<void> {
+  const { count } = await supabase
+    .from('payment_methods')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
+
+  await supabase
+    .from('wallets')
+    .update({ is_active: (count ?? 0) > 0 })
+    .eq('user_id', userId);
+}
+
+// ─── Wallet Write ─────────────────────────────────────────────────────────────
+
 /**
- * Deduct `amount` from the user's wallet balance.
- * Returns the new balance, or an error string if balance is insufficient.
+ * Deduct `amount` from the user's wallet.
+ * Updates `wallets.balance`, `wallets.total_debited`, and `users.wallet_balance`.
  */
 export async function deductWalletBalance(
   userId: string,
   amount: number,
-): Promise<{ newBalance: number | null; error?: string }> {
-  const current = await getWalletBalance(userId);
+): Promise<{ newBalance: number | null; balanceBefore: number | null; error?: string }> {
+  const { data: wallet, error: fetchErr } = await supabase
+    .from('wallets')
+    .select('balance, total_debited')
+    .eq('user_id', userId)
+    .maybeSingle();
 
-  if (current === null) {
-    return { newBalance: null, error: 'Wallet not initialized' };
+  if (fetchErr || !wallet) {
+    return { newBalance: null, balanceBefore: null, error: 'Wallet not found' };
   }
+
+  const current = Number(wallet.balance);
   if (current < amount) {
     return {
       newBalance: null,
+      balanceBefore: current,
       error: `Insufficient balance (Rs ${current} available, Rs ${amount} required)`,
     };
   }
 
-  const newBalance = current - amount;
-  const { error } = await supabase
-    .from('users')
-    .update({ wallet_balance: newBalance })
-    .eq('id', userId);
+  const newBalance      = current - amount;
+  const newTotalDebited = Number(wallet.total_debited) + amount;
 
-  if (error) return { newBalance: null, error: error.message };
-  return { newBalance };
+  const { error } = await supabase
+    .from('wallets')
+    .update({ balance: newBalance, total_debited: newTotalDebited })
+    .eq('user_id', userId);
+
+  if (error) return { newBalance: null, balanceBefore: current, error: error.message };
+
+  // Keep users.wallet_balance in sync
+  await supabase.from('users').update({ wallet_balance: newBalance }).eq('id', userId);
+
+  return { newBalance, balanceBefore: current };
 }
 
 // ─── Payment Methods ──────────────────────────────────────────────────────────
@@ -169,12 +246,10 @@ export async function addPaymentMethod(params: {
   bankName?: string;
   makeDefault?: boolean;
 }): Promise<{ id?: string; error?: string }> {
-  // Determine whether to make it the default
   const existing  = await getSavedPaymentMethods(params.userId);
   const isDefault = params.makeDefault || existing.length === 0;
 
   if (isDefault) {
-    // Clear any current default
     await supabase
       .from('payment_methods')
       .update({ is_default: false })
@@ -195,17 +270,25 @@ export async function addPaymentMethod(params: {
     .single();
 
   if (error) return { error: error.message };
+
+  // Activate the wallet now that a method exists
+  await _syncWalletActive(params.userId);
+
   return { id: data?.id };
 }
 
-/** Remove a saved payment method by id. */
+/** Remove a saved payment method by id. Pass userId to deactivate wallet if last method removed. */
 export async function deletePaymentMethod(
   id: string,
+  userId?: string,
 ): Promise<{ error?: string }> {
   const { error } = await supabase
     .from('payment_methods')
     .delete()
     .eq('id', id);
+
+  if (userId) await _syncWalletActive(userId);
+
   return { error: error?.message };
 }
 
@@ -225,4 +308,117 @@ export async function setDefaultPaymentMethod(
     .eq('id', id);
 
   return { error: error?.message };
+}
+
+// ─── Wallet Top-Up ───────────────────────────────────────────────────────────
+
+/**
+ * Add `amount` to the user's wallet.
+ * Updates `wallets.balance`, `wallets.total_credited`, and `users.wallet_balance`.
+ */
+export async function topUpWalletBalance(
+  userId: string,
+  amount: number,
+): Promise<{ newBalance: number | null; balanceBefore: number | null; error?: string }> {
+  const { data: wallet, error: fetchErr } = await supabase
+    .from('wallets')
+    .select('balance, total_credited')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (fetchErr || !wallet) {
+    return { newBalance: null, balanceBefore: null, error: 'Wallet not found' };
+  }
+
+  const current          = Number(wallet.balance);
+  const newBalance        = current + amount;
+  const newTotalCredited  = Number(wallet.total_credited) + amount;
+
+  const { error } = await supabase
+    .from('wallets')
+    .update({ balance: newBalance, total_credited: newTotalCredited })
+    .eq('user_id', userId);
+
+  if (error) return { newBalance: null, balanceBefore: current, error: error.message };
+
+  // Keep users.wallet_balance in sync
+  await supabase.from('users').update({ wallet_balance: newBalance }).eq('id', userId);
+
+  return { newBalance, balanceBefore: current };
+}
+
+// ─── Wallet Transactions ──────────────────────────────────────────────────────
+
+export interface WalletTransaction {
+  id: string;
+  userId: string;
+  queueEntryId?: string;
+  businessId?: string;
+  paymentMethodId?: string;
+  amount: number;
+  type: 'debit' | 'credit';
+  reason: string;
+  balanceBefore: number;
+  balanceAfter: number;
+  createdAt: string;
+}
+
+/** Record a wallet debit/credit in the ledger. */
+export async function recordWalletTransaction(params: {
+  userId: string;
+  queueEntryId?: string;
+  businessId?: string;
+  paymentMethodId?: string;
+  amount: number;
+  type: 'debit' | 'credit';
+  reason: string;
+  balanceBefore: number;
+  balanceAfter: number;
+}): Promise<{ id?: string; error?: string }> {
+  const { data, error } = await supabase
+    .from('wallet_transactions')
+    .insert({
+      user_id:           params.userId,
+      queue_entry_id:    params.queueEntryId    ?? null,
+      business_id:       params.businessId      ?? null,
+      payment_method_id: params.paymentMethodId ?? null,
+      amount:            params.amount,
+      type:              params.type,
+      reason:            params.reason,
+      balance_before:    params.balanceBefore,
+      balance_after:     params.balanceAfter,
+    })
+    .select('id')
+    .single();
+
+  if (error) return { error: error.message };
+  return { id: data?.id };
+}
+
+/** Fetch the 50 most recent transactions for a user. */
+export async function getWalletTransactions(
+  userId: string,
+): Promise<WalletTransaction[]> {
+  const { data, error } = await supabase
+    .from('wallet_transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    id:              row.id,
+    userId:          row.user_id,
+    queueEntryId:    row.queue_entry_id    ?? undefined,
+    businessId:      row.business_id       ?? undefined,
+    paymentMethodId: row.payment_method_id ?? undefined,
+    amount:          Number(row.amount),
+    type:            row.type as 'debit' | 'credit',
+    reason:          row.reason,
+    balanceBefore:   Number(row.balance_before),
+    balanceAfter:    Number(row.balance_after),
+    createdAt:       row.created_at,
+  }));
 }

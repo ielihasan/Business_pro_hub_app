@@ -18,7 +18,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@/hooks/useTheme';
-import { useStore, SavedPaymentMethod, WalletPaymentType } from '@/store/useStore';
+import { useStore, SavedPaymentMethod, WalletPaymentType, WalletInfo } from '@/store/useStore';
 import { COMMITMENT_RATE, PAKISTAN_BANKS } from '@/lib/wallet';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 
@@ -76,17 +76,20 @@ export default function WalletPaymentScreen() {
 
   const user           = useStore((s) => s.user);
   const paymentMethods = useStore((s) => s.paymentMethods);
+  const walletInfo     = useStore((s) => s.walletInfo);
   const loadWallet     = useStore((s) => s.loadWallet);
   const addMethod      = useStore((s) => s.addWalletPaymentMethod);
   const removeMethod   = useStore((s) => s.removeWalletPaymentMethod);
   const setDefault     = useStore((s) => s.setDefaultWalletPaymentMethod);
+  const topUpWallet    = useStore((s) => s.topUpWallet);
 
   const [refreshing,    setRefreshing]    = useState(false);
   const [dialog,        setDialog]        = useState<DialogConfig | null>(null);
   const [showAdd,       setShowAdd]       = useState(false);
+  const [showTopUp,     setShowTopUp]     = useState(false);
   const [showBanks,     setShowBanks]     = useState(false);
 
-  // Form state
+  // Add method form state
   const [selType,       setSelType]       = useState<MethodType>('easypaisa');
   const [accountTitle,  setAccountTitle]  = useState('');
   const [accountNumber, setAccountNumber] = useState('');
@@ -94,12 +97,68 @@ export default function WalletPaymentScreen() {
   const [showBankList,  setShowBankList]  = useState(false);
   const [saving,        setSaving]        = useState(false);
 
+  // Top-up form state
+  const [topUpAmt,      setTopUpAmt]      = useState('');
+  const [cardNumber,    setCardNumber]    = useState('');
+  const [cardExpiry,    setCardExpiry]    = useState('');
+  const [cardCvv,       setCardCvv]       = useState('');
+  const [topping,       setTopping]       = useState(false);
+
   useEffect(() => { loadWallet(); }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadWallet();
     setRefreshing(false);
+  };
+
+  const resetTopUp = () => {
+    setTopUpAmt('');
+    setCardNumber('');
+    setCardExpiry('');
+    setCardCvv('');
+  };
+
+  const formatCardNumber = (v: string) => {
+    const d = v.replace(/\D/g, '').slice(0, 16);
+    return d.replace(/(.{4})/g, '$1 ').trim();
+  };
+
+  const formatExpiry = (v: string) => {
+    const d = v.replace(/\D/g, '').slice(0, 4);
+    if (d.length >= 3) return `${d.slice(0, 2)}/${d.slice(2)}`;
+    return d;
+  };
+
+  const handleTopUp = async () => {
+    const amount = parseInt(topUpAmt.replace(/,/g, ''), 10);
+    if (!amount || amount < 100) {
+      return setDialog({ title: 'Invalid Amount', message: 'Minimum top-up amount is Rs 100.', icon: 'alert-circle-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
+    }
+    const rawCard = cardNumber.replace(/\s/g, '');
+    if (rawCard.length < 16) {
+      return setDialog({ title: 'Invalid Card', message: 'Please enter a valid 16-digit card number.', icon: 'card-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
+    }
+    if (cardExpiry.length < 5) {
+      return setDialog({ title: 'Invalid Expiry', message: 'Please enter card expiry in MM/YY format.', icon: 'calendar-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
+    }
+    if (cardCvv.length < 3) {
+      return setDialog({ title: 'Invalid CVV', message: 'Please enter the 3-digit CVV on the back of your card.', icon: 'lock-closed-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
+    }
+
+    setTopping(true);
+    // Simulate a 1-second payment processing delay
+    await new Promise(res => setTimeout(res, 1200));
+    const defaultMethod = paymentMethods.find(m => m.isDefault) ?? paymentMethods[0];
+    const result = await topUpWallet(amount, defaultMethod?.id);
+    setTopping(false);
+
+    if (!result.success) {
+      return setDialog({ title: 'Top-Up Failed', message: result.error ?? 'Could not add funds. Please try again.', icon: 'alert-circle-outline', iconVariant: 'destructive', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
+    }
+    setShowTopUp(false);
+    resetTopUp();
+    setDialog({ title: 'Funds Added!', message: `Rs ${amount.toLocaleString('en-PK')} has been added to your wallet.\n\nNew balance: Rs ${result.newBalance?.toLocaleString('en-PK') ?? '—'}`, icon: 'checkmark-circle-outline', iconVariant: 'success', actions: [{ label: 'Great!', onPress: () => setDialog(null) }] });
   };
 
   const resetForm = () => {
@@ -243,15 +302,50 @@ export default function WalletPaymentScreen() {
 
           {/* Bottom row */}
           <View style={styles.wcBottom}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={[styles.wcHolderLabel, { color: BG + '66' }]}>ACCOUNT HOLDER</Text>
               <Text style={[styles.wcHolder, { color: BG }]} numberOfLines={1}>{user?.name ?? '—'}</Text>
             </View>
-            <View style={[styles.wcCurrencyBox, { borderColor: BG + '44' }]}>
-              <Text style={[styles.wcCurrency, { color: BG }]}>PKR</Text>
-            </View>
+            {isWalletActive ? (
+              <TouchableOpacity
+                style={[styles.wcAddFundsBtn, { backgroundColor: BG + '22', borderColor: BG + '40' }]}
+                onPress={() => setShowTopUp(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add" size={14} color={BG} />
+                <Text style={[styles.wcAddFundsText, { color: BG }]}>Add Funds</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.wcCurrencyBox, { borderColor: BG + '44' }]}>
+                <Text style={[styles.wcCurrency, { color: BG }]}>PKR</Text>
+              </View>
+            )}
           </View>
         </View>
+
+        {/* ── Wallet Stats ───────────────────────────────────────────────────── */}
+        {isWalletActive && walletInfo && (
+          <View style={[styles.statsRow, { backgroundColor: CARD, borderColor: BORDER }]}>
+            <View style={styles.statCell}>
+              <Text style={[styles.statLabel, { color: MUTED }]}>TOTAL ADDED</Text>
+              <Text style={[styles.statValue, { color: '#22c55e' }]}>
+                + Rs {walletInfo.totalCredited.toLocaleString('en-PK')}
+              </Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: BORDER }]} />
+            <View style={styles.statCell}>
+              <Text style={[styles.statLabel, { color: MUTED }]}>TOTAL SPENT</Text>
+              <Text style={[styles.statValue, { color: colors.destructive }]}>
+                − Rs {walletInfo.totalDebited.toLocaleString('en-PK')}
+              </Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: BORDER }]} />
+            <View style={styles.statCell}>
+              <Text style={[styles.statLabel, { color: MUTED }]}>CURRENCY</Text>
+              <Text style={[styles.statValue, { color: FG }]}>{walletInfo.currency}</Text>
+            </View>
+          </View>
+        )}
 
         {/* ── Fee Info Strip ─────────────────────────────────────────────────── */}
         <View style={[styles.feeStrip, { backgroundColor: CARD, borderColor: BORDER }]}>
@@ -393,94 +487,51 @@ export default function WalletPaymentScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ── Accepted Methods ────────────────────────────────────────────────── */}
-        <View style={[styles.acceptedCard, { backgroundColor: CARD, borderColor: BORDER }]}>
-          {/* Heading */}
-          <View style={styles.acceptedHeadRow}>
-            <View>
-              <Text style={[styles.acceptedHeading, { color: FG }]}>We Accept</Text>
-              <Text style={[styles.acceptedSub, { color: MUTED }]}>
-                Pakistani mobile wallets & all major banks
-              </Text>
-            </View>
-            <View style={[styles.acceptedCountBadge, { backgroundColor: SEC, borderColor: BORDER }]}>
-              <Text style={[styles.acceptedCountText, { color: FG }]}>{PAKISTAN_BANKS.length + 2}</Text>
-              <Text style={[styles.acceptedCountLabel, { color: MUTED }]}>methods</Text>
-            </View>
+        {/* ── We Accept ──────────────────────────────────────────────────────── */}
+        <TouchableOpacity
+          style={[styles.acceptedCompact, { backgroundColor: CARD, borderColor: showBanks ? '#2563EB60' : BORDER }]}
+          onPress={() => setShowBanks(!showBanks)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.acceptedCompactIcon, { backgroundColor: '#2563EB18' }]}>
+            <Ionicons name="business-outline" size={18} color="#2563EB" />
           </View>
-
-          {/* Mobile wallet tiles */}
-          <Text style={[styles.acceptedGroupLabel, { color: MUTED }]}>MOBILE WALLETS</Text>
-          <View style={styles.walletRow}>
-            <View style={[styles.walletTile, { backgroundColor: '#37B34A10', borderColor: '#37B34A40' }]}>
-              <View style={[styles.walletTileIconBox, { backgroundColor: '#37B34A20' }]}>
-                <Ionicons name="phone-portrait-outline" size={22} color="#37B34A" />
-              </View>
-              <Text style={[styles.walletTileName, { color: FG }]}>Easypaisa</Text>
-              <Text style={[styles.walletTileType, { color: '#37B34A' }]}>Mobile Wallet</Text>
-              <View style={[styles.walletTilePill, { backgroundColor: '#37B34A22' }]}>
-                <Text style={[styles.walletTilePillText, { color: '#37B34A' }]}>Telenor</Text>
-              </View>
-            </View>
-            <View style={[styles.walletTile, { backgroundColor: '#BF202F10', borderColor: '#BF202F40' }]}>
-              <View style={[styles.walletTileIconBox, { backgroundColor: '#BF202F20' }]}>
-                <Ionicons name="phone-portrait-outline" size={22} color="#BF202F" />
-              </View>
-              <Text style={[styles.walletTileName, { color: FG }]}>JazzCash</Text>
-              <Text style={[styles.walletTileType, { color: '#BF202F' }]}>Mobile Wallet</Text>
-              <View style={[styles.walletTilePill, { backgroundColor: '#BF202F22' }]}>
-                <Text style={[styles.walletTilePillText, { color: '#BF202F' }]}>Jazz / Warid</Text>
-              </View>
-            </View>
+          <View style={styles.acceptedCompactBody}>
+            <Text style={[styles.acceptedCompactTitle, { color: FG }]}>We Accept</Text>
+            <Text style={[styles.acceptedCompactSub, { color: MUTED }]}>
+              Easypaisa · JazzCash · {PAKISTAN_BANKS.length} Pakistan Banks
+            </Text>
           </View>
+          <View style={[styles.bankExpandBtn, { backgroundColor: showBanks ? '#2563EB18' : SEC, borderColor: showBanks ? '#2563EB44' : BORDER }]}>
+            <Ionicons name={showBanks ? 'chevron-up' : 'chevron-down'} size={15} color={showBanks ? '#2563EB' : MUTED} />
+          </View>
+        </TouchableOpacity>
 
-          {/* Bank accounts — tappable header to expand/collapse */}
-          <Text style={[styles.acceptedGroupLabel, { color: MUTED }]}>BANK ACCOUNTS (IBFT)</Text>
-          <TouchableOpacity
-            style={[styles.bankSectionHeader, { backgroundColor: BG, borderColor: showBanks ? '#2563EB60' : BORDER }]}
-            onPress={() => setShowBanks(!showBanks)}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.bankSectionIcon, { backgroundColor: '#2563EB18' }]}>
-              <Ionicons name="business-outline" size={18} color="#2563EB" />
-            </View>
-            <View style={styles.bankSectionTextCol}>
-              <Text style={[styles.bankSectionTitle, { color: FG }]}>All Pakistan Banks</Text>
-              <Text style={[styles.bankSectionSub, { color: MUTED }]}>
-                {PAKISTAN_BANKS.length} banks via IBFT / IBAN
-              </Text>
-            </View>
-            <View style={[styles.bankExpandBtn, { backgroundColor: showBanks ? '#2563EB18' : SEC, borderColor: showBanks ? '#2563EB44' : BORDER }]}>
-              <Ionicons name={showBanks ? 'chevron-up' : 'chevron-down'} size={16} color={showBanks ? '#2563EB' : MUTED} />
-            </View>
-          </TouchableOpacity>
-
-          {showBanks && (
-            <View style={[styles.bankExpandedList, { borderColor: BORDER }]}>
-              {PAKISTAN_BANKS.map((bank, idx) => (
-                <View
-                  key={bank.id}
-                  style={[
-                    styles.bankListRow,
-                    { borderBottomColor: BORDER },
-                    idx === PAKISTAN_BANKS.length - 1 && { borderBottomWidth: 0 },
-                  ]}
-                >
-                  <View style={[styles.bankListNum, { backgroundColor: SEC }]}>
-                    <Text style={[styles.bankListNumText, { color: MUTED }]}>{idx + 1}</Text>
-                  </View>
-                  <View style={[styles.bankListShortBox, { backgroundColor: '#2563EB12', borderColor: '#2563EB30' }]}>
-                    <Text style={[styles.bankListShort, { color: '#2563EB' }]}>{bank.shortName}</Text>
-                  </View>
-                  <Text style={[styles.bankListName, { color: FG }]}>{bank.name}</Text>
-                  <View style={[styles.bankListIban, { backgroundColor: SEC, borderColor: BORDER }]}>
-                    <Text style={[styles.bankListIbanText, { color: MUTED }]}>IBFT</Text>
-                  </View>
+        {showBanks && (
+          <View style={[styles.bankExpandedList, { borderColor: BORDER, marginBottom: 16 }]}>
+            {PAKISTAN_BANKS.map((bank, idx) => (
+              <View
+                key={bank.id}
+                style={[
+                  styles.bankListRow,
+                  { borderBottomColor: BORDER },
+                  idx === PAKISTAN_BANKS.length - 1 && { borderBottomWidth: 0 },
+                ]}
+              >
+                <View style={[styles.bankListNum, { backgroundColor: SEC }]}>
+                  <Text style={[styles.bankListNumText, { color: MUTED }]}>{idx + 1}</Text>
                 </View>
-              ))}
-            </View>
-          )}
-        </View>
+                <View style={[styles.bankListShortBox, { backgroundColor: '#2563EB12', borderColor: '#2563EB30' }]}>
+                  <Text style={[styles.bankListShort, { color: '#2563EB' }]}>{bank.shortName}</Text>
+                </View>
+                <Text style={[styles.bankListName, { color: FG }]}>{bank.name}</Text>
+                <View style={[styles.bankListIban, { backgroundColor: SEC, borderColor: BORDER }]}>
+                  <Text style={[styles.bankListIbanText, { color: MUTED }]}>IBFT</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* ── Elixa Branding ───────────────────────────────────────────────────── */}
         <View style={styles.brandingRow}>
@@ -495,6 +546,147 @@ export default function WalletPaymentScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* ── Top Up Bottom Sheet ──────────────────────────────────────────────── */}
+      <Modal visible={showTopUp} animationType="slide" transparent onRequestClose={() => setShowTopUp(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
+          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => { if (!topping) setShowTopUp(false); }} />
+
+          <View style={[styles.sheet, { backgroundColor: BG, borderColor: BORDER }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: BORDER }]} />
+
+            <View style={[styles.sheetHeaderRow, { borderBottomColor: BORDER }]}>
+              <View>
+                <Text style={[styles.sheetTitle, { color: FG }]}>Add Funds</Text>
+                <Text style={[styles.sheetSub, { color: MUTED }]}>Charge your debit / credit card</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowTopUp(false)} hitSlop={12} style={[styles.closeBtn, { backgroundColor: SEC, borderColor: BORDER }]}>
+                <Ionicons name="close" size={18} color={FG} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+
+              {/* Quick amounts */}
+              <Text style={[styles.fieldLabel, { color: MUTED }]}>SELECT AMOUNT</Text>
+              <View style={styles.quickAmtRow}>
+                {['500', '1000', '2000', '5000'].map((a) => {
+                  const active = topUpAmt === a;
+                  return (
+                    <TouchableOpacity
+                      key={a}
+                      style={[styles.quickAmtChip, { backgroundColor: active ? FG : CARD, borderColor: active ? FG : BORDER }]}
+                      onPress={() => setTopUpAmt(a)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.quickAmtText, { color: active ? BG : FG }]}>Rs {parseInt(a).toLocaleString('en-PK')}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Custom amount */}
+              <Text style={[styles.fieldLabel, { color: MUTED }]}>OR ENTER CUSTOM AMOUNT</Text>
+              <View style={[styles.inputRow, { backgroundColor: CARD, borderColor: BORDER }]}>
+                <Text style={[styles.inputText, { color: MUTED, flex: 0 }]}>Rs</Text>
+                <TextInput
+                  style={[styles.inputText, { color: FG }]}
+                  placeholder="e.g. 3000"
+                  placeholderTextColor={MUTED}
+                  value={topUpAmt}
+                  onChangeText={(v) => setTopUpAmt(v.replace(/[^0-9]/g, ''))}
+                  keyboardType="number-pad"
+                  returnKeyType="next"
+                />
+              </View>
+
+              {/* Divider */}
+              <View style={[styles.topUpDivider, { backgroundColor: BORDER }]} />
+              <Text style={[styles.fieldLabel, { color: MUTED }]}>CARD DETAILS</Text>
+
+              {/* Card number */}
+              <View style={[styles.inputRow, { backgroundColor: CARD, borderColor: BORDER, marginBottom: 10 }]}>
+                <Ionicons name="card-outline" size={16} color={MUTED} />
+                <TextInput
+                  style={[styles.inputText, { color: FG }]}
+                  placeholder="Card Number"
+                  placeholderTextColor={MUTED}
+                  value={cardNumber}
+                  onChangeText={(v) => setCardNumber(formatCardNumber(v))}
+                  keyboardType="number-pad"
+                  maxLength={19}
+                  returnKeyType="next"
+                />
+                {/* Card type hint */}
+                {cardNumber.replace(/\s/g, '').length >= 1 && (
+                  <Text style={[styles.cardTypeBadge, { color: MUTED }]}>
+                    {cardNumber.startsWith('4') ? 'VISA' : cardNumber.startsWith('5') ? 'MC' : 'CARD'}
+                  </Text>
+                )}
+              </View>
+
+              {/* Expiry + CVV row */}
+              <View style={styles.cardRow}>
+                <View style={[styles.inputRow, { backgroundColor: CARD, borderColor: BORDER, flex: 1 }]}>
+                  <Ionicons name="calendar-outline" size={16} color={MUTED} />
+                  <TextInput
+                    style={[styles.inputText, { color: FG }]}
+                    placeholder="MM/YY"
+                    placeholderTextColor={MUTED}
+                    value={cardExpiry}
+                    onChangeText={(v) => setCardExpiry(formatExpiry(v))}
+                    keyboardType="number-pad"
+                    maxLength={5}
+                    returnKeyType="next"
+                  />
+                </View>
+                <View style={[styles.inputRow, { backgroundColor: CARD, borderColor: BORDER, flex: 1 }]}>
+                  <Ionicons name="lock-closed-outline" size={16} color={MUTED} />
+                  <TextInput
+                    style={[styles.inputText, { color: FG }]}
+                    placeholder="CVV"
+                    placeholderTextColor={MUTED}
+                    value={cardCvv}
+                    onChangeText={(v) => setCardCvv(v.replace(/\D/g, '').slice(0, 3))}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    secureTextEntry
+                    returnKeyType="done"
+                  />
+                </View>
+              </View>
+
+              <Text style={[styles.fieldHint, { color: MUTED }]}>
+                Card details are not stored. This is a simulated payment for demonstration.
+              </Text>
+
+              {/* Pay button */}
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: FG, opacity: topping ? 0.7 : 1, marginTop: 22 }]}
+                onPress={handleTopUp}
+                activeOpacity={0.85}
+                disabled={topping}
+              >
+                {topping ? (
+                  <>
+                    <ActivityIndicator color={BG} />
+                    <Text style={[styles.saveBtnText, { color: BG }]}>Processing…</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="add-circle-outline" size={20} color={BG} />
+                    <Text style={[styles.saveBtnText, { color: BG }]}>
+                      {topUpAmt ? `Add Rs ${parseInt(topUpAmt || '0').toLocaleString('en-PK')} to Wallet` : 'Add Funds'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <View style={{ height: 28 }} />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* ── Add Method Bottom Sheet ──────────────────────────────────────────── */}
       <Modal visible={showAdd} animationType="slide" transparent onRequestClose={() => setShowAdd(false)}>
@@ -518,8 +710,8 @@ export default function WalletPaymentScreen() {
             <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
               {/* Type selector */}
-              <Text style={[styles.fieldLabel, { color: MUTED }]}>SELECT TYPE</Text>
-              <View style={styles.typeGrid}>
+              <Text style={[styles.fieldLabel, { color: MUTED }]}>SELECT PAYMENT TYPE</Text>
+              <View style={styles.typeList}>
                 {(['easypaisa', 'jazzcash', 'bank'] as MethodType[]).map((t) => {
                   const meta   = METHOD_META[t];
                   const active = selType === t;
@@ -527,26 +719,32 @@ export default function WalletPaymentScreen() {
                     <TouchableOpacity
                       key={t}
                       style={[
-                        styles.typeCard,
+                        styles.typeRow,
                         {
-                          backgroundColor: active ? meta.color + '18' : CARD,
+                          backgroundColor: active ? meta.color + '10' : CARD,
                           borderColor:     active ? meta.color : BORDER,
-                          borderWidth:     active ? 2 : 1,
+                          borderWidth:     active ? 1.5 : 1,
                         },
                       ]}
                       onPress={() => { setSelType(t); setAccountNumber(''); setBankName(''); }}
                       activeOpacity={0.8}
                     >
-                      <View style={[styles.typeCardIcon, { backgroundColor: active ? meta.color + '22' : SEC }]}>
-                        <Ionicons name={meta.icon as any} size={20} color={active ? meta.color : MUTED} />
+                      <View style={[styles.typeRowIcon, { backgroundColor: active ? meta.color + '22' : SEC }]}>
+                        <Ionicons name={meta.icon as any} size={22} color={active ? meta.color : MUTED} />
                       </View>
-                      <Text style={[styles.typeCardName, { color: active ? meta.color : FG }]}>{meta.label}</Text>
-                      <Text style={[styles.typeCardSub, { color: MUTED }]}>{meta.sublabel}</Text>
-                      {active && (
-                        <View style={[styles.typeCardCheck, { backgroundColor: meta.color }]}>
-                          <Ionicons name="checkmark" size={10} color="#fff" />
-                        </View>
-                      )}
+                      <View style={styles.typeRowBody}>
+                        <Text style={[styles.typeRowName, { color: active ? meta.color : FG }]}>{meta.label}</Text>
+                        <Text style={[styles.typeRowSub, { color: MUTED }]}>{meta.sublabel}</Text>
+                      </View>
+                      <View style={[
+                        styles.typeRowRadio,
+                        {
+                          borderColor:     active ? meta.color : BORDER,
+                          backgroundColor: active ? meta.color : 'transparent',
+                        },
+                      ]}>
+                        {active && <Ionicons name="checkmark" size={11} color="#fff" />}
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -639,6 +837,48 @@ export default function WalletPaymentScreen() {
                 </>
               )}
 
+              {/* Live preview card */}
+              {(accountTitle.trim().length > 0 || accountNumber.trim().length > 0) && (
+                <View style={{ marginTop: 22 }}>
+                  <Text style={[styles.fieldLabel, { color: MUTED }]}>PREVIEW</Text>
+                  <View style={[styles.previewCard, { backgroundColor: FG }]}>
+                    <View style={styles.previewTopRow}>
+                      <View style={[styles.previewIconBox, { backgroundColor: BG + '22' }]}>
+                        <Ionicons name={METHOD_META[selType].icon as any} size={15} color={BG} />
+                      </View>
+                      <Text style={[styles.previewTypeLabel, { color: BG + 'AA' }]}>
+                        {METHOD_META[selType].sublabel.toUpperCase()}
+                      </Text>
+                    </View>
+
+                    <Text style={[styles.previewNum, { color: BG }]}>
+                      {accountNumber.trim()
+                        ? maskNumber(accountNumber.trim(), selType)
+                        : selType === 'bank' ? 'PK·· ···· ···· ···· ···· ··' : '03··  ···  ····'}
+                    </Text>
+
+                    <View style={[styles.previewDivider, { backgroundColor: BG + '22' }]} />
+
+                    <View style={styles.previewBottomRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.previewHolderLabel, { color: BG + '66' }]}>ACCOUNT HOLDER</Text>
+                        <Text style={[styles.previewHolder, { color: BG }]} numberOfLines={1}>
+                          {accountTitle.trim() || 'Your Full Name'}
+                        </Text>
+                        {selType === 'bank' && bankName ? (
+                          <Text style={[styles.previewBank, { color: BG + '88' }]} numberOfLines={1}>{bankName}</Text>
+                        ) : null}
+                      </View>
+                      <View style={[styles.previewBadge, { backgroundColor: BG + '22', borderColor: BG + '33' }]}>
+                        <Text style={[styles.previewBadgeText, { color: BG }]}>
+                          {METHOD_META[selType].label.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
               {/* Save */}
               <TouchableOpacity
                 style={[styles.saveBtn, { backgroundColor: FG, opacity: saving ? 0.6 : 1 }]}
@@ -720,9 +960,25 @@ const styles = StyleSheet.create({
 
   wcBottom:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   wcHolderLabel:   { fontSize: 8, fontWeight: '700', letterSpacing: 1.5, marginBottom: 4 },
-  wcHolder:        { fontSize: 15, fontWeight: '800', maxWidth: 210 },
+  wcHolder:        { fontSize: 15, fontWeight: '800', maxWidth: 170 },
   wcCurrencyBox:   { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, borderWidth: 1.5 },
   wcCurrency:      { fontSize: 13, fontWeight: '900', letterSpacing: 1 },
+  wcAddFundsBtn:   {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: 10, borderWidth: 1,
+  },
+  wcAddFundsText:  { fontSize: 12, fontWeight: '800' },
+
+  /* ── Wallet Stats row */
+  statsRow: {
+    flexDirection: 'row', borderRadius: 14, borderWidth: 1,
+    marginBottom: 14, overflow: 'hidden',
+  },
+  statCell:    { flex: 1, alignItems: 'center', paddingVertical: 12, gap: 4 },
+  statDivider: { width: 1, marginVertical: 10 },
+  statLabel:   { fontSize: 8, fontWeight: '700', letterSpacing: 1.5 },
+  statValue:   { fontSize: 13, fontWeight: '900' },
 
   /* ── Fee strip */
   feeStrip: {
@@ -811,33 +1067,15 @@ const styles = StyleSheet.create({
   },
   addBtnText: { fontSize: 15, fontWeight: '900' },
 
-  /* ── Accepted Methods card */
-  acceptedCard: {
-    borderRadius: 18, borderWidth: 1, padding: 18,
-    marginBottom: 16, gap: 14,
+  /* ── Compact We Accept row */
+  acceptedCompact: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 6,
   },
-  acceptedHeadRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  acceptedHeading:    { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-  acceptedSub:        { fontSize: 12, lineHeight: 18, marginTop: 3 },
-  acceptedGroupLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 2, marginTop: 2 },
-  acceptedCountBadge: {
-    alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 12, borderWidth: 1,
-  },
-  acceptedCountText:  { fontSize: 20, fontWeight: '900', lineHeight: 22 },
-  acceptedCountLabel: { fontSize: 8, fontWeight: '700', letterSpacing: 1 },
-
-  /* Mobile wallet tiles */
-  walletRow: { flexDirection: 'row', gap: 12 },
-  walletTile: {
-    flex: 1, borderRadius: 14, borderWidth: 1.5,
-    padding: 14, gap: 6, alignItems: 'flex-start',
-  },
-  walletTileIconBox: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
-  walletTileName:    { fontSize: 15, fontWeight: '900' },
-  walletTileType:    { fontSize: 11, fontWeight: '700' },
-  walletTilePill:    { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, marginTop: 2 },
-  walletTilePillText:{ fontSize: 9, fontWeight: '700' },
+  acceptedCompactIcon:  { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  acceptedCompactBody:  { flex: 1 },
+  acceptedCompactTitle: { fontSize: 14, fontWeight: '800' },
+  acceptedCompactSub:   { fontSize: 11, marginTop: 2 },
 
   /* Bank section — tappable header */
   bankSectionHeader: {
@@ -884,7 +1122,8 @@ const styles = StyleSheet.create({
   sheet: {
     borderTopLeftRadius: 26, borderTopRightRadius: 26,
     borderWidth: 1, borderBottomWidth: 0,
-    maxHeight: '92%',
+    height: '88%',
+    overflow: 'hidden',
   },
   sheetHandle: { width: 44, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 2 },
   sheetHeaderRow: {
@@ -897,20 +1136,38 @@ const styles = StyleSheet.create({
   closeBtn:   { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   sheetBody:  { padding: 20 },
 
-  /* Type grid */
-  typeGrid: { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  typeCard: {
-    flex: 1, borderRadius: 14, padding: 12,
-    alignItems: 'center', gap: 6, position: 'relative',
+  /* Type list (vertical) */
+  typeList: { gap: 10, marginBottom: 4 },
+  typeRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    borderRadius: 16, padding: 14,
   },
-  typeCardIcon:   { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  typeCardName:   { fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  typeCardSub:    { fontSize: 9, textAlign: 'center' },
-  typeCardCheck:  {
-    position: 'absolute', top: 8, right: 8,
-    width: 16, height: 16, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center',
+  typeRowIcon: { width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  typeRowBody: { flex: 1, gap: 2 },
+  typeRowName: { fontSize: 15, fontWeight: '800' },
+  typeRowSub:  { fontSize: 12 },
+  typeRowRadio: {
+    width: 22, height: 22, borderRadius: 11, borderWidth: 2,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
+
+  /* Preview card */
+  previewCard: {
+    borderRadius: 20, padding: 20, gap: 14,
+    shadowColor: '#000', shadowOpacity: 0.18,
+    shadowOffset: { width: 0, height: 4 }, shadowRadius: 12, elevation: 6,
+  },
+  previewTopRow:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  previewIconBox:   { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  previewTypeLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
+  previewNum:       { fontSize: 18, fontWeight: '800', letterSpacing: 1.5, fontVariant: ['tabular-nums'] as any },
+  previewDivider:   { height: 1 },
+  previewBottomRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
+  previewHolderLabel: { fontSize: 8, fontWeight: '700', letterSpacing: 1.5, marginBottom: 3 },
+  previewHolder:    { fontSize: 14, fontWeight: '800' },
+  previewBank:      { fontSize: 11, fontWeight: '500', marginTop: 3 },
+  previewBadge:     { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1, flexShrink: 0 },
+  previewBadgeText: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
 
   /* Form fields */
   fieldLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8, marginTop: 18 },
@@ -942,4 +1199,15 @@ const styles = StyleSheet.create({
     borderRadius: 14, paddingVertical: 16, marginTop: 22,
   },
   saveBtnText: { fontSize: 15, fontWeight: '900' },
+
+  /* ── Top-up modal extras */
+  quickAmtRow:   { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  quickAmtChip:  {
+    flex: 1, borderRadius: 12, borderWidth: 1,
+    paddingVertical: 12, alignItems: 'center',
+  },
+  quickAmtText:  { fontSize: 12, fontWeight: '800' },
+  topUpDivider:  { height: 1, marginVertical: 18 },
+  cardRow:       { flexDirection: 'row', gap: 10, marginBottom: 4 },
+  cardTypeBadge: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
 });

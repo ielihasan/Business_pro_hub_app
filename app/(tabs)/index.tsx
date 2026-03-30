@@ -23,7 +23,6 @@ import {
   CategoryFilter,
   NearbyBusinesses,
 } from '@/components/home';
-import { COMMITMENT_RATE } from '@/lib/wallet';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
 
 function getGreeting() {
@@ -39,6 +38,8 @@ export default function HomeScreen() {
   const user                = useStore((s) => s.user);
   const activeQueues        = useStore((s) => s.activeQueues);
   const unreadCount         = useStore((s) => s.unreadCount);
+  const paymentMethods      = useStore((s) => s.paymentMethods);
+  const totalBadge          = unreadCount + (paymentMethods.length === 0 ? 1 : 0);
 
   const [refreshing,                setRefreshing]                = useState(false);
   const [selectedCategory,          setSelectedCategory]          = useState('all');
@@ -52,9 +53,7 @@ export default function HomeScreen() {
 
   const activeQueue            = activeQueues[0] ?? null;
   const syncQueuesFromSupabase = useStore((s) => s.syncQueuesFromSupabase);
-  const paymentMethods         = useStore((s) => s.paymentMethods);
   const walletBalance          = user?.walletBalance ?? null;
-  const showPaymentBanner      = paymentMethods.length === 0;
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -96,9 +95,9 @@ export default function HomeScreen() {
             activeOpacity={0.75}
           >
             <Ionicons name="notifications-outline" size={18} color={FG} />
-            {unreadCount > 0 && (
+            {totalBadge > 0 && (
               <View style={[styles.badge, { backgroundColor: colors.destructive }]}>
-                <Text style={[styles.badgeText, { color: colors.destructiveForeground }]}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                <Text style={[styles.badgeText, { color: colors.destructiveForeground }]}>{totalBadge > 9 ? '9+' : totalBadge}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -126,28 +125,6 @@ export default function HomeScreen() {
           </Text>
           <Text style={[styles.greetTag, { color: MUTED }]}>Your queue status at a glance.</Text>
         </View>
-
-        {/* ── Payment Method Banner ── */}
-        {showPaymentBanner && (
-          <TouchableOpacity
-            style={[styles.payBanner, { backgroundColor: CARD, borderColor: BORDER }]}
-            onPress={() => router.push('/profile/payment')}
-            activeOpacity={0.85}
-          >
-            <View style={[styles.payBannerIcon, { backgroundColor: colors.destructive + '18', borderColor: colors.destructive + '44' }]}>
-              <Ionicons name="wallet-outline" size={20} color={colors.destructive} />
-            </View>
-            <View style={styles.payBannerText}>
-              <Text style={[styles.payBannerTitle, { color: FG }]}>Set up a payment method</Text>
-              <Text style={[styles.payBannerSub, { color: MUTED }]}>
-                {Math.round(COMMITMENT_RATE * 100)}% advance required to join queues
-              </Text>
-            </View>
-            <View style={[styles.payBannerBadge, { backgroundColor: colors.destructive }]}>
-              <Text style={styles.payBannerBadgeText}>SET UP</Text>
-            </View>
-          </TouchableOpacity>
-        )}
 
         {/* ── Active Queue / Empty State ── */}
         {activeQueue ? (
@@ -262,23 +239,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 13, gap: 10,
   },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
-
-  /* ── Payment banner ── */
-  payBanner: {
-    marginHorizontal: 24, marginBottom: 16, borderRadius: 16, borderWidth: 1,
-    padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12,
-  },
-  payBannerIcon: {
-    width: 42, height: 42, borderRadius: 12, borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  payBannerText:    { flex: 1 },
-  payBannerTitle:   { fontSize: 13, fontWeight: '800', marginBottom: 2 },
-  payBannerSub:     { fontSize: 11 },
-  payBannerBadge:   {
-    paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: 8, flexShrink: 0,
-  },
-  payBannerBadgeText: { fontSize: 9, fontWeight: '900', color: '#fff', letterSpacing: 0.5 },
 
 });

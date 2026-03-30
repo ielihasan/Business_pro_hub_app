@@ -27,15 +27,21 @@ import {
   COMMITMENT_RATE,
   calculateCommitmentFee,
   SavedPaymentMethod,
+  WalletInfo,
   initializeWallet,
   getWalletBalance,
+  getWalletInfo,
   deductWalletBalance,
+  topUpWalletBalance,
+  recordWalletTransaction,
   getSavedPaymentMethods,
   addPaymentMethod,
   deletePaymentMethod,
   setDefaultPaymentMethod,
   WalletPaymentType,
 } from '@/lib/wallet';
+
+export { WalletInfo };
 import {
   requestNotificationPermissions,
   notifyQueueJoined,
@@ -151,6 +157,7 @@ interface AppState {
 
   // Wallet & Payments
   paymentMethods: SavedPaymentMethod[];
+  walletInfo: WalletInfo | null;
 
   // Settings
   notificationsEnabled: boolean;
@@ -208,6 +215,7 @@ interface AppState {
 
   // Wallet & Payment Methods
   loadWallet: () => Promise<void>;
+  topUpWallet: (amount: number, paymentMethodId?: string) => Promise<{ success: boolean; newBalance?: number; walletInfo?: WalletInfo; error?: string }>;
   addWalletPaymentMethod: (params: {
     type: WalletPaymentType;
     accountTitle: string;
@@ -300,6 +308,7 @@ export const useStore = create<AppState>()(
       orders: [],
       favoriteBusinesses: [],
       paymentMethods: [],
+      walletInfo: null,
       notifications: [],
       unreadCount: 0,
       notificationsEnabled: true,
@@ -637,16 +646,22 @@ export const useStore = create<AppState>()(
         if (!user) return { success: false, error: 'Not authenticated' };
 
         // ── Payment gate: 20% advance on service total ───────────────────────
-        const feeAmount = calculateCommitmentFee(pricing?.totalAmount);
+        const feeAmount    = calculateCommitmentFee(pricing?.totalAmount);
+        const balanceBefore = user.walletBalance ?? 0;
+
         if (feeAmount > 0) {
-          const currentBalance = user.walletBalance;
-          if (currentBalance === null || currentBalance < feeAmount) {
+          if (user.walletBalance === null || user.walletBalance < feeAmount) {
             return {
               success: false,
-              error: `INSUFFICIENT_BALANCE:${currentBalance ?? 0}:${feeAmount}`,
+              error: `INSUFFICIENT_BALANCE:${user.walletBalance ?? 0}:${feeAmount}`,
             };
           }
+          // Must have at least one payment method
+          if (get().paymentMethods.length === 0) {
+            return { success: false, error: 'NO_PAYMENT_METHOD' };
+          }
         }
+
         const { data, error } = await joinBusinessQueue(businessId, user.id, {
           customerName: user.name,
           customerEmail: user.email,
@@ -658,13 +673,27 @@ export const useStore = create<AppState>()(
         });
         if (error || !data) return { success: false, error: error ?? 'Failed to join queue' };
 
-        // ── Deduct 20% advance from wallet (only when priced) ───────────────
+        // ── Deduct 20% advance from wallet & record transaction ───────────────
         if (feeAmount > 0) {
           const { newBalance } = await deductWalletBalance(user.id, feeAmount);
           if (newBalance !== null) {
             set((state) => ({
               user: state.user ? { ...state.user, walletBalance: newBalance } : null,
             }));
+            // Record ledger entry
+            const defaultMethod = get().paymentMethods.find(m => m.isDefault)
+              ?? get().paymentMethods[0];
+            await recordWalletTransaction({
+              userId:           user.id,
+              queueEntryId:     data.id,
+              businessId:       businessId,
+              paymentMethodId:  defaultMethod?.id,
+              amount:           feeAmount,
+              type:             'debit',
+              reason:           `${Math.round(COMMITMENT_RATE * 100)}% advance — ${data.business?.name ?? 'Queue'}`,
+              balanceBefore,
+              balanceAfter:     newBalance,
+            });
           }
         }
 
@@ -818,14 +847,46 @@ export const useStore = create<AppState>()(
       loadWallet: async () => {
         const user = get().user;
         if (!user) return;
-        const [balance, methods] = await Promise.all([
-          getWalletBalance(user.id),
+        const [info, methods] = await Promise.all([
+          getWalletInfo(user.id),
           getSavedPaymentMethods(user.id),
         ]);
         set((state) => ({
           paymentMethods: methods,
-          user: state.user ? { ...state.user, walletBalance: balance } : null,
+          walletInfo:     info,
+          user: state.user
+            ? { ...state.user, walletBalance: info?.balance ?? state.user.walletBalance }
+            : null,
         }));
+      },
+
+      topUpWallet: async (amount: number, paymentMethodId?: string) => {
+        const user = get().user;
+        if (!user) return { success: false, error: 'Not authenticated' };
+        if (amount <= 0) return { success: false, error: 'Invalid amount' };
+
+        const { newBalance, balanceBefore, error } = await topUpWalletBalance(user.id, amount);
+        if (error || newBalance === null) return { success: false, error: error ?? 'Top-up failed' };
+
+        // Record credit transaction
+        await recordWalletTransaction({
+          userId:          user.id,
+          paymentMethodId,
+          amount,
+          type:            'credit',
+          reason:          'Wallet top-up via card',
+          balanceBefore:   balanceBefore ?? 0,
+          balanceAfter:    newBalance,
+        });
+
+        // Reload full wallet info from DB
+        const freshInfo = await getWalletInfo(user.id);
+        set((state) => ({
+          walletInfo: freshInfo,
+          user: state.user ? { ...state.user, walletBalance: newBalance } : null,
+        }));
+
+        return { success: true, newBalance, walletInfo: freshInfo ?? undefined };
       },
 
       addWalletPaymentMethod: async (params) => {
@@ -833,20 +894,26 @@ export const useStore = create<AppState>()(
         if (!user) return { success: false, error: 'Not authenticated' };
         const { id, error } = await addPaymentMethod({ userId: user.id, ...params });
         if (error) return { success: false, error };
-        // Reload payment methods from DB
-        const methods = await getSavedPaymentMethods(user.id);
-        set({ paymentMethods: methods });
+        // Reload methods + wallet info (is_active may have flipped)
+        const [methods, freshInfo] = await Promise.all([
+          getSavedPaymentMethods(user.id),
+          getWalletInfo(user.id),
+        ]);
+        set({ paymentMethods: methods, walletInfo: freshInfo });
         return { success: true };
       },
 
       removeWalletPaymentMethod: async (id) => {
         const user = get().user;
         if (!user) return { success: false, error: 'Not authenticated' };
-        const { error } = await deletePaymentMethod(id);
+        // Pass userId so deletePaymentMethod can sync wallets.is_active
+        const { error } = await deletePaymentMethod(id, user.id);
         if (error) return { success: false, error };
-        set((state) => ({
-          paymentMethods: state.paymentMethods.filter((m) => m.id !== id),
-        }));
+        const [methods, freshInfo] = await Promise.all([
+          getSavedPaymentMethods(user.id),
+          getWalletInfo(user.id),
+        ]);
+        set({ paymentMethods: methods, walletInfo: freshInfo });
         return { success: true };
       },
 

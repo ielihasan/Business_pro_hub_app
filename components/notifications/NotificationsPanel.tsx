@@ -10,22 +10,31 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useStore, Notification } from '@/store/useStore';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { COMMITMENT_RATE } from '@/lib/wallet';
 
 interface NotificationsPanelProps {
   visible: boolean;
   onClose: () => void;
 }
 
-// Icon config per notification type — B&W, colors applied dynamically from theme
 const TYPE_ICONS: Record<Notification['type'], string> = {
   queue_update: 'people-outline',
   order_ready:  'bag-check-outline',
   loyalty:      'star-outline',
   promo:        'megaphone-outline',
+};
+
+// Accent color per notification type
+const TYPE_COLORS: Record<Notification['type'], { icon: string; bg: string }> = {
+  queue_update: { icon: '#3B82F6', bg: '#3B82F618' }, // blue
+  order_ready:  { icon: '#22C55E', bg: '#22C55E18' }, // green
+  loyalty:      { icon: '#F59E0B', bg: '#F59E0B18' }, // amber
+  promo:        { icon: '#A855F7', bg: '#A855F718' }, // purple
 };
 
 function formatRelativeTime(dateStr: string): string {
@@ -51,6 +60,7 @@ function NotificationItem({
   onDelete: (id: string) => void;
 }) {
   const { colors } = useTheme();
+  const typeColor = TYPE_COLORS[item.type];
 
   return (
     <TouchableOpacity
@@ -64,14 +74,14 @@ function NotificationItem({
       activeOpacity={0.7}
       onPress={() => onPress(item.id)}
     >
-      {/* Unread dot */}
+      {/* Unread dot — colored to match the type */}
       {!item.read && (
-        <View style={[styles.unreadDot, { backgroundColor: colors.foreground }]} />
+        <View style={[styles.unreadDot, { backgroundColor: typeColor.icon }]} />
       )}
 
-      {/* Icon */}
-      <View style={[styles.notifIcon, { backgroundColor: colors.secondary }]}>
-        <Ionicons name={TYPE_ICONS[item.type] as any} size={22} color={colors.foreground} />
+      {/* Icon — colored background + icon per type */}
+      <View style={[styles.notifIcon, { backgroundColor: typeColor.bg }]}>
+        <Ionicons name={TYPE_ICONS[item.type] as any} size={22} color={typeColor.icon} />
       </View>
 
       {/* Content */}
@@ -112,10 +122,48 @@ function NotificationItem({
   );
 }
 
+// ── Pinned action card shown when no payment method is set up ─────────────────
+function SetupActionCard({ onClose }: { onClose: () => void }) {
+  const { colors } = useTheme();
+  const advancePct = Math.round(COMMITMENT_RATE * 100);
+
+  return (
+    <TouchableOpacity
+      style={[styles.actionCard, { backgroundColor: colors.card, borderColor: colors.destructive + '60' }]}
+      activeOpacity={0.85}
+      onPress={() => { onClose(); router.push('/profile/payment'); }}
+    >
+      {/* Red urgency strip on left */}
+      <View style={[styles.actionStrip, { backgroundColor: colors.destructive }]} />
+
+      <View style={[styles.actionIconBox, { backgroundColor: colors.destructive + '18' }]}>
+        <Ionicons name="wallet-outline" size={22} color={colors.destructive} />
+      </View>
+
+      <View style={styles.actionBody}>
+        <View style={styles.actionTitleRow}>
+          <View style={[styles.actionUrgentBadge, { backgroundColor: colors.destructive }]}>
+            <Text style={styles.actionUrgentText}>ACTION REQUIRED</Text>
+          </View>
+        </View>
+        <Text style={[styles.actionTitle, { color: colors.foreground }]}>
+          Set up a payment method
+        </Text>
+        <Text style={[styles.actionSub, { color: colors.mutedForeground }]}>
+          A {advancePct}% wallet advance is required to join any priced queue. Add EasyPaisa, JazzCash, or a bank account to get started.
+        </Text>
+      </View>
+
+      <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} style={{ marginLeft: 4 }} />
+    </TouchableOpacity>
+  );
+}
+
 export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps) {
   const { colors } = useTheme();
 
-  const { notifications, unreadCount, markNotificationRead, markAllNotificationsRead, deleteNotification, clearAllNotifications, notificationsEnabled } = useStore();
+  const { notifications, unreadCount, paymentMethods, markNotificationRead, markAllNotificationsRead, deleteNotification, clearAllNotifications, notificationsEnabled } = useStore();
+  const needsPaymentSetup = paymentMethods.length === 0;
 
   const handleItemPress = useCallback(
     (id: string) => {
@@ -164,9 +212,11 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <View style={styles.headerLeft}>
             <Text style={[styles.headerTitle, { color: colors.foreground }]}>Notifications</Text>
-            {unreadCount > 0 && (
-              <View style={[styles.headerBadge, { backgroundColor: colors.foreground }]}>
-                <Text style={[styles.headerBadgeText, { color: colors.background }]}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+            {(unreadCount + (needsPaymentSetup ? 1 : 0)) > 0 && (
+              <View style={[styles.headerBadge, { backgroundColor: colors.destructive }]}>
+                <Text style={[styles.headerBadgeText, { color: '#fff' }]}>
+                  {(unreadCount + (needsPaymentSetup ? 1 : 0)) > 99 ? '99+' : (unreadCount + (needsPaymentSetup ? 1 : 0))}
+                </Text>
               </View>
             )}
           </View>
@@ -210,10 +260,11 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
                 loyalty: 'Rewards',
                 promo: 'Promos',
               };
+              const pillColor = TYPE_COLORS[type];
               return (
-                <View key={type} style={[styles.summaryPill, { backgroundColor: colors.secondary }]}>
-                  <Ionicons name={TYPE_ICONS[type] as any} size={12} color={colors.foreground} />
-                  <Text style={[styles.summaryPillText, { color: colors.foreground }]}>
+                <View key={type} style={[styles.summaryPill, { backgroundColor: pillColor.bg }]}>
+                  <Ionicons name={TYPE_ICONS[type] as any} size={12} color={pillColor.icon} />
+                  <Text style={[styles.summaryPillText, { color: pillColor.icon }]}>
                     {labels[type]} {count}
                   </Text>
                 </View>
@@ -227,8 +278,9 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
           data={notifications}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
-          ListEmptyComponent={renderEmpty}
-          contentContainerStyle={notifications.length === 0 ? styles.emptyList : undefined}
+          ListHeaderComponent={needsPaymentSetup ? <SetupActionCard onClose={onClose} /> : null}
+          ListEmptyComponent={needsPaymentSetup ? null : renderEmpty}
+          contentContainerStyle={notifications.length === 0 && !needsPaymentSetup ? styles.emptyList : undefined}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => null}
         />
@@ -338,4 +390,26 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: Typography.fontSize.xl, fontWeight: '700', marginBottom: Spacing[2], textAlign: 'center' },
   emptyDesc: { fontSize: Typography.fontSize.sm, textAlign: 'center', lineHeight: 20 },
+
+  // ── Action card ──
+  actionCard: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: Spacing[4], marginVertical: Spacing[3],
+    borderRadius: 16, borderWidth: 1.5,
+    overflow: 'hidden', paddingRight: 14, paddingVertical: 14,
+    gap: 12,
+  },
+  actionStrip:      { width: 4, alignSelf: 'stretch', flexShrink: 0 },
+  actionIconBox:    {
+    width: 46, height: 46, borderRadius: 13,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  actionBody:       { flex: 1, gap: 4 },
+  actionTitleRow:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  actionUrgentBadge: {
+    paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6,
+  },
+  actionUrgentText: { fontSize: 8, fontWeight: '900', color: '#fff', letterSpacing: 0.8 },
+  actionTitle:      { fontSize: 14, fontWeight: '800', lineHeight: 20 },
+  actionSub:        { fontSize: 12, lineHeight: 17 },
 });
