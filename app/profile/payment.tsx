@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,617 +6,749 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Platform,
-  KeyboardAvoidingView,
-  Image,
   ActivityIndicator,
+  StatusBar,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@/hooks/useTheme';
+import { useStore, SavedPaymentMethod, WalletPaymentType } from '@/store/useStore';
+import { COMMITMENT_FEE, PAKISTAN_BANKS } from '@/lib/wallet';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
-import { Spacing, Typography, BorderRadius } from '@/constants/theme';
-import { useStore } from '@/store/useStore';
-import {
-  PAYMENT_METHODS,
-  PaymentMethodId,
-  PaymentMethodConfig,
-  generateTransactionId,
-  openPaymentApp,
-  pickReceiptImage,
-  captureReceiptCamera,
-  createTransaction,
-  uploadReceiptAndUpdateTransaction,
-  ReceiptPickerResult,
-} from '@/lib/payment';
 
-type Step = 'select' | 'instructions' | 'upload' | 'done';
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-// ────────────────────────────────────────────────────────────────────────────
+type MethodType = WalletPaymentType;
 
-export default function PaymentScreen() {
-  const { colors } = useTheme();
-  const { user } = useStore();
+const METHOD_META: Record<
+  MethodType,
+  { label: string; icon: string; color: string; placeholder: string; hint: string }
+> = {
+  easypaisa: {
+    label:       'Easypaisa',
+    icon:        'phone-portrait-outline',
+    color:       '#37B34A',
+    placeholder: '03XX-XXXXXXX',
+    hint:        'Enter your registered Easypaisa mobile number',
+  },
+  jazzcash: {
+    label:       'JazzCash',
+    icon:        'phone-portrait-outline',
+    color:       '#BF202F',
+    placeholder: '03XX-XXXXXXX',
+    hint:        'Enter your registered JazzCash mobile number',
+  },
+  bank: {
+    label:       'Bank Account',
+    icon:        'business-outline',
+    color:       '#2563EB',
+    placeholder: 'PK00XXXX0000000000000000',
+    hint:        'Enter your IBAN (24-digit account number)',
+  },
+};
 
-  const [step, setStep]               = useState<Step>('select');
-  const [selectedId, setSelectedId]   = useState<PaymentMethodId | null>(null);
-  const [amount, setAmount]           = useState('');
-  const [txnId, setTxnId]             = useState('');
-  const [receipt, setReceipt]         = useState<ReceiptPickerResult | null>(null);
-  const [receiptUrl, setReceiptUrl]   = useState('');
-  const [externalTxnId, setExternalTxnId] = useState('');
-  const [isSaving, setIsSaving]           = useState(false);
-  const [isUploading, setIsUploading]     = useState(false);
-  const [openingApp, setOpeningApp]       = useState(false);
-  const [dialog, setDialog] = useState<DialogConfig | null>(null);
+function maskNumber(num: string, type: MethodType): string {
+  if (type === 'bank') {
+    if (num.length <= 6) return num;
+    return `${num.slice(0, 6)}••••••••${num.slice(-4)}`;
+  }
+  // Mobile number: 0311-1234567 → 0311-•••4567
+  const digits = num.replace(/\D/g, '');
+  if (digits.length <= 7) return num;
+  return `${digits.slice(0, 4)}-•••${digits.slice(-4)}`;
+}
 
-  const method = selectedId ? PAYMENT_METHODS.find(m => m.id === selectedId)! : null;
+// ─── Main Component ───────────────────────────────────────────────────────────
 
-  // ── Step 1: Select method + amount ─────────────────────────────────────────
-  const handleProceed = async () => {
-    if (!selectedId) {
-      setDialog({ title: 'Select Method', message: 'Please choose a payment method.', icon: 'card-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
-      return;
-    }
-    const parsed = parseFloat(amount);
-    if (!amount || isNaN(parsed) || parsed <= 0) {
-      setDialog({ title: 'Invalid Amount', message: 'Please enter a valid amount greater than 0.', icon: 'alert-circle-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
-      return;
-    }
-    if (!user?.id) {
-      setDialog({ title: 'Not Logged In', message: 'Please log in first.', icon: 'log-in-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
-      return;
-    }
+export default function WalletPaymentScreen() {
+  const { colors, isDark } = useTheme();
 
-    setIsSaving(true);
-    const newTxnId = generateTransactionId(user.id);
-    setTxnId(newTxnId);
-    const { error } = await createTransaction({
-      transaction_id: newTxnId,
-      user_id: user.id,
-      payment_method: selectedId,
-      amount: parsed,
-    });
-    setIsSaving(false);
-    if (error) console.warn('Transaction create warn:', error);
-    setStep('instructions');
-  };
+  const user           = useStore((s) => s.user);
+  const paymentMethods = useStore((s) => s.paymentMethods);
+  const loadWallet     = useStore((s) => s.loadWallet);
+  const addMethod      = useStore((s) => s.addWalletPaymentMethod);
+  const removeMethod   = useStore((s) => s.removeWalletPaymentMethod);
+  const setDefault     = useStore((s) => s.setDefaultWalletPaymentMethod);
 
-  // ── Step 2: Open payment app ────────────────────────────────────────────────
-  const handleOpenApp = async () => {
-    if (!method) return;
-    setOpeningApp(true);
-    await openPaymentApp(method, amount, txnId);
-    setOpeningApp(false);
-  };
+  const [refreshing, setRefreshing] = useState(false);
+  const [dialog,     setDialog]     = useState<DialogConfig | null>(null);
+  const [showAdd,    setShowAdd]    = useState(false);
 
-  const handleCopy = (text: string) => {
-    Clipboard.setStringAsync(text);
-    setDialog({ title: 'Copied!', message: 'Copied to clipboard.', icon: 'checkmark-circle', iconVariant: 'success', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
-  };
+  // Add-method form state
+  const [selType,       setSelType]       = useState<MethodType>('easypaisa');
+  const [accountTitle,  setAccountTitle]  = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [bankName,      setBankName]      = useState('');
+  const [showBankList,  setShowBankList]  = useState(false);
+  const [saving,        setSaving]        = useState(false);
 
-  // ── Step 3: Upload receipt ──────────────────────────────────────────────────
-  const handlePickImage = useCallback(async (source: 'gallery' | 'camera') => {
-    const result = source === 'gallery' ? await pickReceiptImage() : await captureReceiptCamera();
-    if (!result) {
-      setDialog({ title: 'Permission Required', message: `Please allow ${source === 'gallery' ? 'photo library' : 'camera'} access in Settings.`, icon: 'alert-circle-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
-      return;
-    }
-    setReceipt(result);
+  // ── Load wallet on mount
+  useEffect(() => {
+    loadWallet();
   }, []);
 
-  const handleSubmitReceipt = async () => {
-    if (!receipt) {
-      setDialog({ title: 'No Receipt', message: 'Please upload your payment receipt first.', icon: 'image-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
-      return;
-    }
-    if (!user?.id) {
-      setDialog({ title: 'Not Logged In', message: 'Please log in first.', icon: 'log-in-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
-      return;
-    }
-    if (method?.id !== 'bank' && !externalTxnId.trim()) {
-      setDialog({ title: 'Missing Transaction ID', message: `Please enter the ${method?.name} Transaction ID shown on your payment confirmation.`, icon: 'alert-circle-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
-      return;
-    }
-    setIsUploading(true);
-    const { receiptUrl: url, error } = await uploadReceiptAndUpdateTransaction(receipt, txnId, user.id, externalTxnId.trim() || undefined);
-    setIsUploading(false);
-    if (error) {
-      setDialog({ title: 'Upload Failed', message: `Could not upload receipt: ${error}\n\nNote your Transaction ID and contact support.`, icon: 'alert-circle-outline', iconVariant: 'destructive', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
-      return;
-    }
-    setReceiptUrl(url ?? '');
-    setStep('done');
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadWallet();
+    setRefreshing(false);
   };
 
-  // ── Shared header ───────────────────────────────────────────────────────────
-  const renderHeader = (title: string, subtitle?: string) => (
-    <View style={[styles.header, { borderBottomColor: colors.border }]}>
-      <TouchableOpacity style={styles.backBtn} onPress={() => {
-        if (step === 'select') router.back();
-        else if (step === 'instructions') setStep('select');
-        else if (step === 'upload') setStep('instructions');
-      }}>
-        {step !== 'done' && <Ionicons name="arrow-back" size={24} color={colors.foreground} />}
-      </TouchableOpacity>
-      <View style={{ flex: 1, alignItems: 'center' }}>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>{title}</Text>
-        {subtitle ? <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>{subtitle}</Text> : null}
-      </View>
-      <View style={{ width: 40 }} />
-    </View>
-  );
+  const resetForm = () => {
+    setSelType('easypaisa');
+    setAccountTitle('');
+    setAccountNumber('');
+    setBankName('');
+    setShowBankList(false);
+  };
 
-  const renderStepDots = () => (
-    <View style={styles.stepDots}>
-      {(['select', 'instructions', 'upload', 'done'] as Step[]).map((s, i) => {
-        const idx = ['select', 'instructions', 'upload', 'done'].indexOf(step);
-        const completed = idx > i;
-        const active    = step === s;
-        return <View key={s} style={[styles.stepDot, { backgroundColor: completed || active ? colors.primary : colors.border, width: active ? 20 : 8 }]} />;
-      })}
-    </View>
-  );
+  // ── Add method ──────────────────────────────────────────────────────────────
+  const handleAdd = async () => {
+    if (!accountTitle.trim()) {
+      setDialog({
+        title: 'Missing Name', message: 'Please enter your account title / full name.',
+        icon: 'person-outline', iconVariant: 'warning',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
+      return;
+    }
+    if (!accountNumber.trim()) {
+      setDialog({
+        title: 'Missing Number', message: 'Please enter your account / mobile number.',
+        icon: 'call-outline', iconVariant: 'warning',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
+      return;
+    }
+    if (selType === 'bank' && !bankName.trim()) {
+      setDialog({
+        title: 'Select Bank', message: 'Please select your bank from the list.',
+        icon: 'business-outline', iconVariant: 'warning',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
+      return;
+    }
 
-  // ── STEP 1 ──────────────────────────────────────────────────────────────────
-  const renderSelect = () => (
-    <>
-      {renderHeader('Payment Methods', 'Choose how you want to pay')}
-      {renderStepDots()}
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>PAYMENT METHOD</Text>
-        {PAYMENT_METHODS.map((m) => {
-          const active = selectedId === m.id;
-          return (
-            <TouchableOpacity key={m.id} activeOpacity={0.8}
-              style={[styles.methodCard, {
-                backgroundColor: active ? colors.secondary : colors.card,
-                borderColor: active ? colors.foreground : colors.border,
-                borderWidth: active ? 1.5 : StyleSheet.hairlineWidth,
-              }]}
-              onPress={() => setSelectedId(m.id)}
-            >
-              <View style={[styles.methodIcon, { backgroundColor: colors.secondary }]}>
-                <Ionicons name={m.icon as any} size={28} color={colors.foreground} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.methodName, { color: colors.foreground }]}>{m.name}</Text>
-                <Text style={[styles.methodSub, { color: colors.mutedForeground }]}>
-                  {m.id === 'bank' ? 'IBFT / Bank Transfer' : 'Mobile Wallet'}
-                </Text>
-              </View>
-              <View style={[styles.radioCircle, { borderColor: active ? colors.foreground : colors.border, backgroundColor: active ? colors.foreground : 'transparent' }]}>
-                {active && <Ionicons name="checkmark" size={14} color={colors.background} />}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+    setSaving(true);
+    const result = await addMethod({
+      type:          selType,
+      accountTitle:  accountTitle.trim(),
+      accountNumber: accountNumber.trim(),
+      bankName:      selType === 'bank' ? bankName.trim() : undefined,
+    });
+    setSaving(false);
 
-        <Text style={[styles.sectionLabel, { color: colors.mutedForeground, marginTop: Spacing[6] }]}>AMOUNT (PKR)</Text>
-        <View style={[styles.amountBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.currencyLabel, { color: colors.mutedForeground }]}>Rs.</Text>
-          <TextInput
-            style={[styles.amountInput, { color: colors.foreground }]}
-            placeholder="0.00" placeholderTextColor={colors.mutedForeground}
-            value={amount} onChangeText={(v) => setAmount(v.replace(/[^0-9.]/g, ''))}
-            keyboardType="decimal-pad" returnKeyType="done"
-          />
+    if (!result.success) {
+      setDialog({
+        title: 'Error', message: result.error ?? 'Failed to save payment method.',
+        icon: 'alert-circle-outline', iconVariant: 'destructive',
+        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+      });
+      return;
+    }
+
+    setShowAdd(false);
+    resetForm();
+    setDialog({
+      title: 'Method Saved!',
+      message: `Your ${METHOD_META[selType].label} account has been saved successfully.`,
+      icon: 'checkmark-circle-outline', iconVariant: 'success',
+      actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+    });
+  };
+
+  // ── Delete method ──────────────────────────────────────────────────────────
+  const handleDelete = (method: SavedPaymentMethod) => {
+    setDialog({
+      title: 'Remove Method',
+      message: `Remove ${METHOD_META[method.type].label} ending in ${method.accountNumber.slice(-4)}?`,
+      icon: 'trash-outline', iconVariant: 'destructive',
+      actions: [
+        { label: 'Cancel',  variant: 'secondary', onPress: () => setDialog(null) },
+        {
+          label: 'Remove', variant: 'destructive',
+          onPress: async () => {
+            setDialog(null);
+            const res = await removeMethod(method.id);
+            if (!res.success) {
+              setDialog({
+                title: 'Error', message: res.error ?? 'Could not remove method.',
+                icon: 'alert-circle-outline', iconVariant: 'destructive',
+                actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+              });
+            }
+          },
+        },
+      ],
+    });
+  };
+
+  // ── Theme ──────────────────────────────────────────────────────────────────
+  const BG     = colors.background;
+  const FG     = colors.foreground;
+  const MUTED  = colors.mutedForeground;
+  const BORDER = colors.border;
+  const CARD   = colors.card;
+  const SEC    = colors.secondary;
+
+  const walletBalance = user?.walletBalance ?? null;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  return (
+    <View style={[styles.root, { backgroundColor: BG }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+
+      <SafeAreaView edges={['top']} style={{ backgroundColor: BG }}>
+        {/* Header */}
+        <View style={[styles.header, { borderBottomColor: BORDER }]}>
+          <TouchableOpacity
+            style={[styles.backBtn, { backgroundColor: CARD, borderColor: BORDER }]}
+            onPress={() => router.back()}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="arrow-back" size={20} color={FG} />
+          </TouchableOpacity>
+          <View style={styles.headerText}>
+            <Text style={[styles.headerLabel, { color: MUTED }]}>ACCOUNT</Text>
+            <Text style={[styles.headerTitle, { color: FG }]}>WALLET & PAYMENTS</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.refreshBtn, { backgroundColor: CARD, borderColor: BORDER }]}
+            onPress={onRefresh}
+            activeOpacity={0.75}
+            disabled={refreshing}
+          >
+            {refreshing
+              ? <ActivityIndicator size="small" color={FG} />
+              : <Ionicons name="refresh-outline" size={18} color={FG} />}
+          </TouchableOpacity>
         </View>
+      </SafeAreaView>
 
-        <View style={[styles.infoBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-          <Ionicons name="shield-checkmark-outline" size={18} color={colors.foreground} />
-          <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
-            A unique Transaction ID will be generated for your payment — this protects against fraud and helps us verify your receipt.
-          </Text>
-        </View>
-
-        <TouchableOpacity activeOpacity={0.85}
-          style={[styles.proceedBtn, { backgroundColor: selectedId ? (method?.color ?? colors.primary) : colors.border }]}
-          onPress={handleProceed} disabled={isSaving || !selectedId}
-        >
-          {isSaving ? <ActivityIndicator color="#fff" /> : <>
-            <Text style={styles.proceedBtnText}>Continue</Text>
-            <Ionicons name="arrow-forward" size={20} color="#fff" />
-          </>}
-        </TouchableOpacity>
-        <View style={{ height: Spacing[8] }} />
-      </ScrollView>
-    </>
-  );
-
-  // ── STEP 2 ──────────────────────────────────────────────────────────────────
-  const renderInstructions = () => {
-    if (!method) return null;
-    const lines = method.instructions.map(l => l.replace('{amount}', amount).replace('{txnId}', txnId));
-    return (
-      <>
-        {renderHeader(method.name, 'Follow these steps')}
-        {renderStepDots()}
-        <ScrollView contentContainerStyle={styles.content}>
-
-          {/* TXN ID */}
-          <View style={[styles.txnCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.txnCardHeader}>
-              <Ionicons name="receipt-outline" size={18} color={colors.foreground} />
-              <Text style={[styles.txnLabel, { color: colors.foreground }]}>Your Transaction ID</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* ── Wallet Card ──────────────────────────────────────────────────── */}
+        <View style={[styles.walletCard, { backgroundColor: FG }]}>
+          {/* Logo row */}
+          <View style={styles.walletTop}>
+            <View style={styles.walletBrandRow}>
+              <Ionicons name="wallet-outline" size={18} color={BG} />
+              <Text style={[styles.walletBrand, { color: BG }]}>BusinessHub Pro</Text>
             </View>
-            <Text style={[styles.txnId, { color: colors.foreground }]}>{txnId}</Text>
-            <TouchableOpacity style={[styles.copyBtn, { borderColor: colors.border }]} onPress={() => handleCopy(txnId)} activeOpacity={0.7}>
-              <Ionicons name="copy-outline" size={15} color={colors.foreground} />
-              <Text style={[styles.copyBtnText, { color: colors.foreground }]}>Copy Transaction ID</Text>
-            </TouchableOpacity>
-            <Text style={[styles.txnNote, { color: colors.mutedForeground }]}>
-              ⚠️ Use this ID as the payment reference/remarks. Required for verification.
+            <Text style={[styles.walletTag, { color: BG + 'AA' }]}>DIGITAL WALLET</Text>
+          </View>
+
+          {/* Balance */}
+          <View style={styles.walletMid}>
+            <Text style={[styles.walletBalLabel, { color: BG + '99' }]}>AVAILABLE BALANCE</Text>
+            {walletBalance === null ? (
+              <ActivityIndicator color={BG} style={{ marginTop: 6 }} />
+            ) : (
+              <Text style={[styles.walletBal, { color: BG }]}>
+                Rs {walletBalance.toLocaleString('en-PK')}
+              </Text>
+            )}
+          </View>
+
+          {/* Holder row */}
+          <View style={styles.walletBottom}>
+            <View>
+              <Text style={[styles.walletHolderLabel, { color: BG + '77' }]}>ACCOUNT HOLDER</Text>
+              <Text style={[styles.walletHolder, { color: BG }]} numberOfLines={1}>
+                {user?.name ?? '—'}
+              </Text>
+            </View>
+            <View style={[styles.walletChip, { backgroundColor: BG + '22', borderColor: BG + '44' }]}>
+              <Text style={[styles.walletChipText, { color: BG }]}>PKR</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Commitment Fee Info ───────────────────────────────────────────── */}
+        <View style={[styles.infoCard, { backgroundColor: CARD, borderColor: BORDER }]}>
+          <View style={[styles.infoIconWrap, { backgroundColor: SEC, borderColor: BORDER }]}>
+            <Ionicons name="shield-checkmark-outline" size={20} color={FG} />
+          </View>
+          <View style={styles.infoText}>
+            <Text style={[styles.infoTitle, { color: FG }]}>Queue Commitment Fee</Text>
+            <Text style={[styles.infoSub, { color: MUTED }]}>
+              Rs {COMMITMENT_FEE} is deducted from your wallet each time you join a queue. This ensures customers show up and keeps wait times accurate.
             </Text>
           </View>
+        </View>
 
-          {/* Amount badge */}
-          <View style={[styles.amountBadge, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-            <Text style={[styles.amountBadgeLabel, { color: colors.mutedForeground }]}>Amount to Pay</Text>
-            <Text style={[styles.amountBadgeValue, { color: colors.foreground }]}>Rs. {parseFloat(amount).toLocaleString()}</Text>
+        {/* ── Payment Methods ───────────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <View style={styles.sectionRow}>
+            <Text style={[styles.sectionLabel, { color: MUTED }]}>SAVED PAYMENT METHODS</Text>
+            <Text style={[styles.sectionCount, { color: MUTED }]}>{paymentMethods.length}</Text>
           </View>
 
-          {/* Wallet / Bank account details */}
-          {(method.accountDetails || method.bankDetails) && (() => {
-            const details = method.accountDetails ?? method.bankDetails!;
-            const title = method.id === 'bank'
-              ? 'Bank Account Details'
-              : `Send Money to This ${method.name} Account`;
-            return (
-              <View style={[styles.bankBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={styles.bankBoxHeaderRow}>
-                  <Ionicons name={method.id === 'bank' ? 'business-outline' : 'phone-portrait-outline'} size={18} color={colors.foreground} />
-                  <Text style={[styles.bankBoxTitle, { color: colors.foreground }]}>{title}</Text>
-                </View>
-                {details.map((d) => (
-                  <View key={d.label} style={styles.bankRow}>
-                    <Text style={[styles.bankLabel, { color: colors.mutedForeground }]}>{d.label}</Text>
-                    <TouchableOpacity style={styles.bankValueRow} onPress={() => handleCopy(d.value)} activeOpacity={0.7}>
-                      <Text style={[styles.bankValue, { color: colors.foreground }]}>{d.value}</Text>
-                      <Ionicons name="copy-outline" size={14} color={colors.mutedForeground} style={{ marginLeft: 4 }} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                <View style={[styles.tapToCopyHint, { borderTopColor: colors.border }]}>
-                  <Ionicons name="finger-print-outline" size={13} color={colors.mutedForeground} />
-                  <Text style={[styles.tapToCopyText, { color: colors.mutedForeground }]}>Tap any value to copy</Text>
-                </View>
-              </View>
-            );
-          })()}
-
-          {/* Step instructions */}
-          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>STEPS TO FOLLOW</Text>
-          <View style={[styles.instructionsBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {lines.map((line, i) => (
-              <View key={i} style={[styles.instructionRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
-                <Text style={[styles.instructionText, { color: colors.foreground }]}>{line}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Open App */}
-          {method.id !== 'bank' && (
-            <TouchableOpacity activeOpacity={0.85}
-              style={[styles.openAppBtn, { backgroundColor: colors.foreground }]}
-              onPress={handleOpenApp} disabled={openingApp}
-            >
-              {openingApp ? <ActivityIndicator color={colors.background} /> : <>
-                <Ionicons name="phone-portrait-outline" size={20} color={colors.background} />
-                <Text style={[styles.openAppBtnText, { color: colors.background }]}>Open {method.name}</Text>
-              </>}
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity activeOpacity={0.85}
-            style={[styles.proceedBtn, { backgroundColor: colors.foreground, marginTop: Spacing[3] }]}
-            onPress={() => setStep('upload')}
-          >
-            <Text style={styles.proceedBtnText}>I've Paid — Upload Receipt</Text>
-            <Ionicons name="arrow-forward" size={20} color="#fff" />
-          </TouchableOpacity>
-          <View style={{ height: Spacing[8] }} />
-        </ScrollView>
-      </>
-    );
-  };
-
-  // ── STEP 3 ──────────────────────────────────────────────────────────────────
-  const renderUpload = () => {
-    if (!method) return null;
-    return (
-      <>
-        {renderHeader('Upload Receipt', 'Proof of your payment')}
-        {renderStepDots()}
-        <ScrollView contentContainerStyle={styles.content}>
-          <View style={[styles.txnReminder, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-            <Text style={[styles.txnReminderLabel, { color: colors.mutedForeground }]}>Our Transaction ID (for your reference)</Text>
-            <Text style={[styles.txnReminderValue, { color: colors.foreground }]}>{txnId}</Text>
-          </View>
-
-          {/* External TXN ID (Easypaisa/JazzCash generated) */}
-          {method.id !== 'bank' && (
-            <View style={[styles.externalTxnBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.externalTxnHeader}>
-                <Ionicons name="receipt-outline" size={18} color={colors.foreground} />
-                <Text style={[styles.externalTxnTitle, { color: colors.foreground }]}>
-                  {method.name} Transaction ID *
-                </Text>
-              </View>
-              <Text style={[styles.externalTxnDesc, { color: colors.mutedForeground }]}>
-                Enter the Transaction ID shown on your {method.name} payment confirmation screen or SMS.
+          {paymentMethods.length === 0 ? (
+            <View style={[styles.emptyMethods, { backgroundColor: CARD, borderColor: BORDER }]}>
+              <Ionicons name="card-outline" size={32} color={MUTED} />
+              <Text style={[styles.emptyTitle, { color: FG }]}>No payment methods saved</Text>
+              <Text style={[styles.emptySub, { color: MUTED }]}>
+                Add EasyPaisa, JazzCash, or a bank account to get started.
               </Text>
-              <TextInput
-                style={[styles.externalTxnInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.secondary }]}
-                placeholder={`e.g. EP12345678 or ETP-XXXXXXXX`}
-                placeholderTextColor={colors.mutedForeground}
-                value={externalTxnId}
-                onChangeText={setExternalTxnId}
-                autoCapitalize="characters"
-                returnKeyType="done"
-              />
-            </View>
-          )}
-
-          {receipt ? (
-            <View style={styles.receiptPreviewWrap}>
-              <Image source={{ uri: receipt.uri }} style={styles.receiptPreview} resizeMode="cover" />
-              <TouchableOpacity activeOpacity={0.7}
-                style={[styles.changeReceiptBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => setReceipt(null)}
-              >
-                <Ionicons name="refresh-outline" size={16} color={colors.foreground} />
-                <Text style={[styles.changeReceiptText, { color: colors.foreground }]}>Change Receipt</Text>
-              </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.uploadArea}>
-              <View style={[styles.uploadPlaceholder, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                <Ionicons name="cloud-upload-outline" size={48} color={colors.mutedForeground} />
-                <Text style={[styles.uploadTitle, { color: colors.foreground }]}>Upload Receipt</Text>
-                <Text style={[styles.uploadDesc, { color: colors.mutedForeground }]}>
-                  Screenshot or photo of your payment confirmation
-                </Text>
-              </View>
-              <View style={styles.uploadBtns}>
-                <TouchableOpacity activeOpacity={0.8}
-                  style={[styles.uploadBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
-                  onPress={() => handlePickImage('gallery')}
-                >
-                  <Ionicons name="images-outline" size={22} color={colors.foreground} />
-                  <Text style={[styles.uploadBtnText, { color: colors.foreground }]}>Photo Library</Text>
-                </TouchableOpacity>
-                <TouchableOpacity activeOpacity={0.8}
-                  style={[styles.uploadBtn, { backgroundColor: colors.secondary, borderColor: colors.border }]}
-                  onPress={() => handlePickImage('camera')}
-                >
-                  <Ionicons name="camera-outline" size={22} color={colors.foreground} />
-                  <Text style={[styles.uploadBtnText, { color: colors.foreground }]}>Camera</Text>
-                </TouchableOpacity>
-              </View>
+            <View style={styles.methodsList}>
+              {paymentMethods.map((method) => {
+                const meta = METHOD_META[method.type];
+                return (
+                  <View
+                    key={method.id}
+                    style={[
+                      styles.methodCard,
+                      {
+                        backgroundColor: CARD,
+                        borderColor: method.isDefault ? FG : BORDER,
+                        borderWidth: method.isDefault ? 1.5 : 1,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.methodIconWrap, { backgroundColor: meta.color + '18', borderColor: meta.color + '44' }]}>
+                      <Ionicons name={meta.icon as any} size={22} color={meta.color} />
+                    </View>
+
+                    <View style={styles.methodInfo}>
+                      <View style={styles.methodNameRow}>
+                        <Text style={[styles.methodName, { color: FG }]}>{meta.label}</Text>
+                        {method.isDefault && (
+                          <View style={[styles.defaultBadge, { backgroundColor: FG }]}>
+                            <Text style={[styles.defaultBadgeText, { color: BG }]}>DEFAULT</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={[styles.methodTitle, { color: MUTED }]}>{method.accountTitle}</Text>
+                      <Text style={[styles.methodNumber, { color: FG }]}>
+                        {maskNumber(method.accountNumber, method.type)}
+                      </Text>
+                      {method.bankName ? (
+                        <Text style={[styles.methodBank, { color: MUTED }]}>{method.bankName}</Text>
+                      ) : null}
+                    </View>
+
+                    <View style={styles.methodActions}>
+                      {!method.isDefault && (
+                        <TouchableOpacity
+                          style={[styles.methodActionBtn, { borderColor: BORDER }]}
+                          onPress={() => setDefault(method.id)}
+                          activeOpacity={0.75}
+                        >
+                          <Ionicons name="star-outline" size={15} color={FG} />
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        style={[styles.methodActionBtn, { borderColor: BORDER }]}
+                        onPress={() => handleDelete(method)}
+                        activeOpacity={0.75}
+                      >
+                        <Ionicons name="trash-outline" size={15} color={colors.destructive} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           )}
 
-          <View style={[styles.infoBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-            <Ionicons name="information-circle-outline" size={16} color={colors.foreground} />
-            <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
-              Your receipt is matched against your unique Transaction ID. Mismatched or fraudulent receipts will be automatically rejected.
-            </Text>
-          </View>
-
-          <TouchableOpacity activeOpacity={0.85}
-            style={[styles.proceedBtn, { backgroundColor: (receipt && (method.id === 'bank' || externalTxnId.trim())) ? colors.foreground : colors.border }]}
-            onPress={handleSubmitReceipt} disabled={isUploading || !receipt || (method.id !== 'bank' && !externalTxnId.trim())}
+          {/* Add button */}
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: FG }]}
+            onPress={() => { resetForm(); setShowAdd(true); }}
+            activeOpacity={0.85}
           >
-            {isUploading ? <ActivityIndicator color={colors.background} /> : <>
-              <Ionicons name="checkmark-circle-outline" size={20} color={colors.background} />
-              <Text style={styles.proceedBtnText}>Submit Receipt</Text>
-            </>}
+            <Ionicons name="add-circle-outline" size={20} color={BG} />
+            <Text style={[styles.addBtnText, { color: BG }]}>Add Payment Method</Text>
           </TouchableOpacity>
-          <View style={{ height: Spacing[8] }} />
-        </ScrollView>
-      </>
-    );
-  };
-
-  // ── STEP 4 ──────────────────────────────────────────────────────────────────
-  const renderDone = () => (
-    <>
-      {renderHeader('Payment Submitted', '')}
-      <ScrollView contentContainerStyle={[styles.content, styles.doneContent]}>
-        <View style={[styles.doneIcon, { backgroundColor: colors.secondary }]}>
-          <Ionicons name="checkmark-circle" size={72} color={colors.foreground} />
         </View>
-        <Text style={[styles.doneTitle, { color: colors.foreground }]}>Receipt Submitted!</Text>
-        <Text style={[styles.doneDesc, { color: colors.mutedForeground }]}>
-          Your payment receipt has been submitted for verification. We'll update your account within 24 hours.
-        </Text>
 
-        <View style={[styles.doneTxnBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.doneTxnLabel, { color: colors.mutedForeground }]}>Transaction ID</Text>
-          <Text style={[styles.doneTxnValue, { color: colors.foreground }]}>{txnId}</Text>
-          <View style={[styles.doneStatusBadge, { backgroundColor: colors.secondary, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border }]}>
-            <Ionicons name="time-outline" size={14} color={colors.mutedForeground} />
-            <Text style={[styles.doneStatusText, { color: colors.mutedForeground }]}>Pending Verification</Text>
+        {/* ── Accepted Methods Info ─────────────────────────────────────────── */}
+        <View style={[styles.acceptedCard, { backgroundColor: CARD, borderColor: BORDER }]}>
+          <Text style={[styles.acceptedTitle, { color: MUTED }]}>ACCEPTED METHODS</Text>
+          <View style={styles.acceptedRow}>
+            {(['easypaisa', 'jazzcash', 'bank'] as MethodType[]).map((t) => {
+              const meta = METHOD_META[t];
+              return (
+                <View key={t} style={[styles.acceptedItem, { backgroundColor: SEC, borderColor: BORDER }]}>
+                  <Ionicons name={meta.icon as any} size={16} color={meta.color} />
+                  <Text style={[styles.acceptedLabel, { color: FG }]}>{meta.label}</Text>
+                </View>
+              );
+            })}
           </View>
-        </View>
-
-        {receiptUrl ? <Image source={{ uri: receiptUrl }} style={styles.doneReceiptThumb} resizeMode="cover" /> : null}
-
-        <View style={[styles.infoBox, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-          <Ionicons name="shield-checkmark-outline" size={16} color={colors.foreground} />
-          <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
-            Keep your Transaction ID ({txnId}) as proof. Contact support if verification takes more than 24 hours.
+          <Text style={[styles.acceptedNote, { color: MUTED }]}>
+            20+ Pakistan banks supported including HBL, UBL, MCB, Meezan, Alfalah, Allied, BOP, Faysal and more.
           </Text>
         </View>
 
-        <TouchableOpacity activeOpacity={0.85}
-          style={[styles.proceedBtn, { backgroundColor: colors.primary, marginTop: Spacing[4] }]}
-          onPress={() => router.replace('/(tabs)/profile')}
-        >
-          <Ionicons name="home-outline" size={20} color="#fff" />
-          <Text style={styles.proceedBtnText}>Back to Profile</Text>
-        </TouchableOpacity>
-        <View style={{ height: Spacing[8] }} />
+        <View style={{ height: 48 }} />
       </ScrollView>
-    </>
-  );
 
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        {step === 'select'       && renderSelect()}
-        {step === 'instructions' && renderInstructions()}
-        {step === 'upload'       && renderUpload()}
-        {step === 'done'         && renderDone()}
-      </KeyboardAvoidingView>
+      {/* ── Add Method Modal ───────────────────────────────────────────────────── */}
+      <Modal
+        visible={showAdd}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowAdd(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => { if (!showBankList) setShowAdd(false); }}
+          />
+
+          <View style={[styles.modalSheet, { backgroundColor: BG, borderColor: BORDER }]}>
+            {/* Sheet handle */}
+            <View style={[styles.sheetHandle, { backgroundColor: BORDER }]} />
+
+            <View style={[styles.sheetHeader, { borderBottomColor: BORDER }]}>
+              <Text style={[styles.sheetTitle, { color: FG }]}>Add Payment Method</Text>
+              <TouchableOpacity onPress={() => setShowAdd(false)} hitSlop={12}>
+                <Ionicons name="close" size={22} color={FG} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.sheetScroll}
+              contentContainerStyle={styles.sheetContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Type selector */}
+              <Text style={[styles.fieldLabel, { color: MUTED }]}>TYPE</Text>
+              <View style={styles.typeRow}>
+                {(['easypaisa', 'jazzcash', 'bank'] as MethodType[]).map((t) => {
+                  const meta   = METHOD_META[t];
+                  const active = selType === t;
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      style={[
+                        styles.typeChip,
+                        {
+                          backgroundColor: active ? FG : CARD,
+                          borderColor:     active ? FG : BORDER,
+                          flex: 1,
+                        },
+                      ]}
+                      onPress={() => { setSelType(t); setAccountNumber(''); setBankName(''); }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name={meta.icon as any}
+                        size={16}
+                        color={active ? BG : meta.color}
+                      />
+                      <Text style={[styles.typeChipText, { color: active ? BG : FG }]}>
+                        {meta.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Account title */}
+              <Text style={[styles.fieldLabel, { color: MUTED }]}>ACCOUNT TITLE / FULL NAME</Text>
+              <View style={[styles.inputBox, { backgroundColor: CARD, borderColor: BORDER }]}>
+                <Ionicons name="person-outline" size={16} color={MUTED} />
+                <TextInput
+                  style={[styles.input, { color: FG }]}
+                  placeholder="e.g. Muhammad Ali Khan"
+                  placeholderTextColor={MUTED}
+                  value={accountTitle}
+                  onChangeText={setAccountTitle}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                />
+              </View>
+
+              {/* Account number */}
+              <Text style={[styles.fieldLabel, { color: MUTED }]}>
+                {selType === 'bank' ? 'IBAN / ACCOUNT NUMBER' : 'MOBILE NUMBER'}
+              </Text>
+              <View style={[styles.inputBox, { backgroundColor: CARD, borderColor: BORDER }]}>
+                <Ionicons
+                  name={selType === 'bank' ? 'card-outline' : 'call-outline'}
+                  size={16}
+                  color={MUTED}
+                />
+                <TextInput
+                  style={[styles.input, { color: FG }]}
+                  placeholder={METHOD_META[selType].placeholder}
+                  placeholderTextColor={MUTED}
+                  value={accountNumber}
+                  onChangeText={setAccountNumber}
+                  keyboardType={selType === 'bank' ? 'default' : 'phone-pad'}
+                  autoCapitalize="characters"
+                  returnKeyType="next"
+                />
+              </View>
+              <Text style={[styles.fieldHint, { color: MUTED }]}>
+                {METHOD_META[selType].hint}
+              </Text>
+
+              {/* Bank selector (only for bank type) */}
+              {selType === 'bank' && (
+                <>
+                  <Text style={[styles.fieldLabel, { color: MUTED }]}>BANK NAME</Text>
+                  <TouchableOpacity
+                    style={[styles.inputBox, { backgroundColor: CARD, borderColor: BORDER }]}
+                    onPress={() => setShowBankList(!showBankList)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="business-outline" size={16} color={MUTED} />
+                    <Text style={[styles.input, { color: bankName ? FG : MUTED, flex: 1 }]}>
+                      {bankName || 'Select your bank…'}
+                    </Text>
+                    <Ionicons
+                      name={showBankList ? 'chevron-up' : 'chevron-down'}
+                      size={16}
+                      color={MUTED}
+                    />
+                  </TouchableOpacity>
+
+                  {showBankList && (
+                    <View style={[styles.bankDropdown, { backgroundColor: CARD, borderColor: BORDER }]}>
+                      {PAKISTAN_BANKS.map((bank) => (
+                        <TouchableOpacity
+                          key={bank.id}
+                          style={[
+                            styles.bankOption,
+                            { borderBottomColor: BORDER },
+                            bankName === bank.name && { backgroundColor: SEC },
+                          ]}
+                          onPress={() => { setBankName(bank.name); setShowBankList(false); }}
+                          activeOpacity={0.75}
+                        >
+                          <Text style={[styles.bankOptShort, { color: MUTED }]}>{bank.shortName}</Text>
+                          <Text style={[styles.bankOptName, { color: FG }]}>{bank.name}</Text>
+                          {bankName === bank.name && (
+                            <Ionicons name="checkmark" size={16} color={FG} />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </>
+              )}
+
+              {/* Save button */}
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: FG, opacity: saving ? 0.6 : 1 }]}
+                onPress={handleAdd}
+                activeOpacity={0.85}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color={BG} />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={20} color={BG} />
+                    <Text style={[styles.saveBtnText, { color: BG }]}>Save Payment Method</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <View style={{ height: 24 }} />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
-    </SafeAreaView>
+    </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  root: { flex: 1 },
 
+  /* Header */
   header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: Spacing[4], paddingVertical: Spacing[4],
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingHorizontal: 20, paddingTop: 8, paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  headerTitle: { fontSize: Typography.fontSize.lg, fontWeight: '700', textAlign: 'center' },
-  headerSub: { fontSize: Typography.fontSize.xs, marginTop: 2, textAlign: 'center' },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 12, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  refreshBtn: {
+    width: 40, height: 40, borderRadius: 12, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  headerText:  { flex: 1 },
+  headerLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 2, marginBottom: 2 },
+  headerTitle: { fontSize: 22, fontWeight: '900', letterSpacing: -0.8 },
 
-  stepDots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, paddingVertical: Spacing[3] },
-  stepDot: { height: 8, borderRadius: 4 },
+  scroll: { paddingHorizontal: 20, paddingTop: 20 },
 
-  content: { padding: Spacing[4] },
+  /* Wallet card */
+  walletCard: {
+    borderRadius: 20, padding: 22,
+    marginBottom: 16, gap: 16,
+    shadowColor: '#000', shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 }, shadowRadius: 12,
+    elevation: 6,
+  },
+  walletTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  walletBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  walletBrand:    { fontSize: 14, fontWeight: '800', letterSpacing: -0.3 },
+  walletTag:      { fontSize: 9, fontWeight: '700', letterSpacing: 2 },
+  walletMid:      {},
+  walletBalLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 2, marginBottom: 6 },
+  walletBal:      { fontSize: 36, fontWeight: '900', letterSpacing: -1.5 },
+  walletBottom:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  walletHolderLabel: { fontSize: 8, fontWeight: '700', letterSpacing: 1.5, marginBottom: 3 },
+  walletHolder:   { fontSize: 14, fontWeight: '700', maxWidth: 200 },
+  walletChip: {
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 8, borderWidth: 1,
+  },
+  walletChipText: { fontSize: 12, fontWeight: '800' },
 
-  sectionLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing[3] },
+  /* Info card */
+  infoCard: {
+    flexDirection: 'row', gap: 12, alignItems: 'flex-start',
+    borderRadius: 14, borderWidth: 1,
+    padding: 14, marginBottom: 20,
+  },
+  infoIconWrap: {
+    width: 40, height: 40, borderRadius: 10, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  infoText:  { flex: 1, gap: 3 },
+  infoTitle: { fontSize: 13, fontWeight: '800' },
+  infoSub:   { fontSize: 12, lineHeight: 18 },
 
+  /* Section */
+  section:      { marginBottom: 20 },
+  sectionRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  sectionCount: { fontSize: 11, fontWeight: '700' },
+
+  /* Empty state */
+  emptyMethods: {
+    borderRadius: 14, borderWidth: 1, paddingVertical: 32,
+    alignItems: 'center', gap: 8, marginBottom: 14,
+  },
+  emptyTitle: { fontSize: 14, fontWeight: '800' },
+  emptySub:   { fontSize: 12, textAlign: 'center', paddingHorizontal: 24 },
+
+  /* Methods list */
+  methodsList: { gap: 10, marginBottom: 14 },
   methodCard: {
-    flexDirection: 'row', alignItems: 'center',
-    padding: Spacing[4], borderRadius: BorderRadius.DEFAULT, marginBottom: Spacing[3],
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderRadius: 14, padding: 14,
   },
-  methodIcon: { width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center', marginRight: Spacing[3] },
-  methodName: { fontSize: Typography.fontSize.base, fontWeight: '700' },
-  methodSub: { fontSize: Typography.fontSize.xs, marginTop: 2 },
-  radioCircle: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
-
-  amountBox: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 2, borderRadius: BorderRadius.DEFAULT,
-    paddingHorizontal: Spacing[4], paddingVertical: Spacing[3],
-    marginBottom: Spacing[4], gap: Spacing[2],
+  methodIconWrap: {
+    width: 46, height: 46, borderRadius: 12, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  currencyLabel: { fontSize: 18, fontWeight: '700' },
-  amountInput: { flex: 1, fontSize: 28, fontWeight: '800' },
-
-  infoBox: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: Spacing[2],
-    padding: Spacing[4], borderRadius: BorderRadius.DEFAULT,
-    borderWidth: 1, marginBottom: Spacing[4],
+  methodInfo:    { flex: 1, gap: 2 },
+  methodNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  methodName:    { fontSize: 13, fontWeight: '800' },
+  defaultBadge:  { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  defaultBadgeText: { fontSize: 8, fontWeight: '800' },
+  methodTitle:   { fontSize: 11 },
+  methodNumber:  { fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
+  methodBank:    { fontSize: 10 },
+  methodActions: { gap: 8, alignItems: 'center' },
+  methodActionBtn: {
+    width: 34, height: 34, borderRadius: 10, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
   },
-  infoText: { flex: 1, fontSize: Typography.fontSize.xs, lineHeight: 18 },
 
-  proceedBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: Spacing[2], paddingVertical: Spacing[4], borderRadius: BorderRadius.DEFAULT,
+  /* Add button */
+  addBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderRadius: 14, paddingVertical: 15,
   },
-  proceedBtnText: { color: '#fff', fontSize: Typography.fontSize.base, fontWeight: '700' },
+  addBtnText: { fontSize: 15, fontWeight: '800' },
 
-  txnCard: { borderRadius: BorderRadius.DEFAULT, borderWidth: 1.5, padding: Spacing[4], marginBottom: Spacing[4] },
-  txnCardHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing[2], marginBottom: Spacing[2] },
-  txnLabel: { fontSize: Typography.fontSize.sm, fontWeight: '700', textTransform: 'uppercase' },
-  txnId: { fontSize: 18, fontWeight: '800', letterSpacing: 1.2, marginBottom: Spacing[3] },
-  copyBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing[1],
-    alignSelf: 'flex-start', borderWidth: 1,
-    paddingHorizontal: Spacing[3], paddingVertical: Spacing[2],
-    borderRadius: BorderRadius.DEFAULT, marginBottom: Spacing[3],
+  /* Accepted card */
+  acceptedCard: {
+    borderRadius: 14, borderWidth: 1, padding: 16,
+    gap: 12, marginBottom: 16,
   },
-  copyBtnText: { fontSize: Typography.fontSize.sm, fontWeight: '600' },
-  txnNote: { fontSize: Typography.fontSize.xs, lineHeight: 16 },
-
-  amountBadge: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    padding: Spacing[4], borderRadius: BorderRadius.DEFAULT, borderWidth: 1, marginBottom: Spacing[4],
+  acceptedTitle: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  acceptedRow:   { flexDirection: 'row', gap: 10 },
+  acceptedItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 7,
+    borderRadius: 10, borderWidth: 1, flex: 1, justifyContent: 'center',
   },
-  amountBadgeLabel: { fontSize: Typography.fontSize.sm, fontWeight: '600' },
-  amountBadgeValue: { fontSize: 22, fontWeight: '800' },
+  acceptedLabel: { fontSize: 11, fontWeight: '700' },
+  acceptedNote:  { fontSize: 11, lineHeight: 16 },
 
-  bankBox: { borderRadius: BorderRadius.DEFAULT, padding: Spacing[4], marginBottom: Spacing[4] },
-  bankBoxHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing[2], marginBottom: Spacing[3] },
-  bankBoxTitle: { fontSize: Typography.fontSize.base, fontWeight: '700' },
-  tapToCopyHint: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingTop: Spacing[3], borderTopWidth: StyleSheet.hairlineWidth, marginTop: Spacing[1] },
-  tapToCopyText: { fontSize: 11 },
-  bankRow: { marginBottom: Spacing[3] },
-  bankLabel: { fontSize: Typography.fontSize.xs, fontWeight: '600', textTransform: 'uppercase', marginBottom: 2 },
-  bankValueRow: { flexDirection: 'row', alignItems: 'center' },
-  bankValue: { fontSize: Typography.fontSize.sm, fontWeight: '500' },
-
-  instructionsBox: { borderRadius: BorderRadius.DEFAULT, borderWidth: StyleSheet.hairlineWidth, marginBottom: Spacing[4], overflow: 'hidden' },
-  instructionRow: { padding: Spacing[4] },
-  instructionText: { fontSize: Typography.fontSize.sm, lineHeight: 20 },
-
-  openAppBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: Spacing[2], paddingVertical: Spacing[4], borderRadius: BorderRadius.DEFAULT, marginBottom: Spacing[2],
+  /* Modal */
+  modalOverlay:  { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { flex: 1, backgroundColor: '#00000060' },
+  modalSheet: {
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    borderWidth: 1, borderBottomWidth: 0,
+    maxHeight: '90%',
   },
-  openAppBtnText: { fontSize: Typography.fontSize.base, fontWeight: '700' },
-
-  txnReminder: { padding: Spacing[4], borderRadius: BorderRadius.DEFAULT, borderWidth: 1, marginBottom: Spacing[4], alignItems: 'center' },
-  txnReminderLabel: { fontSize: Typography.fontSize.xs, fontWeight: '700', textTransform: 'uppercase', marginBottom: 4 },
-  txnReminderValue: { fontSize: 16, fontWeight: '800', letterSpacing: 1 },
-
-  uploadArea: { marginBottom: Spacing[4] },
-  uploadPlaceholder: {
-    alignItems: 'center', padding: Spacing[8],
-    borderRadius: BorderRadius.DEFAULT, borderWidth: 2,
-    borderStyle: 'dashed', marginBottom: Spacing[4],
-  },
-  uploadTitle: { fontSize: Typography.fontSize.lg, fontWeight: '700', marginTop: Spacing[3], marginBottom: Spacing[2] },
-  uploadDesc: { fontSize: Typography.fontSize.sm, textAlign: 'center', lineHeight: 18 },
-  uploadBtns: { flexDirection: 'row', gap: Spacing[3] },
-  uploadBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: Spacing[2], paddingVertical: Spacing[4], borderRadius: BorderRadius.DEFAULT, borderWidth: 1,
-  },
-  uploadBtnText: { fontSize: Typography.fontSize.sm, fontWeight: '700' },
-
-  receiptPreviewWrap: { marginBottom: Spacing[4], borderRadius: BorderRadius.DEFAULT, overflow: 'hidden' },
-  receiptPreview: { width: '100%', height: 220, borderRadius: BorderRadius.DEFAULT },
-  changeReceiptBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing[2],
-    paddingVertical: Spacing[3], borderTopWidth: StyleSheet.hairlineWidth,
-    borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth,
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 4 },
+  sheetHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomLeftRadius: BorderRadius.DEFAULT, borderBottomRightRadius: BorderRadius.DEFAULT,
   },
-  changeReceiptText: { fontSize: Typography.fontSize.sm, fontWeight: '600' },
+  sheetTitle:   { fontSize: 17, fontWeight: '800' },
+  sheetScroll:  {},
+  sheetContent: { padding: 20 },
 
-  doneContent: { alignItems: 'center', paddingTop: Spacing[6] },
-  doneIcon: { width: 120, height: 120, borderRadius: 60, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing[5] },
-  doneTitle: { fontSize: 26, fontWeight: '800', marginBottom: Spacing[3], textAlign: 'center' },
-  doneDesc: { fontSize: Typography.fontSize.base, textAlign: 'center', lineHeight: 22, marginBottom: Spacing[6], paddingHorizontal: Spacing[4] },
-  doneTxnBox: { width: '100%', borderRadius: BorderRadius.DEFAULT, borderWidth: StyleSheet.hairlineWidth, padding: Spacing[4], alignItems: 'center', marginBottom: Spacing[4] },
-  doneTxnLabel: { fontSize: Typography.fontSize.xs, fontWeight: '700', textTransform: 'uppercase', marginBottom: 4 },
-  doneTxnValue: { fontSize: 18, fontWeight: '800', letterSpacing: 1, marginBottom: Spacing[3] },
-  doneStatusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: Spacing[3], paddingVertical: Spacing[1], borderRadius: 20 },
-  doneStatusText: { fontSize: Typography.fontSize.xs, fontWeight: '700' },
-  doneReceiptThumb: { width: '100%', height: 180, borderRadius: BorderRadius.DEFAULT, marginBottom: Spacing[4] },
-
-  externalTxnBox: { borderRadius: BorderRadius.DEFAULT, borderWidth: 1.5, padding: Spacing[4], marginBottom: Spacing[4] },
-  externalTxnHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing[2], marginBottom: Spacing[2] },
-  externalTxnTitle: { fontSize: Typography.fontSize.sm, fontWeight: '700', textTransform: 'uppercase' },
-  externalTxnDesc: { fontSize: Typography.fontSize.xs, lineHeight: 17, marginBottom: Spacing[3] },
-  externalTxnInput: {
-    borderWidth: 1.5, borderRadius: BorderRadius.DEFAULT,
-    paddingHorizontal: Spacing[4], paddingVertical: Spacing[3],
-    fontSize: Typography.fontSize.base, fontWeight: '600', letterSpacing: 0.5,
+  /* Form */
+  fieldLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8, marginTop: 16 },
+  fieldHint:  { fontSize: 11, marginTop: 6, marginBottom: 4 },
+  inputBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderRadius: 12, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 13,
   },
+  input: { flex: 1, fontSize: 14, padding: 0 },
+
+  typeRow: { flexDirection: 'row', gap: 8 },
+  typeChip: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 5, paddingVertical: 10, borderRadius: 10, borderWidth: 1,
+  },
+  typeChipText: { fontSize: 10, fontWeight: '700' },
+
+  /* Bank dropdown */
+  bankDropdown: {
+    borderRadius: 12, borderWidth: 1,
+    marginTop: 4, overflow: 'hidden',
+  },
+  bankOption: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 14, paddingVertical: 12,
+    gap: 10, borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  bankOptShort: { fontSize: 11, fontWeight: '700', width: 60 },
+  bankOptName:  { flex: 1, fontSize: 13 },
+
+  /* Save button */
+  saveBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderRadius: 14, paddingVertical: 15, marginTop: 20,
+  },
+  saveBtnText: { fontSize: 15, fontWeight: '800' },
 });

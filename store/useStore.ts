@@ -24,6 +24,18 @@ import {
   formatWait,
 } from '@/lib/queue';
 import {
+  COMMITMENT_FEE,
+  SavedPaymentMethod,
+  initializeWallet,
+  getWalletBalance,
+  deductWalletBalance,
+  getSavedPaymentMethods,
+  addPaymentMethod,
+  deletePaymentMethod,
+  setDefaultPaymentMethod,
+  WalletPaymentType,
+} from '@/lib/wallet';
+import {
   requestNotificationPermissions,
   notifyQueueJoined,
   notifyAlmostYourTurn,
@@ -52,7 +64,10 @@ export interface User {
   loyaltyPoints: number;
   totalVisits: number;
   memberSince: string;
+  walletBalance: number | null;
 }
+
+export { SavedPaymentMethod, WalletPaymentType };
 
 export interface Business {
   id: string;
@@ -133,6 +148,9 @@ interface AppState {
   notifications: Notification[];
   unreadCount: number;
 
+  // Wallet & Payments
+  paymentMethods: SavedPaymentMethod[];
+
   // Settings
   notificationsEnabled: boolean;
   locationEnabled: boolean;
@@ -187,6 +205,18 @@ interface AppState {
   // Favorites
   toggleFavorite: (businessId: string) => void;
 
+  // Wallet & Payment Methods
+  loadWallet: () => Promise<void>;
+  addWalletPaymentMethod: (params: {
+    type: WalletPaymentType;
+    accountTitle: string;
+    accountNumber: string;
+    bankName?: string;
+    makeDefault?: boolean;
+  }) => Promise<{ success: boolean; error?: string }>;
+  removeWalletPaymentMethod: (id: string) => Promise<{ success: boolean; error?: string }>;
+  setDefaultWalletPaymentMethod: (id: string) => Promise<{ success: boolean; error?: string }>;
+
   // Feedback
   submitFeedback: (data: { rating: number; category: string; message: string }) => Promise<{ success: boolean; error?: string }>;
 
@@ -225,6 +255,7 @@ const mapSupabaseUserToUser = (supabaseUser: SupabaseUser, profile?: any): User 
     loyaltyPoints: profile?.loyalty_points ?? metadata.loyalty_points ?? 0,
     totalVisits: profile?.total_visits ?? metadata.total_visits ?? 0,
     memberSince: new Date(supabaseUser.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+    walletBalance: profile?.wallet_balance != null ? Number(profile.wallet_balance) : null,
   };
 };
 
@@ -267,6 +298,7 @@ export const useStore = create<AppState>()(
       queueHistory: [],
       orders: [],
       favoriteBusinesses: [],
+      paymentMethods: [],
       notifications: [],
       unreadCount: 0,
       notificationsEnabled: true,
@@ -315,6 +347,16 @@ export const useStore = create<AppState>()(
           set({ isAuthenticated: true, user, session: result.session, isLoading: false, authError: null });
           _setupQueueSubscription(result.user.id);
 
+          // Initialize wallet (no-op if already initialized) + load payment methods
+          const [walletBalance, methods] = await Promise.all([
+            initializeWallet(result.user.id),
+            getSavedPaymentMethods(result.user.id),
+          ]);
+          set((state) => ({
+            paymentMethods: methods,
+            user: state.user ? { ...state.user, walletBalance } : null,
+          }));
+
           // Request notification permissions and send welcome notification
           const { notificationsEnabled, addNotification } = get();
           if (notificationsEnabled) {
@@ -332,6 +374,17 @@ export const useStore = create<AppState>()(
               read: false,
               createdAt: new Date().toISOString(),
             });
+            // Payment method setup reminder if none saved
+            if (methods.length === 0) {
+              addNotification({
+                id: `setup-payment-${Date.now()}`,
+                type: 'promo',
+                title: '💳 Set Up Your Payment Method',
+                message: 'Add EasyPaisa, JazzCash, or a bank account. A Rs 50 commitment fee is required to join any queue.',
+                read: false,
+                createdAt: new Date().toISOString(),
+              });
+            }
           }
 
           return { success: true };
@@ -390,6 +443,15 @@ export const useStore = create<AppState>()(
             const user = mapSupabaseUserToUser(session.user, profile);
             set({ isAuthenticated: true, user, session, isLoading: false });
             _setupQueueSubscription(session.user.id);
+            // Load wallet + payment methods in background
+            const [walletBalance, methods] = await Promise.all([
+              initializeWallet(session.user.id),
+              getSavedPaymentMethods(session.user.id),
+            ]);
+            set((state) => ({
+              paymentMethods: methods,
+              user: state.user ? { ...state.user, walletBalance } : null,
+            }));
           } else {
             set({ isAuthenticated: false, user: null, session: null, isLoading: false });
           }
@@ -572,6 +634,15 @@ export const useStore = create<AppState>()(
       ) => {
         const user = get().user;
         if (!user) return { success: false, error: 'Not authenticated' };
+
+        // ── Payment gate: Rs 50 commitment fee ──────────────────────────────
+        const currentBalance = user.walletBalance;
+        if (currentBalance === null || currentBalance < COMMITMENT_FEE) {
+          return {
+            success: false,
+            error: `INSUFFICIENT_BALANCE:${currentBalance ?? 0}`,
+          };
+        }
         const { data, error } = await joinBusinessQueue(businessId, user.id, {
           customerName: user.name,
           customerEmail: user.email,
@@ -582,6 +653,15 @@ export const useStore = create<AppState>()(
           totalAmount: pricing?.totalAmount,
         });
         if (error || !data) return { success: false, error: error ?? 'Failed to join queue' };
+
+        // ── Deduct commitment fee from wallet ────────────────────────────────
+        const { newBalance } = await deductWalletBalance(user.id, COMMITMENT_FEE);
+        if (newBalance !== null) {
+          set((state) => ({
+            user: state.user ? { ...state.user, walletBalance: newBalance } : null,
+          }));
+        }
+
         const entry: QueueEntry = {
           id: data.id,
           businessId: data.business_id,
@@ -726,6 +806,56 @@ export const useStore = create<AppState>()(
             }
           }
         }
+      },
+
+      // Wallet & Payment Methods
+      loadWallet: async () => {
+        const user = get().user;
+        if (!user) return;
+        const [balance, methods] = await Promise.all([
+          getWalletBalance(user.id),
+          getSavedPaymentMethods(user.id),
+        ]);
+        set((state) => ({
+          paymentMethods: methods,
+          user: state.user ? { ...state.user, walletBalance: balance } : null,
+        }));
+      },
+
+      addWalletPaymentMethod: async (params) => {
+        const user = get().user;
+        if (!user) return { success: false, error: 'Not authenticated' };
+        const { id, error } = await addPaymentMethod({ userId: user.id, ...params });
+        if (error) return { success: false, error };
+        // Reload payment methods from DB
+        const methods = await getSavedPaymentMethods(user.id);
+        set({ paymentMethods: methods });
+        return { success: true };
+      },
+
+      removeWalletPaymentMethod: async (id) => {
+        const user = get().user;
+        if (!user) return { success: false, error: 'Not authenticated' };
+        const { error } = await deletePaymentMethod(id);
+        if (error) return { success: false, error };
+        set((state) => ({
+          paymentMethods: state.paymentMethods.filter((m) => m.id !== id),
+        }));
+        return { success: true };
+      },
+
+      setDefaultWalletPaymentMethod: async (id) => {
+        const user = get().user;
+        if (!user) return { success: false, error: 'Not authenticated' };
+        const { error } = await setDefaultPaymentMethod(id, user.id);
+        if (error) return { success: false, error };
+        set((state) => ({
+          paymentMethods: state.paymentMethods.map((m) => ({
+            ...m,
+            isDefault: m.id === id,
+          })),
+        }));
+        return { success: true };
       },
 
       // Favorites

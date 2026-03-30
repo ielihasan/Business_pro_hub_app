@@ -18,6 +18,7 @@ import { Avatar, Button } from '@/components/ui';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { resolveBusinessById } from '@/lib/queue';
 import { useStore } from '@/store/useStore';
+import { COMMITMENT_FEE } from '@/lib/wallet';
 
 export default function BusinessDetailScreen() {
   const { id }     = useLocalSearchParams<{ id: string }>();
@@ -32,6 +33,8 @@ export default function BusinessDetailScreen() {
   const toggleFavorite      = useStore((s) => s.toggleFavorite);
   const favoriteBusinesses  = useStore((s) => s.favoriteBusinesses);
   const isAuthenticated     = useStore((s) => s.isAuthenticated);
+  const user                = useStore((s) => s.user);
+  const walletBalance       = user?.walletBalance ?? null;
   const isFavorite          = !!(business?.id && favoriteBusinesses.includes(business.id));
 
   useEffect(() => {
@@ -59,15 +62,35 @@ export default function BusinessDetailScreen() {
       });
       return;
     }
+
+    // ── Wallet balance check ─────────────────────────────────────────────────
+    if (walletBalance === null || walletBalance < COMMITMENT_FEE) {
+      setDialog({
+        title:   'Insufficient Wallet Balance',
+        message: `A Rs ${COMMITMENT_FEE} commitment fee is required to join a queue.\n\nYour current balance: Rs ${walletBalance ?? 0}\n\nThis fee ensures customers show up and keeps wait times accurate for everyone.`,
+        icon:    'wallet-outline',
+        iconVariant: 'warning',
+        actions: [
+          { label: 'Cancel',    variant: 'secondary', onPress: () => setDialog(null) },
+          {
+            label: 'Add Funds',
+            variant: 'primary',
+            onPress: () => { setDialog(null); router.push('/profile/payment'); },
+          },
+        ],
+      });
+      return;
+    }
+
     setDialog({
       title:   'Join Queue',
-      message: `${business.name}\n\nCurrent queue: ${business.queue_length ?? 0} people\nEstimated wait: ${business.wait_time ?? 'N/A'}\n\nWould you like to join?`,
+      message: `${business.name}\n\nCurrent queue: ${business.queue_length ?? 0} people\nEstimated wait: ${business.wait_time ?? 'N/A'}\n\nA commitment fee of Rs ${COMMITMENT_FEE} will be deducted from your wallet (Balance: Rs ${walletBalance}).\n\nWould you like to join?`,
       icon: 'people-outline',
       iconVariant: 'default',
       actions: [
         { label: 'Cancel', variant: 'secondary', onPress: () => setDialog(null) },
         {
-          label: 'Join Queue',
+          label: 'Join & Pay Rs 50',
           variant: 'primary',
           onPress: async () => {
             setDialog(null);
@@ -75,9 +98,13 @@ export default function BusinessDetailScreen() {
             const result = await joinQueueInSupabase(business.id);
             setLoading(false);
             if (!result.success || !result.queueEntryId) {
+              // Handle insufficient balance returned from store as well
+              const isBalanceError = result.error?.startsWith('INSUFFICIENT_BALANCE');
               setDialog({
-                title:   'Could Not Join',
-                message: result.error ?? 'An error occurred.',
+                title:   isBalanceError ? 'Insufficient Balance' : 'Could Not Join',
+                message: isBalanceError
+                  ? `Your wallet balance is too low. Please add funds to your wallet and try again.`
+                  : (result.error ?? 'An error occurred.'),
                 icon: 'alert-circle-outline', iconVariant: 'destructive',
                 actions: [{ label: 'OK', onPress: () => setDialog(null) }],
               });
@@ -280,6 +307,13 @@ export default function BusinessDetailScreen() {
                 </>
               )}
             </TouchableOpacity>
+            {/* Commitment fee note */}
+            <View style={styles.feeRow}>
+              <Ionicons name="wallet-outline" size={12} color={MUTED} />
+              <Text style={[styles.feeNote, { color: MUTED }]}>
+                Rs {COMMITMENT_FEE} commitment fee · Wallet: Rs {walletBalance ?? '—'}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -442,6 +476,8 @@ const styles = StyleSheet.create({
     gap: 8, borderRadius: 14, paddingVertical: 16,
   },
   joinBtnText: { fontSize: 14, fontWeight: '900', letterSpacing: 1 },
+  feeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: -4 },
+  feeNote: { fontSize: 10, fontWeight: '500' },
 
   /* ── Quick actions ── */
   actionBtn: {
