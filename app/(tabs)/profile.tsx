@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Animated,
   View,
   Text,
   ScrollView,
@@ -7,6 +8,7 @@ import {
   TouchableOpacity,
   StatusBar,
 } from 'react-native';
+import { useScreenEntrance } from '@/hooks/useScreenEntrance';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +34,7 @@ type MenuItem = {
 
 export default function ProfileScreen() {
   const { colors, isDark }                                   = useTheme();
+  const { entranceStyle }                                    = useScreenEntrance();
   const { user, logout, isLoading, notificationsEnabled, unreadCount } = useStore();
   const { t }                                                = useTranslation();
   const { isUploading, handleEditPhoto }                     = useProfilePhoto();
@@ -120,7 +123,7 @@ export default function ProfileScreen() {
   return (
     <View style={[styles.root, { backgroundColor: BG }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-
+      <Animated.View style={[{ flex: 1 }, entranceStyle]}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: BG }}>
         {/* ── Top Bar ── */}
         <View style={styles.topBar}>
@@ -234,6 +237,7 @@ export default function ProfileScreen() {
           onDismiss={() => setDialog(null)}
         />
       )}
+      </Animated.View>
     </View>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
+  Animated,
   View,
   Text,
   StyleSheet,
@@ -8,6 +9,7 @@ import {
   RefreshControl,
   StatusBar,
 } from 'react-native';
+import { useScreenEntrance } from '@/hooks/useScreenEntrance';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
@@ -17,7 +19,8 @@ import { useStore } from '@/store/useStore';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 
 export default function QueueScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark }    = useTheme();
+  const { entranceStyle }     = useScreenEntrance();
   const { t }              = useTranslation();
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab,  setActiveTab]  = useState<'active' | 'history'>('active');
@@ -76,7 +79,7 @@ export default function QueueScreen() {
   return (
     <View style={[styles.root, { backgroundColor: BG }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-
+      <Animated.View style={[{ flex: 1 }, entranceStyle]}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: BG }}>
         {/* ── Top Bar ── */}
         <View style={styles.topBar}>
@@ -167,6 +170,7 @@ export default function QueueScreen() {
       </ScrollView>
 
       {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
+      </Animated.View>
     </View>
   );
 }

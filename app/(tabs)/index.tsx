@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Animated,
   View,
   ScrollView,
   RefreshControl,
@@ -10,6 +11,7 @@ import {
   TextInput,
   StatusBar,
 } from 'react-native';
+import { useScreenEntrance } from '@/hooks/useScreenEntrance';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,7 +33,8 @@ function getGreeting() {
 }
 
 export default function HomeScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark }     = useTheme();
+  const { entranceStyle }      = useScreenEntrance();
   const user                = useStore((s) => s.user);
   const activeQueues        = useStore((s) => s.activeQueues);
   const unreadCount         = useStore((s) => s.unreadCount);
@@ -67,7 +70,7 @@ export default function HomeScreen() {
   return (
     <View style={[styles.root, { backgroundColor: BG }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-
+      <Animated.View style={[{ flex: 1 }, entranceStyle]}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: BG }}>
         {/* ── Top Bar ── */}
         <View style={styles.topBar}>
@@ -158,17 +161,11 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* ── Section Label ── */}
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: FG }]}>NEARBY</Text>
-          <View style={[styles.sectionLine, { backgroundColor: BORDER }]} />
-        </View>
-
         {/* ── Categories ── */}
         <CategoryFilter selected={selectedCategory} onSelect={setSelectedCategory} />
 
-        {/* ── Nearby Businesses ── */}
-        <NearbyBusinesses businesses={businesses} />
+        {/* ── Available Businesses (capped at 3 on home) ── */}
+        <NearbyBusinesses businesses={businesses} limit={3} />
 
         <View style={{ height: 96 }} />
       </ScrollView>
@@ -177,6 +174,7 @@ export default function HomeScreen() {
         visible={notificationsPanelVisible}
         onClose={() => setNotificationsPanelVisible(false)}
       />
+      </Animated.View>
     </View>
   );
 }
@@ -239,11 +237,4 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
 
-  /* ── Section header ── */
-  sectionHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 24, marginBottom: 8, gap: 12,
-  },
-  sectionTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 2 },
-  sectionLine:  { flex: 1, height: 1 },
 });

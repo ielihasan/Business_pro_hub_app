@@ -1,29 +1,176 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  Animated, View, Text, StyleSheet, TextInput, TouchableOpacity,
   FlatList, ActivityIndicator,
 } from 'react-native';
+import { useScreenEntrance } from '@/hooks/useScreenEntrance';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { fetchBusinesses, BusinessRecord } from '@/lib/business';
 
-const CITIES = [
-  'Karachi', 'Lahore', 'Islamabad', 'Rawalpindi',
-  'Peshawar', 'Quetta', 'Faisalabad', 'Multan',
+// ── City → Province mapping (2023 census) ───────────────────────────────────
+const CITY_PROVINCE: Record<string, string> = {
+  'Abbottabad': 'Khyber Pakhtunkhwa',
+  'Ahmedpur East': 'Punjab',
+  'Arif Wala': 'Punjab',
+  'Attock': 'Punjab',
+  'Badin': 'Sindh',
+  'Bahawalnagar': 'Punjab',
+  'Bahawalpur': 'Punjab',
+  'Barikot': 'Khyber Pakhtunkhwa',
+  'Bhakkar': 'Punjab',
+  'Bhalwal': 'Punjab',
+  'Bholari': 'Sindh',
+  'Burewala': 'Punjab',
+  'Chakwal': 'Punjab',
+  'Chaman': 'Balochistan',
+  'Charsadda': 'Khyber Pakhtunkhwa',
+  'Chichawatni': 'Punjab',
+  'Chiniot': 'Punjab',
+  'Chishtian': 'Punjab',
+  'Dadu': 'Sindh',
+  'Daska': 'Punjab',
+  'Dera Ghazi Khan': 'Punjab',
+  'Dera Ismail Khan': 'Khyber Pakhtunkhwa',
+  'Dera Murad Jamali': 'Balochistan',
+  'Dipalpur': 'Punjab',
+  'Faisalabad': 'Punjab',
+  'Farooqabad': 'Punjab',
+  'Ferozwala': 'Punjab',
+  'Ghotki': 'Sindh',
+  'Gojra': 'Punjab',
+  'Gujar Khan': 'Punjab',
+  'Gujranwala': 'Punjab',
+  'Gujranwala Cantonment': 'Punjab',
+  'Gujrat': 'Punjab',
+  'Hafizabad': 'Punjab',
+  'Haroonabad': 'Punjab',
+  'Hasilpur': 'Punjab',
+  'Haveli Lakha': 'Punjab',
+  'Hub': 'Balochistan',
+  'Hyderabad': 'Sindh',
+  'Islamabad': 'Islamabad Capital Territory',
+  'Jacobabad': 'Sindh',
+  'Jalalpur Jattan': 'Punjab',
+  'Jampur': 'Punjab',
+  'Jaranwala': 'Punjab',
+  'Jatoi': 'Punjab',
+  'Jauharabad': 'Punjab',
+  'Jhang': 'Punjab',
+  'Jhelum': 'Punjab',
+  'Kabal': 'Khyber Pakhtunkhwa',
+  'Kamalia': 'Punjab',
+  'Kamber Ali Khan': 'Sindh',
+  'Kamoke': 'Punjab',
+  'Karachi': 'Sindh',
+  'Kasur': 'Punjab',
+  'Khairpur': 'Sindh',
+  'Khanewal': 'Punjab',
+  'Khanpur': 'Punjab',
+  'Kharian': 'Punjab',
+  'Khushab': 'Punjab',
+  'Khuzdar': 'Balochistan',
+  'Kohat': 'Khyber Pakhtunkhwa',
+  'Kot Abdul Malik': 'Punjab',
+  'Kot Addu': 'Punjab',
+  'Kot Radha Kishan': 'Punjab',
+  'Kotri': 'Sindh',
+  'Lahore': 'Punjab',
+  'Lala Musa': 'Punjab',
+  'Larkana': 'Sindh',
+  'Layyah': 'Punjab',
+  'Lodhran': 'Punjab',
+  'Ludhewala Waraich': 'Punjab',
+  'Mailsi': 'Punjab',
+  'Mandi Bahauddin': 'Punjab',
+  'Mansehra': 'Khyber Pakhtunkhwa',
+  'Mardan': 'Khyber Pakhtunkhwa',
+  'Mian Channu': 'Punjab',
+  'Mianwali': 'Punjab',
+  'Mingora': 'Khyber Pakhtunkhwa',
+  'Mirpur': 'Azad Kashmir',
+  'Mirpur Khas': 'Sindh',
+  'Moro': 'Sindh',
+  'Multan': 'Punjab',
+  'Muridke': 'Punjab',
+  'Muzaffarabad': 'Azad Kashmir',
+  'Muzaffargarh': 'Punjab',
+  'Narowal': 'Punjab',
+  'Nawabshah': 'Sindh',
+  'Nowshera': 'Khyber Pakhtunkhwa',
+  'Okara': 'Punjab',
+  'Pakpattan': 'Punjab',
+  'Panjgur': 'Balochistan',
+  'Pasrur': 'Punjab',
+  'Pattoki': 'Punjab',
+  'Peshawar': 'Khyber Pakhtunkhwa',
+  'Phool Nagar': 'Punjab',
+  'Pishin': 'Balochistan',
+  'Quetta': 'Balochistan',
+  'Rahim Yar Khan': 'Punjab',
+  'Rajanpur': 'Punjab',
+  'Rawalpindi': 'Punjab',
+  'Renala Khurd': 'Punjab',
+  'Sadiqabad': 'Punjab',
+  'Sahiwal': 'Punjab',
+  'Sambrial': 'Punjab',
+  'Samundri': 'Punjab',
+  'Sangla Hill': 'Punjab',
+  'Sargodha': 'Punjab',
+  'Shabqadar': 'Khyber Pakhtunkhwa',
+  'Shahdadkot': 'Sindh',
+  'Shahdadpur': 'Sindh',
+  'Shakargarh': 'Punjab',
+  'Sheikhupura': 'Punjab',
+  'Shikarpur': 'Sindh',
+  'Shujabad': 'Punjab',
+  'Sialkot': 'Punjab',
+  'Sukkur': 'Sindh',
+  'Swabi': 'Khyber Pakhtunkhwa',
+  'Tando Adam': 'Sindh',
+  'Tando Allahyar': 'Sindh',
+  'Tando Muhammad Khan': 'Sindh',
+  'Taunsa': 'Punjab',
+  'Taxila': 'Punjab',
+  'Turbat': 'Balochistan',
+  'Umerkot': 'Sindh',
+  'Vehari': 'Punjab',
+  'Wah Cantonment': 'Punjab',
+  'Wazirabad': 'Punjab',
+};
+
+const ALL_CITIES = Object.keys(CITY_PROVINCE).sort();
+
+const POPULAR_CITIES = [
+  'Karachi', 'Lahore', 'Faisalabad', 'Rawalpindi',
+  'Gujranwala', 'Multan', 'Islamabad', 'Peshawar',
+  'Quetta', 'Hyderabad', 'Sialkot', 'Sargodha',
 ];
 
 type BizResult = BusinessRecord & { distanceKm: number; address?: string | null };
 
 export default function DiscoverScreen() {
-  const { colors } = useTheme();
-  const [query, setQuery]           = useState('');
-  const [activeCity, setActiveCity] = useState<string | null>(null);
-  const [results, setResults]       = useState<BizResult[]>([]);
-  const [loading, setLoading]       = useState(false);
-  const [searched, setSearched]     = useState(false);
+  const { colors }        = useTheme();
+  const { entranceStyle } = useScreenEntrance();
 
+  const [query,      setQuery]      = useState('');
+  const [activeCity, setActiveCity] = useState<string | null>(null);
+  const [results,    setResults]    = useState<BizResult[]>([]);
+  const [loading,    setLoading]    = useState(false);
+  const [searched,   setSearched]   = useState(false);
+
+  // ── Suggestions (shown as body when typing) ──────────────────────────────
+  const suggestions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return ALL_CITIES.filter(c => c.toLowerCase().includes(q));
+  }, [query]);
+
+  const isTyping = query.trim().length > 0 && !searched;
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const doSearch = async (city: string) => {
     setActiveCity(city);
     setLoading(true);
@@ -31,12 +178,13 @@ export default function DiscoverScreen() {
     try {
       const [byName, all] = await Promise.all([
         fetchBusinesses({ query: city, limit: 200 }) as Promise<BizResult[]>,
-        fetchBusinesses({ limit: 200 }) as Promise<BizResult[]>,
+        fetchBusinesses({ limit: 200 })              as Promise<BizResult[]>,
       ]);
-      const seen = new Set(byName.map(b => b.id));
+      const seen   = new Set(byName.map(b => b.id));
       const merged = [...byName];
       for (const b of all) {
-        if (!seen.has(b.id) && ((b as any).address ?? '').toLowerCase().includes(city.toLowerCase())) {
+        if (!seen.has(b.id) &&
+            ((b as any).address ?? '').toLowerCase().includes(city.toLowerCase())) {
           seen.add(b.id);
           merged.push(b);
         }
@@ -49,6 +197,11 @@ export default function DiscoverScreen() {
     }
   };
 
+  const selectCity = (city: string) => {
+    setQuery(city);
+    doSearch(city);
+  };
+
   const clearSearch = () => {
     setActiveCity(null);
     setResults([]);
@@ -56,150 +209,216 @@ export default function DiscoverScreen() {
     setQuery('');
   };
 
+  const { background: BG, foreground: FG, mutedForeground: MUTED,
+          border: BORDER, card: CARD, secondary: SEC } = colors;
+
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <SafeAreaView edges={['top']} style={{ backgroundColor: colors.background }}>
-        {/* Header */}
-        <View style={styles.header}>
-          {activeCity ? (
-            <TouchableOpacity
-              onPress={clearSearch}
-              style={[styles.iconBtn, { backgroundColor: colors.secondary }]}
-            >
-              <Ionicons name="arrow-back" size={18} color={colors.foreground} />
-            </TouchableOpacity>
-          ) : (
-            <View style={[styles.iconBtn, { backgroundColor: colors.secondary }]}>
-              <Ionicons name="location-outline" size={18} color={colors.foreground} />
-            </View>
-          )}
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>
-            {activeCity ? activeCity.toUpperCase() : 'DISCOVER'}
-          </Text>
-          <View style={{ width: 40 }} />
-        </View>
+    <View style={[styles.root, { backgroundColor: BG }]}>
+      <Animated.View style={[{ flex: 1 }, entranceStyle]}>
 
-        {/* Search bar */}
-        <View style={[styles.searchBar, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-          <Ionicons name="search-outline" size={16} color={colors.mutedForeground} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder="Search by city or business…"
-            placeholderTextColor={colors.mutedForeground}
-            value={query}
-            onChangeText={setQuery}
-            onSubmitEditing={() => { if (query.trim()) doSearch(query.trim()); }}
-            returnKeyType="search"
-          />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={() => { setQuery(''); clearSearch(); }}>
-              <Ionicons name="close-circle" size={16} color={colors.mutedForeground} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </SafeAreaView>
-
-      {/* ── City grid ── */}
-      {!searched ? (
-        <FlatList
-          data={CITIES}
-          keyExtractor={item => item}
-          numColumns={2}
-          contentContainerStyle={styles.cityGrid}
-          ListHeaderComponent={
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>POPULAR CITIES</Text>
-          }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.cityCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => { setQuery(item); doSearch(item); }}
-              activeOpacity={0.75}
-            >
-              <View style={[styles.cityIconWrap, { backgroundColor: colors.secondary }]}>
-                <Ionicons name="location-outline" size={22} color={colors.foreground} />
+        <SafeAreaView edges={['top']} style={{ backgroundColor: BG }}>
+          {/* ── Header ── */}
+          <View style={styles.header}>
+            {activeCity ? (
+              <TouchableOpacity
+                onPress={clearSearch}
+                style={[styles.iconBtn, { backgroundColor: SEC }]}
+              >
+                <Ionicons name="arrow-back" size={18} color={FG} />
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.iconBtn, { backgroundColor: SEC }]}>
+                <Ionicons name="location-outline" size={18} color={FG} />
               </View>
-              <Text style={[styles.cityName, { color: colors.foreground }]}>{item}</Text>
-              <Text style={[styles.cityCountry, { color: colors.mutedForeground }]}>Pakistan</Text>
-            </TouchableOpacity>
-          )}
-        />
-      ) : loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.foreground} />
-          <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Searching…</Text>
-        </View>
-      ) : results.length === 0 ? (
-        <View style={styles.center}>
-          <View style={[styles.emptyIcon, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-            <Ionicons name="storefront-outline" size={36} color={colors.foreground} />
-          </View>
-          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Businesses Found</Text>
-          <Text style={[styles.emptyDesc, { color: colors.mutedForeground }]}>
-            No businesses listed in {activeCity} yet.
-          </Text>
-          <TouchableOpacity
-            style={[styles.retryBtn, { backgroundColor: colors.foreground }]}
-            onPress={clearSearch}
-          >
-            <Text style={[styles.retryText, { color: colors.background }]}>Search Another City</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        /* ── Results list ── */
-        <FlatList
-          data={results}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.resultsList}
-          ListHeaderComponent={
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-              {results.length} BUSINESS{results.length !== 1 ? 'ES' : ''} IN {activeCity?.toUpperCase()}
+            )}
+            <Text style={[styles.headerTitle, { color: FG }]}>
+              {activeCity ? activeCity.toUpperCase() : 'DISCOVER'}
             </Text>
-          }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.bizCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => router.push(`/business/${item.id}`)}
-              activeOpacity={0.75}
-            >
-              <View style={[styles.bizAvatar, { backgroundColor: colors.secondary }]}>
-                <Text style={[styles.bizAvatarText, { color: colors.foreground }]}>
-                  {item.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+            <View style={{ width: 40 }} />
+          </View>
+
+          {/* ── Search bar ── */}
+          <View style={[styles.searchBar, { backgroundColor: SEC, borderColor: BORDER }]}>
+            <Ionicons name="search-outline" size={16} color={MUTED} />
+            <TextInput
+              style={[styles.searchInput, { color: FG }]}
+              placeholder="Type a city name…"
+              placeholderTextColor={MUTED}
+              value={query}
+              onChangeText={(text) => {
+                setQuery(text);
+                // reset results so typing after a search re-opens suggestions
+                if (searched) { setSearched(false); setActiveCity(null); setResults([]); }
+              }}
+              onSubmitEditing={() => {
+                if (suggestions.length > 0) selectCity(suggestions[0]);
+                else if (query.trim()) doSearch(query.trim());
+              }}
+              returnKeyType="search"
+              autoCorrect={false}
+              autoCapitalize="words"
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={clearSearch} hitSlop={8}>
+                <Ionicons name="close-circle" size={16} color={MUTED} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </SafeAreaView>
+
+        {/* ── Body ──────────────────────────────────────────────────────────
+            Priority: suggestions → popular grid → loading → empty → results
+        ─────────────────────────────────────────────────────────────────── */}
+
+        {isTyping ? (
+          /* Suggestion list replaces the body while typing */
+          suggestions.length === 0 ? (
+            <View style={styles.center}>
+              <Ionicons name="search-outline" size={40} color={MUTED} />
+              <Text style={[styles.noMatchText, { color: MUTED }]}>
+                No city matches "{query}"
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              key="suggestions"
+              data={suggestions}
+              keyExtractor={item => item}
+              keyboardShouldPersistTaps="always"
+              contentContainerStyle={styles.suggestionList}
+              ListHeaderComponent={
+                <Text style={[styles.sectionLabel, { color: MUTED }]}>
+                  {suggestions.length} {suggestions.length === 1 ? 'CITY' : 'CITIES'} FOUND
                 </Text>
-              </View>
-              <View style={styles.bizInfo}>
-                <Text style={[styles.bizName, { color: colors.foreground }]} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text style={[styles.bizMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
-                  {item.category || 'Business'}
-                </Text>
-                {!!(item as any).address && (
-                  <Text style={[styles.bizMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
-                    {(item as any).address}
-                  </Text>
-                )}
-              </View>
-              <View style={styles.bizRight}>
-                {item.is_open != null && (
-                  <View style={[styles.openBadge, {
-                    backgroundColor: item.is_open ? colors.success + '20' : colors.secondary,
-                  }]}>
-                    <View style={[styles.openDot, {
-                      backgroundColor: item.is_open ? colors.success : colors.mutedForeground,
-                    }]} />
-                    <Text style={[styles.openText, {
-                      color: item.is_open ? colors.success : colors.mutedForeground,
-                    }]}>
-                      {item.is_open ? 'Open' : 'Closed'}
+              }
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.suggestionRow, { backgroundColor: CARD, borderColor: BORDER }]}
+                  onPress={() => selectCity(item)}
+                  activeOpacity={0.72}
+                >
+                  <View style={[styles.suggestionIcon, { backgroundColor: SEC }]}>
+                    <Ionicons name="location-outline" size={16} color={FG} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.suggestionCity, { color: FG }]}>{item}</Text>
+                    <Text style={[styles.suggestionProvince, { color: MUTED }]}>
+                      {CITY_PROVINCE[item] ?? 'Pakistan'}
                     </Text>
                   </View>
-                )}
-                <Ionicons name="chevron-forward" size={14} color={colors.mutedForeground} style={{ marginTop: 6 }} />
-              </View>
+                  <Ionicons name="arrow-forward" size={14} color={MUTED} />
+                </TouchableOpacity>
+              )}
+            />
+          )
+        ) : !searched ? (
+          /* Popular cities grid */
+          <FlatList
+            key="popular-grid"
+            data={POPULAR_CITIES}
+            keyExtractor={item => item}
+            numColumns={2}
+            keyboardShouldPersistTaps="always"
+            contentContainerStyle={styles.cityGrid}
+            ListHeaderComponent={
+              <Text style={[styles.sectionLabel, { color: MUTED }]}>POPULAR CITIES</Text>
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.cityCard, { backgroundColor: CARD, borderColor: BORDER }]}
+                onPress={() => selectCity(item)}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.cityIconWrap, { backgroundColor: SEC }]}>
+                  <Ionicons name="location-outline" size={22} color={FG} />
+                </View>
+                <Text style={[styles.cityName, { color: FG }]}>{item}</Text>
+                <Text style={[styles.cityProvince, { color: MUTED }]}>
+                  {CITY_PROVINCE[item] ?? 'Pakistan'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+        ) : loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={FG} />
+            <Text style={[styles.loadingText, { color: MUTED }]}>Searching…</Text>
+          </View>
+        ) : results.length === 0 ? (
+          <View style={styles.center}>
+            <View style={[styles.emptyIcon, { backgroundColor: SEC, borderColor: BORDER }]}>
+              <Ionicons name="storefront-outline" size={36} color={FG} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: FG }]}>No Businesses Found</Text>
+            <Text style={[styles.emptyDesc, { color: MUTED }]}>
+              No businesses listed in {activeCity} yet.
+            </Text>
+            <TouchableOpacity
+              style={[styles.retryBtn, { backgroundColor: FG }]}
+              onPress={clearSearch}
+            >
+              <Text style={[styles.retryText, { color: BG }]}>Search Another City</Text>
             </TouchableOpacity>
-          )}
-        />
-      )}
+          </View>
+        ) : (
+          <FlatList
+            key="results"
+            data={results}
+            keyExtractor={item => item.id}
+            keyboardShouldPersistTaps="always"
+            contentContainerStyle={styles.resultsList}
+            ListHeaderComponent={
+              <Text style={[styles.sectionLabel, { color: MUTED }]}>
+                {results.length} BUSINESS{results.length !== 1 ? 'ES' : ''} IN {activeCity?.toUpperCase()}
+              </Text>
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.bizCard, { backgroundColor: CARD, borderColor: BORDER }]}
+                onPress={() => router.push(`/business/${item.id}`)}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.bizAvatar, { backgroundColor: SEC }]}>
+                  <Text style={[styles.bizAvatarText, { color: FG }]}>
+                    {item.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.bizInfo}>
+                  <Text style={[styles.bizName, { color: FG }]} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text style={[styles.bizMeta, { color: MUTED }]} numberOfLines={1}>
+                    {item.category || 'Business'}
+                  </Text>
+                  {!!(item as any).address && (
+                    <Text style={[styles.bizMeta, { color: MUTED }]} numberOfLines={1}>
+                      {(item as any).address}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.bizRight}>
+                  {item.is_open != null && (
+                    <View style={[styles.openBadge, {
+                      backgroundColor: item.is_open ? colors.success + '20' : SEC,
+                    }]}>
+                      <View style={[styles.openDot, {
+                        backgroundColor: item.is_open ? colors.success : MUTED,
+                      }]} />
+                      <Text style={[styles.openText, {
+                        color: item.is_open ? colors.success : MUTED,
+                      }]}>
+                        {item.is_open ? 'Open' : 'Closed'}
+                      </Text>
+                    </View>
+                  )}
+                  <Ionicons name="chevron-forward" size={14} color={MUTED} style={{ marginTop: 6 }} />
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        )}
+
+      </Animated.View>
     </View>
   );
 }
@@ -216,7 +435,7 @@ const styles = StyleSheet.create({
 
   searchBar: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    marginHorizontal: 20, marginBottom: 16,
+    marginHorizontal: 20, marginBottom: 12,
     paddingHorizontal: 14, paddingVertical: 12,
     borderRadius: 14, borderWidth: 1,
   },
@@ -224,18 +443,35 @@ const styles = StyleSheet.create({
 
   sectionLabel: {
     fontSize: 11, fontWeight: '700', letterSpacing: 1.5,
-    marginBottom: 14, paddingHorizontal: 20,
+    marginBottom: 12, paddingHorizontal: 20,
   },
 
+  /* ── Suggestions ── */
+  suggestionList: { paddingTop: 8, paddingBottom: 24 },
+  suggestionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 16, marginBottom: 8,
+    padding: 14, borderRadius: 14, borderWidth: 1,
+  },
+  suggestionIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  suggestionCity:     { fontSize: 15, fontWeight: '700' },
+  suggestionProvince: { fontSize: 12, marginTop: 2 },
+  noMatchText:        { fontSize: 14, marginTop: 12, textAlign: 'center' },
+
+  /* ── Popular cities grid ── */
   cityGrid:    { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 20 },
   cityCard: {
     flex: 1, margin: 8, padding: 20, borderRadius: 16, borderWidth: 1,
-    alignItems: 'center', gap: 10,
+    alignItems: 'center', gap: 8,
   },
   cityIconWrap: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   cityName:     { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
-  cityCountry:  { fontSize: 11, fontWeight: '500' },
+  cityProvince: { fontSize: 11, fontWeight: '500', textAlign: 'center' },
 
+  /* ── States ── */
   center:      { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   loadingText: { fontSize: 14, marginTop: 14, fontWeight: '500' },
   emptyIcon: {
@@ -247,6 +483,7 @@ const styles = StyleSheet.create({
   retryBtn:   { paddingHorizontal: 28, paddingVertical: 14, borderRadius: 12 },
   retryText:  { fontSize: 15, fontWeight: '800' },
 
+  /* ── Results ── */
   resultsList: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 },
   bizCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,

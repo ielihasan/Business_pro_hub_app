@@ -1,9 +1,9 @@
 import { Tabs } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { Platform, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Platform, Animated, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -36,6 +36,37 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const CENTER_ICO = colors.background;
   const RING_CLR   = colors.border;
 
+  // ── Tab animations ───────────────────────────────────────────────────
+  const scaleAnims = useRef(state.routes.map(() => new Animated.Value(1))).current;
+  const dotAnims   = useRef(
+    state.routes.map((_, i) => new Animated.Value(i === state.index ? 1 : 0)),
+  ).current;
+  const prevIndexRef = useRef(state.index);
+
+  useEffect(() => {
+    const prev = prevIndexRef.current;
+    if (prev === state.index) return;
+    prevIndexRef.current = state.index;
+
+    // Fade the old indicator out, fade the new one in
+    Animated.timing(dotAnims[prev], {
+      toValue: 0, duration: 200, useNativeDriver: true,
+    }).start();
+    Animated.timing(dotAnims[state.index], {
+      toValue: 1, duration: 240, useNativeDriver: true,
+    }).start();
+
+    // Bounce the newly active tab icon
+    Animated.sequence([
+      Animated.timing(scaleAnims[state.index], {
+        toValue: 0.78, duration: 75, useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnims[state.index], {
+        toValue: 1, friction: 4, tension: 200, useNativeDriver: true,
+      }),
+    ]).start();
+  }, [state.index]);
+
   return (
     <View style={[styles.wrapper, { paddingBottom: bottomInset }]}>
       <View style={[styles.bar, { backgroundColor: BAR_BG, borderTopColor: BORDER_CLR, height: BAR_H + (bottomInset > 0 ? 0 : 4) }]}>
@@ -56,9 +87,9 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               <TouchableOpacity key={route.key} onPress={onPress} style={styles.centerWrap} activeOpacity={0.82}>
                 {/* Outer ring */}
                 <View style={[styles.centerRing, { borderColor: RING_CLR, backgroundColor: colors.secondary }]}>
-                  <View style={[styles.centerCircle, { backgroundColor: CENTER_BG }]}>
+                  <Animated.View style={[styles.centerCircle, { backgroundColor: CENTER_BG, transform: [{ scale: scaleAnims[index] }] }]}>
                     <Ionicons name={focused ? cfg.filled : cfg.outline} size={24} color={CENTER_ICO} />
-                  </View>
+                  </Animated.View>
                 </View>
                 <Text style={[styles.centerLabel, { color: focused ? ACTIVE_CLR : MUTED_CLR }]}>
                   {cfg.label}
@@ -69,14 +100,20 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
           return (
             <TouchableOpacity key={route.key} onPress={onPress} style={styles.tab} activeOpacity={0.65}>
-              <Ionicons
-                name={focused ? cfg.filled : cfg.outline}
-                size={21}
-                color={focused ? ACTIVE_CLR : MUTED_CLR}
-              />
+              <Animated.View style={{ transform: [{ scale: scaleAnims[index] }] }}>
+                <Ionicons
+                  name={focused ? cfg.filled : cfg.outline}
+                  size={21}
+                  color={focused ? ACTIVE_CLR : MUTED_CLR}
+                />
+              </Animated.View>
               <Text style={[styles.tabLabel, { color: focused ? ACTIVE_CLR : MUTED_CLR }, focused && styles.tabLabelActive]}>
                 {cfg.label}
               </Text>
+              {/* Focus indicator pill — always rendered to avoid layout shift */}
+              <Animated.View
+                style={[styles.tabIndicator, { backgroundColor: ACTIVE_CLR, opacity: dotAnims[index] }]}
+              />
             </TouchableOpacity>
           );
         })}
@@ -103,6 +140,10 @@ const styles = StyleSheet.create({
   },
   tabLabel:       { fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   tabLabelActive: { fontWeight: '800' },
+  tabIndicator: {
+    width: 18, height: 3, borderRadius: 1.5,
+    marginTop: 2,
+  },
 
   centerWrap: {
     flex: 1, alignItems: 'center', justifyContent: 'flex-end',

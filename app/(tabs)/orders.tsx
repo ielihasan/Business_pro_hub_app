@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
+  Animated,
   View,
   Text,
   ScrollView,
@@ -9,6 +10,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { useScreenEntrance } from '@/hooks/useScreenEntrance';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
@@ -25,7 +27,8 @@ const FILTERS: { key: Filter; label: string }[] = [
 ];
 
 export default function OrdersScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark }    = useTheme();
+  const { entranceStyle }     = useScreenEntrance();
   const user = useStore((s) => s.user);
 
   const [orders, setOrders]       = useState<OrderHistoryEntry[]>([]);
@@ -74,7 +77,7 @@ export default function OrdersScreen() {
   return (
     <View style={[styles.root, { backgroundColor: BG }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-
+      <Animated.View style={[{ flex: 1 }, entranceStyle]}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: BG }}>
         {/* ── Header ── */}
         <View style={[styles.header, { borderBottomColor: BORDER }]}>
@@ -172,6 +175,7 @@ export default function OrdersScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+      </Animated.View>
     </View>
   );
 }

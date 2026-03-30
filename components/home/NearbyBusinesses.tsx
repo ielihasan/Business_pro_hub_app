@@ -3,47 +3,39 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { useTranslation } from 'react-i18next';
 import { BusinessCard } from './BusinessCard';
 
 interface NearbyBusinessesProps {
   businesses: any[];
+  /** Cap the displayed list. If set, shows a "See All" button revealing the full list. */
+  limit?: number;
 }
 
-export function NearbyBusinesses({ businesses }: NearbyBusinessesProps) {
+export function NearbyBusinesses({ businesses, limit }: NearbyBusinessesProps) {
   const { colors } = useTheme();
-  const { t }      = useTranslation();
 
   const FG     = colors.foreground;
   const MUTED  = colors.mutedForeground;
-  const CARD   = colors.card;
   const BORDER = colors.border;
+
+  const displayed = limit ? businesses.slice(0, limit) : businesses;
+  const hasMore   = limit ? businesses.length > limit  : false;
 
   return (
     <View style={styles.section}>
       {/* Section header */}
       <View style={styles.sectionHeader}>
-        <View>
-          <Text style={[styles.sectionTitle, { color: FG }]}>
-            {t('home.nearby.title')}
-          </Text>
-          <Text style={[styles.subtitle, { color: MUTED }]}>
-            {businesses.length} {businesses.length === 1 ? 'business' : 'businesses'} found
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => router.push('/map')}
-          style={[styles.seeAllBtn, { backgroundColor: CARD, borderColor: BORDER }]}
-          activeOpacity={0.75}
-        >
-          <Text style={[styles.seeAllText, { color: FG }]}>{t('common.see_all')}</Text>
-          <Ionicons name="arrow-forward-outline" size={12} color={FG} />
-        </TouchableOpacity>
+        <Text style={[styles.sectionTitle, { color: FG }]}>
+          AVAILABLE BUSINESSES
+        </Text>
+        <Text style={[styles.subtitle, { color: MUTED }]}>
+          {businesses.length} {businesses.length === 1 ? 'business' : 'businesses'} found
+        </Text>
       </View>
 
       {/* Empty state */}
       {businesses.length === 0 ? (
-        <View style={[styles.emptyBox, { backgroundColor: CARD, borderColor: BORDER }]}>
+        <View style={[styles.emptyBox, { backgroundColor: colors.card, borderColor: BORDER }]}>
           <View style={[styles.emptyIconWrap, { borderColor: BORDER }]}>
             <Ionicons name="search-outline" size={28} color={FG} />
           </View>
@@ -54,9 +46,21 @@ export function NearbyBusinesses({ businesses }: NearbyBusinessesProps) {
         </View>
       ) : (
         <View style={styles.list}>
-          {businesses.map((business: any) => (
+          {displayed.map((business: any) => (
             <BusinessCard key={business.id} business={business} />
           ))}
+          {hasMore && (
+            <TouchableOpacity
+              style={[styles.seeMoreRow, { borderColor: BORDER }]}
+              onPress={() => router.push('/businesses')}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.seeMoreText, { color: FG }]}>
+                See {businesses.length - limit!} more businesses
+              </Text>
+              <Ionicons name="arrow-forward" size={14} color={FG} />
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>
@@ -66,19 +70,9 @@ export function NearbyBusinesses({ businesses }: NearbyBusinessesProps) {
 const styles = StyleSheet.create({
   section: { paddingHorizontal: 24, marginBottom: 24 },
 
-  sectionHeader: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 16,
-  },
-  sectionTitle: { fontSize: 16, fontWeight: '800', letterSpacing: -0.3, marginBottom: 2 },
-  subtitle:     { fontSize: 11, fontWeight: '500' },
-
-  seeAllBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: 20, borderWidth: 1,
-  },
-  seeAllText: { fontSize: 12, fontWeight: '700' },
+  sectionHeader: { marginBottom: 16 },
+  sectionTitle:  { fontSize: 16, fontWeight: '800', letterSpacing: -0.3, marginBottom: 2 },
+  subtitle:      { fontSize: 11, fontWeight: '500' },
 
   emptyBox: {
     borderRadius: 16, borderWidth: 1,
@@ -93,4 +87,12 @@ const styles = StyleSheet.create({
   emptySubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
 
   list: { gap: 1 },
+
+  seeMoreRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, marginTop: 4,
+    borderWidth: 1, borderRadius: 12,
+    paddingVertical: 14,
+  },
+  seeMoreText: { fontSize: 13, fontWeight: '700' },
 });
