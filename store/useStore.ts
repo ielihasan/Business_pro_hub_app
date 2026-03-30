@@ -24,7 +24,8 @@ import {
   formatWait,
 } from '@/lib/queue';
 import {
-  COMMITMENT_FEE,
+  COMMITMENT_RATE,
+  calculateCommitmentFee,
   SavedPaymentMethod,
   initializeWallet,
   getWalletBalance,
@@ -635,13 +636,16 @@ export const useStore = create<AppState>()(
         const user = get().user;
         if (!user) return { success: false, error: 'Not authenticated' };
 
-        // ── Payment gate: Rs 50 commitment fee ──────────────────────────────
-        const currentBalance = user.walletBalance;
-        if (currentBalance === null || currentBalance < COMMITMENT_FEE) {
-          return {
-            success: false,
-            error: `INSUFFICIENT_BALANCE:${currentBalance ?? 0}`,
-          };
+        // ── Payment gate: 20% advance on service total ───────────────────────
+        const feeAmount = calculateCommitmentFee(pricing?.totalAmount);
+        if (feeAmount > 0) {
+          const currentBalance = user.walletBalance;
+          if (currentBalance === null || currentBalance < feeAmount) {
+            return {
+              success: false,
+              error: `INSUFFICIENT_BALANCE:${currentBalance ?? 0}:${feeAmount}`,
+            };
+          }
         }
         const { data, error } = await joinBusinessQueue(businessId, user.id, {
           customerName: user.name,
@@ -654,12 +658,14 @@ export const useStore = create<AppState>()(
         });
         if (error || !data) return { success: false, error: error ?? 'Failed to join queue' };
 
-        // ── Deduct commitment fee from wallet ────────────────────────────────
-        const { newBalance } = await deductWalletBalance(user.id, COMMITMENT_FEE);
-        if (newBalance !== null) {
-          set((state) => ({
-            user: state.user ? { ...state.user, walletBalance: newBalance } : null,
-          }));
+        // ── Deduct 20% advance from wallet (only when priced) ───────────────
+        if (feeAmount > 0) {
+          const { newBalance } = await deductWalletBalance(user.id, feeAmount);
+          if (newBalance !== null) {
+            set((state) => ({
+              user: state.user ? { ...state.user, walletBalance: newBalance } : null,
+            }));
+          }
         }
 
         const entry: QueueEntry = {

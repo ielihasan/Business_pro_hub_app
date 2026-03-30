@@ -23,7 +23,7 @@ import {
   CategoryFilter,
   NearbyBusinesses,
 } from '@/components/home';
-import { COMMITMENT_FEE } from '@/lib/wallet';
+import { COMMITMENT_RATE } from '@/lib/wallet';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
 
 function getGreeting() {
@@ -140,7 +140,7 @@ export default function HomeScreen() {
             <View style={styles.payBannerText}>
               <Text style={[styles.payBannerTitle, { color: FG }]}>Set up a payment method</Text>
               <Text style={[styles.payBannerSub, { color: MUTED }]}>
-                Rs {COMMITMENT_FEE} fee required to join queues
+                {Math.round(COMMITMENT_RATE * 100)}% advance required to join queues
               </Text>
             </View>
             <View style={[styles.payBannerBadge, { backgroundColor: colors.destructive }]}>

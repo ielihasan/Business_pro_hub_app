@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TextInput,
   ActivityIndicator,
   Linking,
   Share,
@@ -18,16 +19,17 @@ import { Avatar, Button } from '@/components/ui';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { resolveBusinessById } from '@/lib/queue';
 import { useStore } from '@/store/useStore';
-import { COMMITMENT_FEE } from '@/lib/wallet';
+import { COMMITMENT_RATE, calculateCommitmentFee } from '@/lib/wallet';
 
 export default function BusinessDetailScreen() {
   const { id }     = useLocalSearchParams<{ id: string }>();
   const { colors, isDark } = useTheme();
 
-  const [loading,    setLoading]    = useState(false);
-  const [business,   setBusiness]   = useState<any | null>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [dialog,     setDialog]     = useState<DialogConfig | null>(null);
+  const [loading,       setLoading]       = useState(false);
+  const [business,      setBusiness]      = useState<any | null>(null);
+  const [fetchError,    setFetchError]    = useState<string | null>(null);
+  const [dialog,        setDialog]        = useState<DialogConfig | null>(null);
+  const [serviceAmount, setServiceAmount] = useState('');
 
   const joinQueueInSupabase = useStore((s) => s.joinQueueInSupabase);
   const toggleFavorite      = useStore((s) => s.toggleFavorite);
@@ -46,6 +48,11 @@ export default function BusinessDetailScreen() {
     })();
   }, [id]);
 
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  const parsedAmount  = parseFloat(serviceAmount) || 0;
+  const advanceFee    = calculateCommitmentFee(parsedAmount);
+  const advancePct    = Math.round(COMMITMENT_RATE * 100);
+
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleJoinQueue = () => {
     if (!business) return;
@@ -63,47 +70,52 @@ export default function BusinessDetailScreen() {
       return;
     }
 
-    // ── Wallet balance check ─────────────────────────────────────────────────
-    if (walletBalance === null || walletBalance < COMMITMENT_FEE) {
+    // ── Wallet check only when a service amount is entered ───────────────────
+    if (advanceFee > 0 && (walletBalance === null || walletBalance < advanceFee)) {
       setDialog({
         title:   'Insufficient Wallet Balance',
-        message: `A Rs ${COMMITMENT_FEE} commitment fee is required to join a queue.\n\nYour current balance: Rs ${walletBalance ?? 0}\n\nThis fee ensures customers show up and keeps wait times accurate for everyone.`,
+        message: `Your ${advancePct}% advance for Rs ${parsedAmount} service is Rs ${advanceFee}.\n\nYour wallet: Rs ${walletBalance ?? 0}\n\nPlease add funds to continue.`,
         icon:    'wallet-outline',
         iconVariant: 'warning',
         actions: [
           { label: 'Cancel',    variant: 'secondary', onPress: () => setDialog(null) },
-          {
-            label: 'Add Funds',
-            variant: 'primary',
-            onPress: () => { setDialog(null); router.push('/profile/payment'); },
-          },
+          { label: 'Add Funds', variant: 'primary',   onPress: () => { setDialog(null); router.push('/profile/payment'); } },
         ],
       });
       return;
     }
 
+    const feeText = advanceFee > 0
+      ? `Rs ${advanceFee} (${advancePct}% of Rs ${parsedAmount}) will be deducted as advance.`
+      : 'No advance payment required for this visit.';
+
     setDialog({
-      title:   'Join Queue',
-      message: `${business.name}\n\nCurrent queue: ${business.queue_length ?? 0} people\nEstimated wait: ${business.wait_time ?? 'N/A'}\n\nA commitment fee of Rs ${COMMITMENT_FEE} will be deducted from your wallet (Balance: Rs ${walletBalance}).\n\nWould you like to join?`,
+      title:   'Confirm Queue Join',
+      message: `${business.name}\n\nQueue: ${business.queue_length ?? 0} waiting  ·  Wait: ${business.wait_time ?? 'N/A'}\n\n${feeText}\nWallet: Rs ${walletBalance ?? '—'}`,
       icon: 'people-outline',
       iconVariant: 'default',
       actions: [
         { label: 'Cancel', variant: 'secondary', onPress: () => setDialog(null) },
         {
-          label: 'Join & Pay Rs 50',
+          label: advanceFee > 0 ? `Join & Pay Rs ${advanceFee}` : 'Join Queue',
           variant: 'primary',
           onPress: async () => {
             setDialog(null);
             setLoading(true);
-            const result = await joinQueueInSupabase(business.id);
+            const result = await joinQueueInSupabase(
+              business.id,
+              undefined,
+              parsedAmount > 0
+                ? { totalAmount: parsedAmount }
+                : undefined,
+            );
             setLoading(false);
             if (!result.success || !result.queueEntryId) {
-              // Handle insufficient balance returned from store as well
               const isBalanceError = result.error?.startsWith('INSUFFICIENT_BALANCE');
               setDialog({
                 title:   isBalanceError ? 'Insufficient Balance' : 'Could Not Join',
                 message: isBalanceError
-                  ? `Your wallet balance is too low. Please add funds to your wallet and try again.`
+                  ? `Your wallet balance is too low to cover the ${advancePct}% advance. Please top up and try again.`
                   : (result.error ?? 'An error occurred.'),
                 icon: 'alert-circle-outline', iconVariant: 'destructive',
                 actions: [{ label: 'OK', onPress: () => setDialog(null) }],
@@ -292,6 +304,37 @@ export default function BusinessDetailScreen() {
                 <Text style={[styles.queueCountLabel, { color: MUTED }]}>IN QUEUE</Text>
               </View>
             </View>
+            {/* ── Service amount input ── */}
+            <View style={[styles.amountRow, { borderColor: BORDER, backgroundColor: BG }]}>
+              <Text style={[styles.amountPrefix, { color: MUTED }]}>Rs</Text>
+              <TextInput
+                style={[styles.amountInput, { color: FG }]}
+                placeholder="Estimated service cost (optional)"
+                placeholderTextColor={MUTED}
+                value={serviceAmount}
+                onChangeText={(v) => setServiceAmount(v.replace(/[^0-9.]/g, ''))}
+                keyboardType="decimal-pad"
+                returnKeyType="done"
+              />
+            </View>
+
+            {/* ── 20% advance preview ── */}
+            <View style={[styles.advanceRow, {
+              backgroundColor: advanceFee > 0 ? FG + '0E' : 'transparent',
+              borderColor: advanceFee > 0 ? BORDER : 'transparent',
+            }]}>
+              <Ionicons
+                name="wallet-outline"
+                size={12}
+                color={advanceFee > 0 ? FG : MUTED}
+              />
+              <Text style={[styles.advanceText, { color: advanceFee > 0 ? FG : MUTED }]}>
+                {advanceFee > 0
+                  ? `${advancePct}% advance: Rs ${advanceFee}  ·  Wallet: Rs ${walletBalance ?? '—'}`
+                  : `${advancePct}% advance applies to priced services  ·  Wallet: Rs ${walletBalance ?? '—'}`}
+              </Text>
+            </View>
+
             <TouchableOpacity
               style={[styles.joinBtn, { backgroundColor: FG }]}
               onPress={handleJoinQueue}
@@ -303,17 +346,12 @@ export default function BusinessDetailScreen() {
               ) : (
                 <>
                   <Ionicons name="add-circle-outline" size={20} color={BG} />
-                  <Text style={[styles.joinBtnText, { color: BG }]}>JOIN QUEUE</Text>
+                  <Text style={[styles.joinBtnText, { color: BG }]}>
+                    {advanceFee > 0 ? `JOIN & PAY Rs ${advanceFee}` : 'JOIN QUEUE'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
-            {/* Commitment fee note */}
-            <View style={styles.feeRow}>
-              <Ionicons name="wallet-outline" size={12} color={MUTED} />
-              <Text style={[styles.feeNote, { color: MUTED }]}>
-                Rs {COMMITMENT_FEE} commitment fee · Wallet: Rs {walletBalance ?? '—'}
-              </Text>
-            </View>
           </View>
         </View>
 
@@ -476,8 +514,21 @@ const styles = StyleSheet.create({
     gap: 8, borderRadius: 14, paddingVertical: 16,
   },
   joinBtnText: { fontSize: 14, fontWeight: '900', letterSpacing: 1 },
-  feeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: -4 },
-  feeNote: { fontSize: 10, fontWeight: '500' },
+
+  amountRow: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 10, borderWidth: 1,
+    paddingHorizontal: 12, paddingVertical: 10, gap: 6,
+  },
+  amountPrefix: { fontSize: 13, fontWeight: '700' },
+  amountInput:  { flex: 1, fontSize: 14, padding: 0 },
+
+  advanceRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderRadius: 8, borderWidth: 1,
+    paddingHorizontal: 10, paddingVertical: 7,
+  },
+  advanceText: { fontSize: 11, fontWeight: '600', flex: 1 },
 
   /* ── Quick actions ── */
   actionBtn: {

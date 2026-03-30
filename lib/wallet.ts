@@ -2,8 +2,17 @@ import { supabase } from './supabase';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** Rs 50 deducted from wallet when a user joins a queue (commitment fee). */
-export const COMMITMENT_FEE = 50;
+/** 20% of the service total is deducted as an advance when joining a queue. */
+export const COMMITMENT_RATE = 0.20;
+
+/**
+ * Returns the advance fee for a given service total (20%).
+ * Returns 0 when no total is provided (walk-in / unpriced queue).
+ */
+export function calculateCommitmentFee(totalAmount?: number): number {
+  if (!totalAmount || totalAmount <= 0) return 0;
+  return Math.ceil(totalAmount * COMMITMENT_RATE);
+}
 
 // ─── Pakistan Banks ───────────────────────────────────────────────────────────
 

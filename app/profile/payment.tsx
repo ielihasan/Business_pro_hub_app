@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@/hooks/useTheme';
 import { useStore, SavedPaymentMethod, WalletPaymentType } from '@/store/useStore';
-import { COMMITMENT_FEE, PAKISTAN_BANKS } from '@/lib/wallet';
+import { COMMITMENT_RATE, PAKISTAN_BANKS } from '@/lib/wallet';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -84,6 +84,7 @@ export default function WalletPaymentScreen() {
   const [refreshing,    setRefreshing]    = useState(false);
   const [dialog,        setDialog]        = useState<DialogConfig | null>(null);
   const [showAdd,       setShowAdd]       = useState(false);
+  const [showBanks,     setShowBanks]     = useState(false);
 
   // Form state
   const [selType,       setSelType]       = useState<MethodType>('easypaisa');
@@ -163,8 +164,9 @@ export default function WalletPaymentScreen() {
   const CARD   = colors.card;
   const SEC    = colors.secondary;
 
-  const walletBalance = user?.walletBalance ?? null;
-  const queueCapacity = walletBalance !== null ? Math.floor(walletBalance / COMMITMENT_FEE) : null;
+  const walletBalance    = user?.walletBalance ?? null;
+  const isWalletActive   = paymentMethods.length > 0;
+  const advancePct       = Math.round(COMMITMENT_RATE * 100);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -206,21 +208,33 @@ export default function WalletPaymentScreen() {
           {/* Balance */}
           <View style={styles.wcBal}>
             <Text style={[styles.wcBalLabel, { color: BG + '88' }]}>AVAILABLE BALANCE</Text>
-            {walletBalance === null
-              ? <ActivityIndicator color={BG} style={{ marginTop: 8 }} />
-              : <Text style={[styles.wcBalAmt, { color: BG }]}>
+            {!isWalletActive ? (
+              /* Locked — no payment method added yet */
+              <View style={styles.wcLocked}>
+                <View style={[styles.wcLockedIconBox, { backgroundColor: BG + '22' }]}>
+                  <Ionicons name="lock-closed" size={20} color={BG + 'AA'} />
+                </View>
+                <View>
+                  <Text style={[styles.wcLockedTitle, { color: BG }]}>Wallet Locked</Text>
+                  <Text style={[styles.wcLockedSub, { color: BG + '88' }]}>
+                    Add a payment method to activate
+                  </Text>
+                </View>
+              </View>
+            ) : walletBalance === null ? (
+              <ActivityIndicator color={BG} style={{ marginTop: 8 }} />
+            ) : (
+              <>
+                <Text style={[styles.wcBalAmt, { color: BG }]}>
                   Rs {walletBalance.toLocaleString('en-PK')}
                 </Text>
-            }
-            {queueCapacity !== null && (
-              <View style={[styles.wcCapRow, { backgroundColor: BG + '18' }]}>
-                <Ionicons name="people-outline" size={12} color={BG + 'BB'} />
-                <Text style={[styles.wcCapText, { color: BG + 'BB' }]}>
-                  {queueCapacity > 0
-                    ? `Enough to join ${queueCapacity} more queue${queueCapacity === 1 ? '' : 's'}`
-                    : 'Insufficient balance to join queues'}
-                </Text>
-              </View>
+                <View style={[styles.wcCapRow, { backgroundColor: BG + '18' }]}>
+                  <Ionicons name="information-circle-outline" size={12} color={BG + 'BB'} />
+                  <Text style={[styles.wcCapText, { color: BG + 'BB' }]}>
+                    {advancePct}% advance deducted on priced services
+                  </Text>
+                </View>
+              </>
             )}
           </View>
 
@@ -246,13 +260,15 @@ export default function WalletPaymentScreen() {
           </View>
           <View style={styles.feeStripBody}>
             <Text style={[styles.feeStripTitle, { color: FG }]}>
-              Rs {COMMITMENT_FEE} queue commitment fee
+              {advancePct}% advance on service total
             </Text>
             <Text style={[styles.feeStripSub, { color: MUTED }]}>
-              Deducted each time you join a queue — ensures you show up
+              Deducted from wallet as booking advance — refunded on arrival
             </Text>
           </View>
-          <Text style={[styles.feeStripAmt, { color: FG }]}>−Rs {COMMITMENT_FEE}</Text>
+          <View style={[styles.feeStripBadge, { backgroundColor: SEC, borderColor: BORDER }]}>
+            <Text style={[styles.feeStripPct, { color: FG }]}>{advancePct}%</Text>
+          </View>
         </View>
 
         {/* ── Payment Methods ─────────────────────────────────────────────────── */}
@@ -379,15 +395,23 @@ export default function WalletPaymentScreen() {
 
         {/* ── Accepted Methods ────────────────────────────────────────────────── */}
         <View style={[styles.acceptedCard, { backgroundColor: CARD, borderColor: BORDER }]}>
-          <Text style={[styles.acceptedHeading, { color: FG }]}>We Accept</Text>
-          <Text style={[styles.acceptedSub, { color: MUTED }]}>
-            All major Pakistani mobile wallets & bank accounts
-          </Text>
+          {/* Heading */}
+          <View style={styles.acceptedHeadRow}>
+            <View>
+              <Text style={[styles.acceptedHeading, { color: FG }]}>We Accept</Text>
+              <Text style={[styles.acceptedSub, { color: MUTED }]}>
+                Pakistani mobile wallets & all major banks
+              </Text>
+            </View>
+            <View style={[styles.acceptedCountBadge, { backgroundColor: SEC, borderColor: BORDER }]}>
+              <Text style={[styles.acceptedCountText, { color: FG }]}>{PAKISTAN_BANKS.length + 2}</Text>
+              <Text style={[styles.acceptedCountLabel, { color: MUTED }]}>methods</Text>
+            </View>
+          </View>
 
-          {/* Mobile wallets */}
+          {/* Mobile wallet tiles */}
           <Text style={[styles.acceptedGroupLabel, { color: MUTED }]}>MOBILE WALLETS</Text>
           <View style={styles.walletRow}>
-            {/* Easypaisa tile */}
             <View style={[styles.walletTile, { backgroundColor: '#37B34A10', borderColor: '#37B34A40' }]}>
               <View style={[styles.walletTileIconBox, { backgroundColor: '#37B34A20' }]}>
                 <Ionicons name="phone-portrait-outline" size={22} color="#37B34A" />
@@ -398,8 +422,6 @@ export default function WalletPaymentScreen() {
                 <Text style={[styles.walletTilePillText, { color: '#37B34A' }]}>Telenor</Text>
               </View>
             </View>
-
-            {/* JazzCash tile */}
             <View style={[styles.walletTile, { backgroundColor: '#BF202F10', borderColor: '#BF202F40' }]}>
               <View style={[styles.walletTileIconBox, { backgroundColor: '#BF202F20' }]}>
                 <Ionicons name="phone-portrait-outline" size={22} color="#BF202F" />
@@ -412,31 +434,66 @@ export default function WalletPaymentScreen() {
             </View>
           </View>
 
-          {/* Bank accounts */}
+          {/* Bank accounts — tappable header to expand/collapse */}
           <Text style={[styles.acceptedGroupLabel, { color: MUTED }]}>BANK ACCOUNTS (IBFT)</Text>
-          <View style={[styles.bankSection, { backgroundColor: BG, borderColor: BORDER }]}>
-            <View style={styles.bankIconRow}>
-              <View style={[styles.bankSectionIcon, { backgroundColor: '#2563EB18' }]}>
-                <Ionicons name="business-outline" size={18} color="#2563EB" />
-              </View>
-              <View>
-                <Text style={[styles.bankSectionTitle, { color: FG }]}>All Pakistan Banks</Text>
-                <Text style={[styles.bankSectionSub, { color: MUTED }]}>via IBFT / IBAN transfer</Text>
-              </View>
+          <TouchableOpacity
+            style={[styles.bankSectionHeader, { backgroundColor: BG, borderColor: showBanks ? '#2563EB60' : BORDER }]}
+            onPress={() => setShowBanks(!showBanks)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.bankSectionIcon, { backgroundColor: '#2563EB18' }]}>
+              <Ionicons name="business-outline" size={18} color="#2563EB" />
             </View>
+            <View style={styles.bankSectionTextCol}>
+              <Text style={[styles.bankSectionTitle, { color: FG }]}>All Pakistan Banks</Text>
+              <Text style={[styles.bankSectionSub, { color: MUTED }]}>
+                {PAKISTAN_BANKS.length} banks via IBFT / IBAN
+              </Text>
+            </View>
+            <View style={[styles.bankExpandBtn, { backgroundColor: showBanks ? '#2563EB18' : SEC, borderColor: showBanks ? '#2563EB44' : BORDER }]}>
+              <Ionicons name={showBanks ? 'chevron-up' : 'chevron-down'} size={16} color={showBanks ? '#2563EB' : MUTED} />
+            </View>
+          </TouchableOpacity>
 
-            {/* Bank grid */}
-            <View style={styles.bankGrid}>
-              {PAKISTAN_BANKS.map((bank) => (
-                <View key={bank.id} style={[styles.bankGridItem, { backgroundColor: SEC, borderColor: BORDER }]}>
-                  <Text style={[styles.bankGridShort, { color: FG }]}>{bank.shortName}</Text>
+          {showBanks && (
+            <View style={[styles.bankExpandedList, { borderColor: BORDER }]}>
+              {PAKISTAN_BANKS.map((bank, idx) => (
+                <View
+                  key={bank.id}
+                  style={[
+                    styles.bankListRow,
+                    { borderBottomColor: BORDER },
+                    idx === PAKISTAN_BANKS.length - 1 && { borderBottomWidth: 0 },
+                  ]}
+                >
+                  <View style={[styles.bankListNum, { backgroundColor: SEC }]}>
+                    <Text style={[styles.bankListNumText, { color: MUTED }]}>{idx + 1}</Text>
+                  </View>
+                  <View style={[styles.bankListShortBox, { backgroundColor: '#2563EB12', borderColor: '#2563EB30' }]}>
+                    <Text style={[styles.bankListShort, { color: '#2563EB' }]}>{bank.shortName}</Text>
+                  </View>
+                  <Text style={[styles.bankListName, { color: FG }]}>{bank.name}</Text>
+                  <View style={[styles.bankListIban, { backgroundColor: SEC, borderColor: BORDER }]}>
+                    <Text style={[styles.bankListIbanText, { color: MUTED }]}>IBFT</Text>
+                  </View>
                 </View>
               ))}
             </View>
-          </View>
+          )}
         </View>
 
-        <View style={{ height: 52 }} />
+        {/* ── Elixa Branding ───────────────────────────────────────────────────── */}
+        <View style={styles.brandingRow}>
+          <View style={[styles.brandingDivider, { backgroundColor: BORDER }]} />
+          <View style={styles.brandingCenter}>
+            <Text style={[styles.brandingPowered, { color: MUTED }]}>POWERED BY</Text>
+            <Text style={[styles.brandingName, { color: FG }]}>Elixa Software</Text>
+            <Text style={[styles.brandingPvt, { color: MUTED }]}>Private Limited</Text>
+          </View>
+          <View style={[styles.brandingDivider, { backgroundColor: BORDER }]} />
+        </View>
+
+        <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* ── Add Method Bottom Sheet ──────────────────────────────────────────── */}
@@ -643,15 +700,21 @@ const styles = StyleSheet.create({
   wcTypePill:  { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   wcTypeText:  { fontSize: 8, fontWeight: '800', letterSpacing: 1.5 },
 
-  wcBal:       {},
-  wcBalLabel:  { fontSize: 9, fontWeight: '700', letterSpacing: 2, marginBottom: 6 },
-  wcBalAmt:    { fontSize: 42, fontWeight: '900', letterSpacing: -2, lineHeight: 48 },
-  wcCapRow:    {
+  wcBal:      {},
+  wcBalLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 2, marginBottom: 6 },
+  wcBalAmt:   { fontSize: 42, fontWeight: '900', letterSpacing: -2, lineHeight: 48 },
+  wcCapRow:   {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5,
     borderRadius: 20, marginTop: 10,
   },
-  wcCapText:   { fontSize: 11, fontWeight: '600' },
+  wcCapText:  { fontSize: 11, fontWeight: '600' },
+
+  /* Locked state */
+  wcLocked:       { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 6 },
+  wcLockedIconBox:{ width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  wcLockedTitle:  { fontSize: 18, fontWeight: '900', marginBottom: 3 },
+  wcLockedSub:    { fontSize: 12, fontWeight: '500' },
 
   wcDivider:   { height: 1 },
 
@@ -670,7 +733,11 @@ const styles = StyleSheet.create({
   feeStripBody:  { flex: 1, gap: 2 },
   feeStripTitle: { fontSize: 13, fontWeight: '800' },
   feeStripSub:   { fontSize: 11, lineHeight: 16 },
-  feeStripAmt:   { fontSize: 16, fontWeight: '900' },
+  feeStripBadge: {
+    paddingHorizontal: 12, paddingVertical: 7,
+    borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center',
+  },
+  feeStripPct: { fontSize: 18, fontWeight: '900' },
 
   /* ── Section */
   section:       { marginBottom: 22 },
@@ -749,9 +816,16 @@ const styles = StyleSheet.create({
     borderRadius: 18, borderWidth: 1, padding: 18,
     marginBottom: 16, gap: 14,
   },
-  acceptedHeading: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-  acceptedSub:     { fontSize: 12, lineHeight: 18, marginTop: -8 },
+  acceptedHeadRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  acceptedHeading:    { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  acceptedSub:        { fontSize: 12, lineHeight: 18, marginTop: 3 },
   acceptedGroupLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 2, marginTop: 2 },
+  acceptedCountBadge: {
+    alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 12, borderWidth: 1,
+  },
+  acceptedCountText:  { fontSize: 20, fontWeight: '900', lineHeight: 22 },
+  acceptedCountLabel: { fontSize: 8, fontWeight: '700', letterSpacing: 1 },
 
   /* Mobile wallet tiles */
   walletRow: { flexDirection: 'row', gap: 12 },
@@ -765,21 +839,44 @@ const styles = StyleSheet.create({
   walletTilePill:    { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, marginTop: 2 },
   walletTilePillText:{ fontSize: 9, fontWeight: '700' },
 
-  /* Bank section */
-  bankSection: {
-    borderRadius: 12, borderWidth: 1, padding: 14, gap: 12,
+  /* Bank section — tappable header */
+  bankSectionHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderRadius: 12, borderWidth: 1, padding: 12,
   },
-  bankIconRow:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  bankSectionIcon:   { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  bankSectionTitle:  { fontSize: 14, fontWeight: '800' },
-  bankSectionSub:    { fontSize: 11 },
+  bankSectionIcon:    { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  bankSectionTextCol: { flex: 1 },
+  bankSectionTitle:   { fontSize: 14, fontWeight: '800' },
+  bankSectionSub:     { fontSize: 11, marginTop: 1 },
+  bankExpandBtn: {
+    width: 32, height: 32, borderRadius: 8, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+  },
 
-  bankGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  bankGridItem: {
-    paddingHorizontal: 9, paddingVertical: 5,
-    borderRadius: 8, borderWidth: 1,
+  /* Expanded bank list */
+  bankExpandedList: {
+    borderRadius: 12, borderWidth: 1, overflow: 'hidden', marginTop: 4,
   },
-  bankGridShort: { fontSize: 11, fontWeight: '700' },
+  bankListRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 12, paddingVertical: 11,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  bankListNum:      { width: 22, height: 22, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  bankListNumText:  { fontSize: 9, fontWeight: '700' },
+  bankListShortBox: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1, minWidth: 62, alignItems: 'center' },
+  bankListShort:    { fontSize: 10, fontWeight: '900' },
+  bankListName:     { flex: 1, fontSize: 13, fontWeight: '500' },
+  bankListIban:     { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, borderWidth: 1 },
+  bankListIbanText: { fontSize: 8, fontWeight: '800' },
+
+  /* ── Elixa branding */
+  brandingRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8, marginTop: 4 },
+  brandingDivider:{ flex: 1, height: 1 },
+  brandingCenter: { alignItems: 'center', gap: 1 },
+  brandingPowered:{ fontSize: 8, fontWeight: '700', letterSpacing: 2 },
+  brandingName:   { fontSize: 13, fontWeight: '900', letterSpacing: -0.3 },
+  brandingPvt:    { fontSize: 9, fontWeight: '500' },
 
   /* ── Modal sheet */
   overlay:   { flex: 1, justifyContent: 'flex-end' },
