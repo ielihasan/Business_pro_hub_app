@@ -94,7 +94,7 @@ export function BusinessCard({ business }: BusinessCardProps) {
             </Text>
             <View style={[styles.catPill, { backgroundColor: SEC, borderColor: BORDER }]}>
               <Ionicons name={getCategoryIcon(business.category) as any} size={10} color={MUTED} />
-              <Text style={[styles.catText, { color: MUTED }]}>
+              <Text style={[styles.catText, { color: MUTED }]} numberOfLines={1}>
                 {business.category ?? 'General'}
               </Text>
             </View>
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   statSep:  { width: 1, height: 24, marginHorizontal: 2 },
   joinBtn: {
     marginLeft: 'auto',
-    width: 32, height: 32, borderRadius: 10,
+    width: 44, height: 44, borderRadius: 12,
     justifyContent: 'center', alignItems: 'center',
   },
 });

@@ -265,7 +265,7 @@ export default function BusinessDetailScreen() {
     <SafeAreaView style={[styles.fill, { backgroundColor: BG }]} edges={['top']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
 
         {/* ── Hero ──────────────────────────────────────────────────────────── */}
         <View style={[styles.hero, { backgroundColor: CARD, borderBottomColor: BORDER }]}>
@@ -377,24 +377,6 @@ export default function BusinessDetailScreen() {
                   : `${advancePct}% advance applies to priced services  ·  Wallet: Rs ${walletBalance ?? '—'}`}
               </Text>
             </View>
-
-            <TouchableOpacity
-              style={[styles.joinBtn, { backgroundColor: CTA }]}
-              onPress={handleJoinQueue}
-              activeOpacity={0.85}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color={CTA_FG} />
-              ) : (
-                <>
-                  <Ionicons name="add-circle-outline" size={20} color={CTA_FG} />
-                  <Text style={[styles.joinBtnText, { color: CTA_FG }]}>
-                    {advanceFee > 0 ? `JOIN & PAY Rs ${advanceFee}` : 'JOIN QUEUE'}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -481,6 +463,27 @@ export default function BusinessDetailScreen() {
 
       </ScrollView>
 
+      {/* ── Sticky Join Footer ── */}
+      <View style={[styles.joinFooter, { backgroundColor: BG, borderTopColor: BORDER }]}>
+        <TouchableOpacity
+          style={[styles.joinBtn, { backgroundColor: CTA }]}
+          onPress={handleJoinQueue}
+          activeOpacity={0.85}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={CTA_FG} />
+          ) : (
+            <>
+              <Ionicons name="add-circle-outline" size={20} color={CTA_FG} />
+              <Text style={[styles.joinBtnText, { color: CTA_FG }]}>
+                {advanceFee > 0 ? `JOIN & PAY Rs ${advanceFee}` : 'JOIN QUEUE'}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+
       {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
     </SafeAreaView>
   );
@@ -552,11 +555,15 @@ const styles = StyleSheet.create({
   queueCount:      { fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
   queueCountLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1 },
 
+  joinFooter: {
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8,
+    borderTopWidth: 1,
+  },
   joinBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, borderRadius: 14, paddingVertical: 16,
+    gap: 8, borderRadius: 14, paddingVertical: 18,
   },
-  joinBtnText: { fontSize: 14, fontWeight: '900', letterSpacing: 1 },
+  joinBtnText: { fontSize: 15, fontWeight: '900', letterSpacing: 1 },
 
   amountRow: {
     flexDirection: 'row', alignItems: 'center',

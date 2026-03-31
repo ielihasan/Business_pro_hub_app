@@ -133,7 +133,16 @@ export default function HomeScreen() {
           <Text style={[styles.greetName, { color: FG }]} numberOfLines={1}>
             {firstName.toUpperCase()}.
           </Text>
-          <Text style={[styles.greetTag, { color: MUTED }]}>Your queue status at a glance.</Text>
+          <View style={styles.greetRow}>
+            <Text style={[styles.greetTag, { color: MUTED }]}>Your queue status at a glance.</Text>
+            {walletBalance !== null && (
+              <View style={[styles.balancePill, { backgroundColor: CARD, borderColor: BORDER }]}>
+                <Text style={[styles.balanceText, { color: FG }]}>
+                  Rs {walletBalance.toLocaleString()}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* ── Active Queue / Empty State ── */}
@@ -232,7 +241,13 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', marginBottom: 6,
   },
   greetName: { fontSize: 44, fontWeight: '900', letterSpacing: -1.5, lineHeight: 46, marginBottom: 8 },
-  greetTag:  { fontSize: 14, lineHeight: 20 },
+  greetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  greetTag:  { fontSize: 14, lineHeight: 20, flex: 1 },
+  balancePill: {
+    borderWidth: 1, borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  balanceText: { fontSize: 12, fontWeight: '800' },
 
   /* ── No-queue card ── */
   noQueueCard: {

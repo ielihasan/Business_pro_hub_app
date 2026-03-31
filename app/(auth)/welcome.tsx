@@ -112,9 +112,6 @@ export default function WelcomeScreen() {
       {/* Brand bar */}
       <View style={s.brandBar}>
         <Text style={[s.wordmark, { color: colors.foreground }]}>BUSINESSHUB PRO</Text>
-        <View style={[s.betaBadge, { backgroundColor: colors.secondary }]}>
-          <Text style={[s.betaText, { color: colors.mutedForeground }]}>BETA</Text>
-        </View>
       </View>
 
       {/* Hero */}
@@ -216,8 +213,6 @@ const s = StyleSheet.create({
 
   brandBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 24, paddingTop: 6, paddingBottom: 4 },
   wordmark:  { fontSize: 13, fontWeight: '900', letterSpacing: 2 },
-  betaBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  betaText:  { fontSize: 9, fontWeight: '800', letterSpacing: 1.5 },
 
   hero: { flex: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16, justifyContent: 'flex-end', overflow: 'hidden' },
   gridPos:    { position: 'absolute', top: 12, right: 16 },

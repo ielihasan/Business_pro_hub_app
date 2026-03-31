@@ -29,14 +29,24 @@ export function NearbyBusinesses({ businesses, loading, limit }: NearbyBusinesse
     <View style={styles.section}>
       {/* Section header */}
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: FG }]}>
-          AVAILABLE BUSINESSES
-        </Text>
-        {!loading && (
-          <Text style={[styles.subtitle, { color: MUTED }]}>
-            {businesses.length} {businesses.length === 1 ? 'business' : 'businesses'} found
+        <View>
+          <Text style={[styles.sectionTitle, { color: FG }]}>
+            AVAILABLE BUSINESSES
           </Text>
-        )}
+          {!loading && (
+            <Text style={[styles.subtitle, { color: MUTED }]}>
+              {businesses.length} {businesses.length === 1 ? 'business' : 'businesses'} found
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity
+          style={[styles.seeAllBtn, { borderColor: BORDER }]}
+          onPress={() => router.push('/(tabs)/map')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.seeAllText, { color: FG }]}>See All</Text>
+          <Ionicons name="arrow-forward" size={12} color={FG} />
+        </TouchableOpacity>
       </View>
 
       {/* Skeleton state */}
@@ -55,6 +65,14 @@ export function NearbyBusinesses({ businesses, loading, limit }: NearbyBusinesse
           <Text style={[styles.emptySubtitle, { color: MUTED }]}>
             Try adjusting your search or category filter
           </Text>
+          <TouchableOpacity
+            style={[styles.exploreBtnRow, { borderColor: BORDER }]}
+            onPress={() => router.push('/(tabs)/map')}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="map-outline" size={14} color={FG} />
+            <Text style={[styles.exploreBtnText, { color: FG }]}>Explore on Map</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.list}>
@@ -82,9 +100,15 @@ export function NearbyBusinesses({ businesses, loading, limit }: NearbyBusinesse
 const styles = StyleSheet.create({
   section: { paddingHorizontal: 24, marginBottom: 24 },
 
-  sectionHeader: { marginBottom: 16 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16 },
   sectionTitle:  { fontSize: 16, fontWeight: '800', letterSpacing: -0.3, marginBottom: 2 },
   subtitle:      { fontSize: 11, fontWeight: '500' },
+  seeAllBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderWidth: 1, borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 6,
+  },
+  seeAllText: { fontSize: 11, fontWeight: '700' },
 
   emptyBox: {
     borderRadius: 16, borderWidth: 1,
@@ -98,7 +122,13 @@ const styles = StyleSheet.create({
   emptyTitle:    { fontSize: 15, fontWeight: '800' },
   emptySubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
 
-  list: { gap: 1 },
+  list: { gap: 10 },
+  exploreBtnRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1, borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 10, marginTop: 4,
+  },
+  exploreBtnText: { fontSize: 13, fontWeight: '700' },
 
   seeMoreRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',

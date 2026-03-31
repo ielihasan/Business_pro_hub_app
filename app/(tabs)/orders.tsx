@@ -13,6 +13,7 @@ import { SkeletonOrderCard } from '@/components/ui/Skeleton';
 import { useScreenEntrance } from '@/hooks/useScreenEntrance';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { OrderCard } from '@/components/orders';
 import { useStore } from '@/store/useStore';
@@ -70,6 +71,7 @@ export default function OrdersScreen() {
 
   const BG    = colors.background;
   const FG    = colors.foreground;
+  const BRAND = colors.brand;
   const MUTED = colors.mutedForeground;
   const BORDER = colors.border;
   const CARD  = colors.card;
@@ -119,15 +121,15 @@ export default function OrdersScreen() {
           return (
             <TouchableOpacity
               key={key}
-              style={[styles.filterTab, active && { borderBottomColor: FG, borderBottomWidth: 2 }]}
+              style={[styles.filterTab, active && { borderBottomColor: BRAND, borderBottomWidth: 2 }]}
               onPress={() => setFilter(key)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.filterText, { color: active ? FG : MUTED }]}>
+              <Text style={[styles.filterText, { color: active ? BRAND : MUTED }]}>
                 {label}
               </Text>
               {key !== 'all' && (
-                <View style={[styles.filterCount, { backgroundColor: active ? FG : BORDER }]}>
+                <View style={[styles.filterCount, { backgroundColor: active ? BRAND : BORDER }]}>
                   <Text style={[styles.filterCountText, { color: active ? CARD : MUTED }]}>
                     {key === 'active'
                       ? orders.filter(o => ['waiting', 'in_progress'].includes(o.status)).length
@@ -166,6 +168,16 @@ export default function OrdersScreen() {
                 ? 'No completed orders to show.'
                 : 'Scan a QR code to join your first queue.'}
             </Text>
+            {filter === 'all' && (
+              <TouchableOpacity
+                style={[styles.scanCta, { backgroundColor: colors.primary }]}
+                onPress={() => router.push('/(tabs)/scan')}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="qr-code-outline" size={16} color={colors.primaryForeground} />
+                <Text style={[styles.scanCtaText, { color: colors.primaryForeground }]}>SCAN QR CODE</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <View style={styles.list}>
@@ -228,4 +240,9 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 13, fontWeight: '800', letterSpacing: 2 },
   emptySub:   { fontSize: 13, textAlign: 'center', lineHeight: 20, maxWidth: 260 },
+  scanCta: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: 14, paddingVertical: 14, paddingHorizontal: 24, marginTop: 4,
+  },
+  scanCtaText: { fontSize: 13, fontWeight: '800', letterSpacing: 1 },
 });

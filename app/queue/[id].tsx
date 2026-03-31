@@ -25,6 +25,13 @@ import {
 } from '@/lib/queue';
 import { useStore } from '@/store/useStore';
 
+/** Compute a "Ready ~H:MM AM/PM" string from minutes-to-wait */
+function readyAtTime(waitMinutes: number | null | undefined): string | null {
+  if (!waitMinutes || waitMinutes <= 0) return null;
+  const ready = new Date(Date.now() + waitMinutes * 60 * 1000);
+  return ready.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
 /** Returns true if the string looks like a UUID */
 function isUuid(s: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
@@ -233,7 +240,11 @@ export default function QueueDetailScreen() {
             <Text style={[styles.statValue, { color: colors.foreground }]}>
               {formatWait(queue.estimated_wait_time)}
             </Text>
-            <Text style={[styles.statSub, { color: colors.mutedForeground }]}>Updated just now</Text>
+            <Text style={[styles.statSub, { color: colors.mutedForeground }]}>
+              {readyAtTime(queue.estimated_wait_time)
+                ? `Ready ~${readyAtTime(queue.estimated_wait_time)}`
+                : 'Updated just now'}
+            </Text>
           </View>
         </View>
 
@@ -299,7 +310,7 @@ export default function QueueDetailScreen() {
                 <View style={styles.serviceItem}>
                   <Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>TOTAL</Text>
                   <Text style={[styles.serviceValue, { color: colors.foreground }]}>
-                    ${queue.total_price.toFixed(2)}
+                    Rs {queue.total_price.toFixed(2)}
                   </Text>
                 </View>
               )}
@@ -443,8 +454,8 @@ const styles = StyleSheet.create({
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   progressLabel:  { fontSize: 10, fontWeight: '700', letterSpacing: 2 },
   progressPct:    { fontSize: 12, fontWeight: '800' },
-  progressTrack:  { height: 4, borderRadius: 2, overflow: 'hidden' },
-  progressFill:   { height: '100%', borderRadius: 2 },
+  progressTrack:  { height: 8, borderRadius: 4, overflow: 'hidden' },
+  progressFill:   { height: '100%', borderRadius: 4 },
 
   /* ── Sections ── */
   sectionWrap:   { paddingHorizontal: 24, paddingVertical: 20, borderBottomWidth: 1 },
