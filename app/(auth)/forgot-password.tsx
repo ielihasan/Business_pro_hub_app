@@ -23,6 +23,8 @@ const SURFACE = '#141414';
 const BORDER  = '#2a2a2a';
 const FG      = '#ffffff';
 const MUTED   = '#919191';
+const BRAND   = '#636B2F';   // olive green — synced from dashboard
+const BRAND_FG = '#FFFFFF';
 const PLACEHOLDER = '#555555';
 
 export default function ForgotPasswordScreen() {
@@ -103,8 +105,8 @@ export default function ForgotPasswordScreen() {
               {loading ? <ActivityIndicator color={FG} /> : <Text style={[styles.btnSecondaryText, { color: FG }]}>Resend Reset Link</Text>}
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.btnPrimary, { backgroundColor: FG }]} onPress={() => router.push('/(auth)/login')} activeOpacity={0.88}>
-              <Text style={[styles.btnPrimaryText, { color: '#000' }]}>Back to Sign In</Text>
+            <TouchableOpacity style={[styles.btnPrimary, { backgroundColor: BRAND }]} onPress={() => router.push('/(auth)/login')} activeOpacity={0.88}>
+              <Text style={[styles.btnPrimaryText, { color: BRAND_FG }]}>Back to Sign In</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -153,12 +155,12 @@ export default function ForgotPasswordScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.btnPrimary, { backgroundColor: FG }, loading && { opacity: 0.6 }]}
+              style={[styles.btnPrimary, { backgroundColor: BRAND }, loading && { opacity: 0.6 }]}
               onPress={handleSubmit}
               disabled={loading}
               activeOpacity={0.88}
             >
-              {loading ? <ActivityIndicator color="#000" /> : <Text style={[styles.btnPrimaryText, { color: '#000' }]}>Send Reset Link</Text>}
+              {loading ? <ActivityIndicator color={BRAND_FG} /> : <Text style={[styles.btnPrimaryText, { color: BRAND_FG }]}>Send Reset Link</Text>}
             </TouchableOpacity>
           </View>
 

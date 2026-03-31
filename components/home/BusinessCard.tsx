@@ -46,11 +46,13 @@ export function BusinessCard({ business }: BusinessCardProps) {
   const { colors } = useTheme();
   const { t }      = useTranslation();
 
-  const FG     = colors.foreground;
-  const MUTED  = colors.mutedForeground;
-  const CARD   = colors.card;
-  const BORDER = colors.border;
-  const SEC    = colors.secondary;
+  const FG       = colors.foreground;
+  const BRAND    = colors.brand;
+  const BRAND_FG = colors.brandForeground;
+  const MUTED    = colors.mutedForeground;
+  const CARD     = colors.card;
+  const BORDER   = colors.border;
+  const SEC      = colors.secondary;
 
   const initials = (business.name ?? '??')
     .split(' ')
@@ -138,11 +140,11 @@ export function BusinessCard({ business }: BusinessCardProps) {
               </Text>
             </View>
             <TouchableOpacity
-              style={[styles.joinBtn, { backgroundColor: FG }]}
+              style={[styles.joinBtn, { backgroundColor: BRAND }]}
               onPress={() => router.push(`/business/${business.id}`)}
               activeOpacity={0.8}
             >
-              <Ionicons name="arrow-forward" size={14} color={CARD} />
+              <Ionicons name="arrow-forward" size={14} color={BRAND_FG} />
             </TouchableOpacity>
           </View>
         </View>

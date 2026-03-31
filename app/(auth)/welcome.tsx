@@ -123,7 +123,7 @@ export default function WelcomeScreen() {
           <DotGrid color={colors.foreground} />
         </View>
 
-        <View style={[s.accentLine, { backgroundColor: colors.foreground }]} />
+        <View style={[s.accentLine, { backgroundColor: colors.brand }]} />
 
         <Text style={[s.headline, { color: colors.foreground }]}>
           Skip the{'\n'}

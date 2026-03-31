@@ -216,12 +216,14 @@ export default function WalletPaymentScreen() {
   };
 
   // ── Theme
-  const BG     = colors.background;
-  const FG     = colors.foreground;
-  const MUTED  = colors.mutedForeground;
-  const BORDER = colors.border;
-  const CARD   = colors.card;
-  const SEC    = colors.secondary;
+  const BG       = colors.background;
+  const FG       = colors.foreground;
+  const BRAND    = colors.brand;
+  const BRAND_FG = colors.brandForeground;
+  const MUTED    = colors.mutedForeground;
+  const BORDER   = colors.border;
+  const CARD     = colors.card;
+  const SEC      = colors.secondary;
 
   const walletBalance    = user?.walletBalance ?? null;
   const isWalletActive   = paymentMethods.length > 0;
@@ -250,46 +252,46 @@ export default function WalletPaymentScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
 
         {/* ── Wallet Card ─────────────────────────────────────────────────── */}
-        <View style={[styles.walletCard, { backgroundColor: FG }]}>
+        <View style={[styles.walletCard, { backgroundColor: BRAND }]}>
           {/* Top row */}
           <View style={styles.wcTop}>
             <View style={styles.wcBrandRow}>
-              <View style={[styles.wcLogoBox, { backgroundColor: BG + '22' }]}>
-                <Ionicons name="wallet" size={16} color={BG} />
+              <View style={[styles.wcLogoBox, { backgroundColor: BRAND_FG + '22' }]}>
+                <Ionicons name="wallet" size={16} color={BRAND_FG} />
               </View>
-              <Text style={[styles.wcBrand, { color: BG }]}>BusinessHub Pro</Text>
+              <Text style={[styles.wcBrand, { color: BRAND_FG }]}>BusinessHub Pro</Text>
             </View>
-            <View style={[styles.wcTypePill, { backgroundColor: BG + '22' }]}>
-              <Text style={[styles.wcTypeText, { color: BG + 'CC' }]}>DIGITAL WALLET</Text>
+            <View style={[styles.wcTypePill, { backgroundColor: BRAND_FG + '22' }]}>
+              <Text style={[styles.wcTypeText, { color: BRAND_FG + 'CC' }]}>DIGITAL WALLET</Text>
             </View>
           </View>
 
           {/* Balance */}
           <View style={styles.wcBal}>
-            <Text style={[styles.wcBalLabel, { color: BG + '88' }]}>AVAILABLE BALANCE</Text>
+            <Text style={[styles.wcBalLabel, { color: BRAND_FG + '88' }]}>AVAILABLE BALANCE</Text>
             {!isWalletActive ? (
               /* Locked — no payment method added yet */
               <View style={styles.wcLocked}>
-                <View style={[styles.wcLockedIconBox, { backgroundColor: BG + '22' }]}>
-                  <Ionicons name="lock-closed" size={20} color={BG + 'AA'} />
+                <View style={[styles.wcLockedIconBox, { backgroundColor: BRAND_FG + '22' }]}>
+                  <Ionicons name="lock-closed" size={20} color={BRAND_FG + 'AA'} />
                 </View>
                 <View>
-                  <Text style={[styles.wcLockedTitle, { color: BG }]}>Wallet Locked</Text>
-                  <Text style={[styles.wcLockedSub, { color: BG + '88' }]}>
+                  <Text style={[styles.wcLockedTitle, { color: BRAND_FG }]}>Wallet Locked</Text>
+                  <Text style={[styles.wcLockedSub, { color: BRAND_FG + '88' }]}>
                     Add a payment method to activate
                   </Text>
                 </View>
               </View>
             ) : walletBalance === null ? (
-              <ActivityIndicator color={BG} style={{ marginTop: 8 }} />
+              <ActivityIndicator color={BRAND_FG} style={{ marginTop: 8 }} />
             ) : (
               <>
-                <Text style={[styles.wcBalAmt, { color: BG }]}>
+                <Text style={[styles.wcBalAmt, { color: BRAND_FG }]}>
                   Rs {walletBalance.toLocaleString('en-PK')}
                 </Text>
-                <View style={[styles.wcCapRow, { backgroundColor: BG + '18' }]}>
-                  <Ionicons name="information-circle-outline" size={12} color={BG + 'BB'} />
-                  <Text style={[styles.wcCapText, { color: BG + 'BB' }]}>
+                <View style={[styles.wcCapRow, { backgroundColor: BRAND_FG + '18' }]}>
+                  <Ionicons name="information-circle-outline" size={12} color={BRAND_FG + 'BB'} />
+                  <Text style={[styles.wcCapText, { color: BRAND_FG + 'BB' }]}>
                     {advancePct}% advance deducted on priced services
                   </Text>
                 </View>
@@ -298,26 +300,26 @@ export default function WalletPaymentScreen() {
           </View>
 
           {/* Divider */}
-          <View style={[styles.wcDivider, { backgroundColor: BG + '22' }]} />
+          <View style={[styles.wcDivider, { backgroundColor: BRAND_FG + '22' }]} />
 
           {/* Bottom row */}
           <View style={styles.wcBottom}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.wcHolderLabel, { color: BG + '66' }]}>ACCOUNT HOLDER</Text>
-              <Text style={[styles.wcHolder, { color: BG }]} numberOfLines={1}>{user?.name ?? '—'}</Text>
+              <Text style={[styles.wcHolderLabel, { color: BRAND_FG + '66' }]}>ACCOUNT HOLDER</Text>
+              <Text style={[styles.wcHolder, { color: BRAND_FG }]} numberOfLines={1}>{user?.name ?? '—'}</Text>
             </View>
             {isWalletActive ? (
               <TouchableOpacity
-                style={[styles.wcAddFundsBtn, { backgroundColor: BG + '22', borderColor: BG + '40' }]}
+                style={[styles.wcAddFundsBtn, { backgroundColor: BRAND_FG + '22', borderColor: BRAND_FG + '40' }]}
                 onPress={() => setShowTopUp(true)}
                 activeOpacity={0.8}
               >
-                <Ionicons name="add" size={14} color={BG} />
-                <Text style={[styles.wcAddFundsText, { color: BG }]}>Add Funds</Text>
+                <Ionicons name="add" size={14} color={BRAND_FG} />
+                <Text style={[styles.wcAddFundsText, { color: BRAND_FG }]}>Add Funds</Text>
               </TouchableOpacity>
             ) : (
-              <View style={[styles.wcCurrencyBox, { borderColor: BG + '44' }]}>
-                <Text style={[styles.wcCurrency, { color: BG }]}>PKR</Text>
+              <View style={[styles.wcCurrencyBox, { borderColor: BRAND_FG + '44' }]}>
+                <Text style={[styles.wcCurrency, { color: BRAND_FG }]}>PKR</Text>
               </View>
             )}
           </View>
@@ -478,12 +480,12 @@ export default function WalletPaymentScreen() {
 
           {/* Add button */}
           <TouchableOpacity
-            style={[styles.addBtn, { backgroundColor: FG }]}
+            style={[styles.addBtn, { backgroundColor: BRAND }]}
             onPress={() => { resetForm(); setShowAdd(true); }}
             activeOpacity={0.85}
           >
-            <Ionicons name="add-circle-outline" size={20} color={BG} />
-            <Text style={[styles.addBtnText, { color: BG }]}>Add Payment Method</Text>
+            <Ionicons name="add-circle-outline" size={20} color={BRAND_FG} />
+            <Text style={[styles.addBtnText, { color: BRAND_FG }]}>Add Payment Method</Text>
           </TouchableOpacity>
         </View>
 
@@ -662,20 +664,20 @@ export default function WalletPaymentScreen() {
 
               {/* Pay button */}
               <TouchableOpacity
-                style={[styles.saveBtn, { backgroundColor: FG, opacity: topping ? 0.7 : 1, marginTop: 22 }]}
+                style={[styles.saveBtn, { backgroundColor: BRAND, opacity: topping ? 0.7 : 1, marginTop: 22 }]}
                 onPress={handleTopUp}
                 activeOpacity={0.85}
                 disabled={topping}
               >
                 {topping ? (
                   <>
-                    <ActivityIndicator color={BG} />
-                    <Text style={[styles.saveBtnText, { color: BG }]}>Processing…</Text>
+                    <ActivityIndicator color={BRAND_FG} />
+                    <Text style={[styles.saveBtnText, { color: BRAND_FG }]}>Processing…</Text>
                   </>
                 ) : (
                   <>
-                    <Ionicons name="add-circle-outline" size={20} color={BG} />
-                    <Text style={[styles.saveBtnText, { color: BG }]}>
+                    <Ionicons name="add-circle-outline" size={20} color={BRAND_FG} />
+                    <Text style={[styles.saveBtnText, { color: BRAND_FG }]}>
                       {topUpAmt ? `Add Rs ${parseInt(topUpAmt || '0').toLocaleString('en-PK')} to Wallet` : 'Add Funds'}
                     </Text>
                   </>
@@ -841,36 +843,36 @@ export default function WalletPaymentScreen() {
               {(accountTitle.trim().length > 0 || accountNumber.trim().length > 0) && (
                 <View style={{ marginTop: 22 }}>
                   <Text style={[styles.fieldLabel, { color: MUTED }]}>PREVIEW</Text>
-                  <View style={[styles.previewCard, { backgroundColor: FG }]}>
+                  <View style={[styles.previewCard, { backgroundColor: BRAND }]}>
                     <View style={styles.previewTopRow}>
-                      <View style={[styles.previewIconBox, { backgroundColor: BG + '22' }]}>
-                        <Ionicons name={METHOD_META[selType].icon as any} size={15} color={BG} />
+                      <View style={[styles.previewIconBox, { backgroundColor: BRAND_FG + '22' }]}>
+                        <Ionicons name={METHOD_META[selType].icon as any} size={15} color={BRAND_FG} />
                       </View>
-                      <Text style={[styles.previewTypeLabel, { color: BG + 'AA' }]}>
+                      <Text style={[styles.previewTypeLabel, { color: BRAND_FG + 'AA' }]}>
                         {METHOD_META[selType].sublabel.toUpperCase()}
                       </Text>
                     </View>
 
-                    <Text style={[styles.previewNum, { color: BG }]}>
+                    <Text style={[styles.previewNum, { color: BRAND_FG }]}>
                       {accountNumber.trim()
                         ? maskNumber(accountNumber.trim(), selType)
                         : selType === 'bank' ? 'PK·· ···· ···· ···· ···· ··' : '03··  ···  ····'}
                     </Text>
 
-                    <View style={[styles.previewDivider, { backgroundColor: BG + '22' }]} />
+                    <View style={[styles.previewDivider, { backgroundColor: BRAND_FG + '22' }]} />
 
                     <View style={styles.previewBottomRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.previewHolderLabel, { color: BG + '66' }]}>ACCOUNT HOLDER</Text>
-                        <Text style={[styles.previewHolder, { color: BG }]} numberOfLines={1}>
+                        <Text style={[styles.previewHolderLabel, { color: BRAND_FG + '66' }]}>ACCOUNT HOLDER</Text>
+                        <Text style={[styles.previewHolder, { color: BRAND_FG }]} numberOfLines={1}>
                           {accountTitle.trim() || 'Your Full Name'}
                         </Text>
                         {selType === 'bank' && bankName ? (
-                          <Text style={[styles.previewBank, { color: BG + '88' }]} numberOfLines={1}>{bankName}</Text>
+                          <Text style={[styles.previewBank, { color: BRAND_FG + '88' }]} numberOfLines={1}>{bankName}</Text>
                         ) : null}
                       </View>
-                      <View style={[styles.previewBadge, { backgroundColor: BG + '22', borderColor: BG + '33' }]}>
-                        <Text style={[styles.previewBadgeText, { color: BG }]}>
+                      <View style={[styles.previewBadge, { backgroundColor: BRAND_FG + '22', borderColor: BRAND_FG + '33' }]}>
+                        <Text style={[styles.previewBadgeText, { color: BRAND_FG }]}>
                           {METHOD_META[selType].label.toUpperCase()}
                         </Text>
                       </View>
@@ -881,16 +883,16 @@ export default function WalletPaymentScreen() {
 
               {/* Save */}
               <TouchableOpacity
-                style={[styles.saveBtn, { backgroundColor: FG, opacity: saving ? 0.6 : 1 }]}
+                style={[styles.saveBtn, { backgroundColor: BRAND, opacity: saving ? 0.6 : 1 }]}
                 onPress={handleAdd}
                 activeOpacity={0.85}
                 disabled={saving}
               >
                 {saving
-                  ? <ActivityIndicator color={BG} />
+                  ? <ActivityIndicator color={BRAND_FG} />
                   : <>
-                      <Ionicons name="checkmark-circle-outline" size={20} color={BG} />
-                      <Text style={[styles.saveBtnText, { color: BG }]}>Save Payment Method</Text>
+                      <Ionicons name="checkmark-circle-outline" size={20} color={BRAND_FG} />
+                      <Text style={[styles.saveBtnText, { color: BRAND_FG }]}>Save Payment Method</Text>
                     </>
                 }
               </TouchableOpacity>

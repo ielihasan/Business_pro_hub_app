@@ -73,6 +73,7 @@ export default function QueueScreen() {
 
   const BG     = colors.background;
   const FG     = colors.foreground;
+  const BRAND  = colors.brand;
   const MUTED  = colors.mutedForeground;
   const BORDER = colors.border;
 
@@ -96,24 +97,24 @@ export default function QueueScreen() {
         {/* ── Tab Switcher ── */}
         <View style={[styles.tabRow, { borderBottomColor: BORDER }]}>
           <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'active' && [styles.tabBtnActive, { borderBottomColor: FG }]]}
+            style={[styles.tabBtn, activeTab === 'active' && [styles.tabBtnActive, { borderBottomColor: BRAND }]]}
             onPress={() => setActiveTab('active')}
             activeOpacity={0.75}
           >
-            <Text style={[styles.tabBtnText, { color: activeTab === 'active' ? FG : MUTED }]}>
+            <Text style={[styles.tabBtnText, { color: activeTab === 'active' ? BRAND : MUTED }]}>
               {t('queue.tabs.active').toUpperCase()}
             </Text>
             {activeQueues.length > 0 && activeTab !== 'active' && (
-              <View style={[styles.tabDot, { backgroundColor: FG }]} />
+              <View style={[styles.tabDot, { backgroundColor: BRAND }]} />
             )}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'history' && [styles.tabBtnActive, { borderBottomColor: FG }]]}
+            style={[styles.tabBtn, activeTab === 'history' && [styles.tabBtnActive, { borderBottomColor: BRAND }]]}
             onPress={() => setActiveTab('history')}
             activeOpacity={0.75}
           >
-            <Text style={[styles.tabBtnText, { color: activeTab === 'history' ? FG : MUTED }]}>
+            <Text style={[styles.tabBtnText, { color: activeTab === 'history' ? BRAND : MUTED }]}>
               {t('queue.tabs.history').toUpperCase()}
             </Text>
           </TouchableOpacity>

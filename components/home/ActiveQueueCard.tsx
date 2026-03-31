@@ -27,6 +27,7 @@ export function ActiveQueueCard({ queue }: { queue: ActiveQueue }) {
   const pulseAnim  = useRef(new Animated.Value(1)).current;
 
   const FG     = colors.foreground;
+  const BRAND  = colors.brand;
   const MUTED  = colors.mutedForeground;
   const CARD   = colors.card;
   const SEC    = colors.secondary;
@@ -55,7 +56,7 @@ export function ActiveQueueCard({ queue }: { queue: ActiveQueue }) {
     >
       <View style={[styles.card, { backgroundColor: CARD, borderColor: BORDER }]}>
         {/* Left accent bar */}
-        <View style={[styles.accentBar, { backgroundColor: FG }]} />
+        <View style={[styles.accentBar, { backgroundColor: BRAND }]} />
 
         <View style={styles.inner}>
           {/* Top row */}
@@ -64,7 +65,7 @@ export function ActiveQueueCard({ queue }: { queue: ActiveQueue }) {
               {/* Live indicator */}
               <View style={styles.liveRow}>
                 <Animated.View
-                  style={[styles.liveDot, { backgroundColor: isServing ? colors.success : FG, transform: [{ scale: pulseAnim }] }]}
+                  style={[styles.liveDot, { backgroundColor: isServing ? colors.success : BRAND, transform: [{ scale: pulseAnim }] }]}
                 />
                 <Text style={[styles.liveLabel, { color: MUTED }]}>
                   {t('home.active_queue.title')}

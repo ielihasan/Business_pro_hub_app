@@ -79,8 +79,8 @@ export default function AboutScreen() {
 
         {/* ── App Hero ── */}
         <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.appIconBg, { backgroundColor: colors.foreground }]}>
-            <Ionicons name="business" size={36} color={colors.background} />
+          <View style={[styles.appIconBg, { backgroundColor: colors.brand }]}>
+            <Ionicons name="business" size={36} color={colors.brandForeground} />
           </View>
           <Text style={[styles.appName, { color: colors.foreground }]}>BusinessHub Pro</Text>
           <Text style={[styles.appTagline, { color: colors.mutedForeground }]}>

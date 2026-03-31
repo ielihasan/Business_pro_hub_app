@@ -31,6 +31,7 @@ export default function LanguageScreen() {
 
   const BG     = colors.background;
   const FG     = colors.foreground;
+  const BRAND  = colors.brand;
   const MUTED  = colors.mutedForeground;
   const BORDER = colors.border;
   const CARD   = colors.card;
@@ -82,8 +83,8 @@ export default function LanguageScreen() {
                 <Text style={[styles.rowSub, { color: MUTED }]}>{lang.region}</Text>
               </View>
 
-              <View style={[styles.radio, { borderColor: active ? FG : BORDER }]}>
-                {active && <View style={[styles.radioDot, { backgroundColor: FG }]} />}
+              <View style={[styles.radio, { borderColor: active ? BRAND : BORDER }]}>
+                {active && <View style={[styles.radioDot, { backgroundColor: BRAND }]} />}
               </View>
             </TouchableOpacity>
           );

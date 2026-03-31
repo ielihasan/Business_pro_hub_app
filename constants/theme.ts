@@ -15,6 +15,10 @@ export const Colors = {
     mutedForeground: '#737373',
     accent: '#E5E5E5',
     accentForeground: '#0a0a0a',
+    // Brand — olive green synced from dashboard landing page (#3D4127 palette)
+    brand: '#636B2F',               // medium olive — CTAs, active states, accents
+    brandForeground: '#FFFFFF',     // white text/icons on brand bg
+    brandMuted: '#E8EDD0',          // very light olive tint for subtle surfaces
     destructive: '#DC2626',
     destructiveForeground: '#FFFFFF',
     success: '#16A34A',
@@ -53,6 +57,10 @@ export const Colors = {
     mutedForeground: '#c6c6c6',     // on-surface-variant
     accent: '#353535',              // surface-container-highest
     accentForeground: '#e2e2e2',
+    // Brand — olive green synced from dashboard landing page (#BAC095 on dark)
+    brand: '#BAC095',               // light sage — readable on dark surfaces
+    brandForeground: '#1E2210',     // very dark olive text/icons on brand bg
+    brandMuted: '#2A3018',          // dark olive tinted surface
     destructive: '#ffb4ab',         // error
     destructiveForeground: '#690005',
     success: '#22c55e',

@@ -28,7 +28,8 @@ export function CategoryFilter({ selected, onSelect }: CategoryFilterProps) {
   const { colors } = useTheme();
   const { t }      = useTranslation();
 
-  const FG     = colors.foreground;
+  const BRAND  = colors.brand;
+  const BRAND_FG = colors.brandForeground;
   const MUTED  = colors.mutedForeground;
   const CARD   = colors.card;
   const BORDER = colors.border;
@@ -50,16 +51,16 @@ export function CategoryFilter({ selected, onSelect }: CategoryFilterProps) {
               style={[
                 styles.chip,
                 active
-                  ? { backgroundColor: FG, borderColor: FG }
+                  ? { backgroundColor: BRAND, borderColor: BRAND }
                   : { backgroundColor: CARD, borderColor: BORDER },
               ]}
             >
               <Ionicons
                 name={cat.icon}
                 size={14}
-                color={active ? colors.background : MUTED}
+                color={active ? BRAND_FG : MUTED}
               />
-              <Text style={[styles.chipText, { color: active ? colors.background : MUTED }]}>
+              <Text style={[styles.chipText, { color: active ? BRAND_FG : MUTED }]}>
                 {t(cat.labelKey)}
               </Text>
             </TouchableOpacity>

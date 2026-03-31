@@ -22,6 +22,7 @@ export default function ThemeScreen() {
 
   const BG     = colors.background;
   const FG     = colors.foreground;
+  const BRAND  = colors.brand;
   const MUTED  = colors.mutedForeground;
   const BORDER = colors.border;
   const CARD   = colors.card;
@@ -67,8 +68,8 @@ export default function ThemeScreen() {
                   </Text>
                   <Text style={[styles.rowSub, { color: MUTED }]}>{opt.subtitle}</Text>
                 </View>
-                <View style={[styles.radio, { borderColor: active ? FG : BORDER }]}>
-                  {active && <View style={[styles.radioDot, { backgroundColor: FG }]} />}
+                <View style={[styles.radio, { borderColor: active ? BRAND : BORDER }]}>
+                  {active && <View style={[styles.radioDot, { backgroundColor: BRAND }]} />}
                 </View>
               </TouchableOpacity>
             );

@@ -17,9 +17,11 @@ export default function SettingsScreen() {
     ({ en: 'English', ur: 'Urdu', ar: 'Arabic', hi: 'Hindi', fr: 'French', de: 'German', es: 'Spanish', zh: 'Chinese' } as any)
     [i18n.language?.slice(0, 2)] ?? 'English';
 
-  const BG     = colors.background;
-  const FG     = colors.foreground;
-  const MUTED  = colors.mutedForeground;
+  const BG       = colors.background;
+  const FG       = colors.foreground;
+  const BRAND    = colors.brand;
+  const BRAND_FG = colors.brandForeground;
+  const MUTED    = colors.mutedForeground;
   const BORDER = colors.border;
   const CARD   = colors.card;
   const SEC    = colors.secondary;
@@ -52,8 +54,8 @@ export default function SettingsScreen() {
         {/* Identity — read only */}
         {user && (
           <View style={[styles.identity, { backgroundColor: CARD, borderColor: BORDER }]}>
-            <View style={[styles.avatar, { backgroundColor: FG }]}>
-              <Text style={[styles.avatarText, { color: BG }]}>
+            <View style={[styles.avatar, { backgroundColor: BRAND }]}>
+              <Text style={[styles.avatarText, { color: BRAND_FG }]}>
                 {(user.name?.[0] ?? 'U').toUpperCase()}
               </Text>
             </View>
