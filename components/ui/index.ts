@@ -9,3 +9,11 @@ export { Progress, CircularProgress } from './Progress';
 export { ImageViewer } from './ImageViewer';
 export { ProfilePhotoModal } from './ProfilePhotoModal';
 export { LanguageSelectorModal } from './LanguageSelectorModal';
+export {
+  SkeletonBox,
+  SkeletonBusinessCard,
+  SkeletonOrderCard,
+  SkeletonQueueItem,
+  SkeletonBusinessDetail,
+  SkeletonQueueDetail,
+} from './Skeleton';

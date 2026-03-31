@@ -4,14 +4,17 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { BusinessCard } from './BusinessCard';
+import { SkeletonBusinessCard } from '@/components/ui/Skeleton';
 
 interface NearbyBusinessesProps {
   businesses: any[];
+  /** Show skeleton placeholders instead of content */
+  loading?: boolean;
   /** Cap the displayed list. If set, shows a "See All" button revealing the full list. */
   limit?: number;
 }
 
-export function NearbyBusinesses({ businesses, limit }: NearbyBusinessesProps) {
+export function NearbyBusinesses({ businesses, loading, limit }: NearbyBusinessesProps) {
   const { colors } = useTheme();
 
   const FG     = colors.foreground;
@@ -20,6 +23,7 @@ export function NearbyBusinesses({ businesses, limit }: NearbyBusinessesProps) {
 
   const displayed = limit ? businesses.slice(0, limit) : businesses;
   const hasMore   = limit ? businesses.length > limit  : false;
+  const skeletonCount = limit ?? 3;
 
   return (
     <View style={styles.section}>
@@ -28,13 +32,21 @@ export function NearbyBusinesses({ businesses, limit }: NearbyBusinessesProps) {
         <Text style={[styles.sectionTitle, { color: FG }]}>
           AVAILABLE BUSINESSES
         </Text>
-        <Text style={[styles.subtitle, { color: MUTED }]}>
-          {businesses.length} {businesses.length === 1 ? 'business' : 'businesses'} found
-        </Text>
+        {!loading && (
+          <Text style={[styles.subtitle, { color: MUTED }]}>
+            {businesses.length} {businesses.length === 1 ? 'business' : 'businesses'} found
+          </Text>
+        )}
       </View>
 
-      {/* Empty state */}
-      {businesses.length === 0 ? (
+      {/* Skeleton state */}
+      {loading ? (
+        <View style={styles.list}>
+          {Array.from({ length: skeletonCount }).map((_, i) => (
+            <SkeletonBusinessCard key={i} />
+          ))}
+        </View>
+      ) : businesses.length === 0 ? (
         <View style={[styles.emptyBox, { backgroundColor: colors.card, borderColor: BORDER }]}>
           <View style={[styles.emptyIconWrap, { borderColor: BORDER }]}>
             <Ionicons name="search-outline" size={28} color={FG} />

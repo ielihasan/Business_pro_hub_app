@@ -8,8 +8,8 @@ import {
   StyleSheet,
   StatusBar,
   TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
+import { SkeletonOrderCard } from '@/components/ui/Skeleton';
 import { useScreenEntrance } from '@/hooks/useScreenEntrance';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -148,8 +148,10 @@ export default function OrdersScreen() {
         contentContainerStyle={styles.scroll}
       >
         {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={FG} />
+          <View style={styles.list}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <SkeletonOrderCard key={i} />
+            ))}
           </View>
         ) : filtered.length === 0 ? (
           <View style={styles.empty}>

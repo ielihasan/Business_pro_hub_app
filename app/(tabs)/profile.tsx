@@ -38,7 +38,7 @@ export default function ProfileScreen() {
   const { user, logout, isLoading, notificationsEnabled, unreadCount, paymentMethods } = useStore();
   const totalBadge = unreadCount + (paymentMethods.length === 0 ? 1 : 0);
   const { t }                                                = useTranslation();
-  const { isUploading, handleEditPhoto }                     = useProfilePhoto();
+  const { isUploading, uploadProgress, handleEditPhoto }     = useProfilePhoto();
 
   const [photoModalVisible,         setPhotoModalVisible]         = useState(false);
   const [imageViewerVisible,        setImageViewerVisible]        = useState(false);
@@ -160,6 +160,7 @@ export default function ProfileScreen() {
           phone={displayUser.phone}
           avatarUri={user?.avatar}
           isUploading={isUploading}
+          uploadProgress={uploadProgress}
           loyaltyPoints={displayUser.loyaltyPoints}
           onAvatarPress={() => setPhotoModalVisible(true)}
         />

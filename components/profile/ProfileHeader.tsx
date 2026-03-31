@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
-import { Avatar } from '@/components/ui';
+import { Avatar, Progress } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
 
 interface ProfileHeaderProps {
@@ -12,6 +12,7 @@ interface ProfileHeaderProps {
   phone?: string;
   avatarUri?: string | null;
   isUploading: boolean;
+  uploadProgress?: number;
   loyaltyPoints?: number;
   onAvatarPress: () => void;
 }
@@ -23,7 +24,7 @@ function getMemberTier(pts: number): { label: string; icon: string } {
   return                   { label: 'Member',        icon: 'person-circle-outline' };
 }
 
-export function ProfileHeader({ name, email, phone, avatarUri, isUploading, loyaltyPoints = 0, onAvatarPress }: ProfileHeaderProps) {
+export function ProfileHeader({ name, email, phone, avatarUri, isUploading, uploadProgress = 0, loyaltyPoints = 0, onAvatarPress }: ProfileHeaderProps) {
   const { colors } = useTheme();
   const tier = getMemberTier(loyaltyPoints);
 
@@ -62,6 +63,13 @@ export function ProfileHeader({ name, email, phone, avatarUri, isUploading, loya
           <Text style={[styles.editPillText, { color: colors.mutedForeground }]}>Edit</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Upload progress bar */}
+      {isUploading && uploadProgress > 0 && (
+        <View style={styles.progressWrap}>
+          <Progress value={uploadProgress} height={3} style={{ borderRadius: 2 }} />
+        </View>
+      )}
 
       {/* Name & email */}
       <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={1}>{name}</Text>
@@ -152,4 +160,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   tierText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.2 },
+
+  progressWrap: { width: '80%', marginBottom: 8 },
 });

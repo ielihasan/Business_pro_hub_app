@@ -16,7 +16,7 @@ import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
-import { Avatar, Button } from '@/components/ui';
+import { Avatar, Button, SkeletonBusinessDetail } from '@/components/ui';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { resolveBusinessById } from '@/lib/queue';
 import { useStore } from '@/store/useStore';
@@ -224,7 +224,7 @@ export default function BusinessDetailScreen() {
     return (
       <SafeAreaView style={[styles.fill, { backgroundColor: colors.background }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-        <ActivityIndicator size="large" color={colors.foreground} style={{ flex: 1 }} />
+        <SkeletonBusinessDetail />
       </SafeAreaView>
     );
   }

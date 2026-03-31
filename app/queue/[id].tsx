@@ -8,6 +8,7 @@ import {
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
+import { SkeletonQueueDetail } from '@/components/ui/Skeleton';
 import { Stack } from 'expo-router';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -148,7 +149,7 @@ export default function QueueDetailScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-        <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
+        <SkeletonQueueDetail />
       </SafeAreaView>
     );
   }

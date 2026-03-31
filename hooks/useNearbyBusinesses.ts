@@ -25,6 +25,7 @@ export function useNearbyBusinesses({ category, query }: UseNearbyBusinessesOpti
   const locationEnabled = useStore((s) => s.locationEnabled);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [businesses, setBusinesses] = useState<BusinessWithDistance[]>([]);
+  const [loading, setLoading] = useState(true);
   const locationRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
   const debouncedQuery = useDebounce(query, 350);
@@ -65,6 +66,7 @@ export function useNearbyBusinesses({ category, query }: UseNearbyBusinessesOpti
 
       // Always load businesses regardless of location result
       await loadBusinesses(loc);
+      setLoading(false);
 
       // Set up realtime subscription
       unsub = subscribeToBusinesses(() => {
@@ -86,5 +88,5 @@ export function useNearbyBusinesses({ category, query }: UseNearbyBusinessesOpti
 
   const refresh = () => loadBusinesses(locationRef.current);
 
-  return { userLocation, businesses, refresh };
+  return { userLocation, businesses, loading, refresh };
 }

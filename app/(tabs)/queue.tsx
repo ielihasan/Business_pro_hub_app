@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Animated,
   View,
@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { useTranslation } from 'react-i18next';
 import { ActiveQueueItem, PastQueueItem, QueueEmptyState } from '@/components/queue';
+import { SkeletonQueueItem } from '@/components/ui/Skeleton';
 import { useStore } from '@/store/useStore';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 
@@ -22,9 +23,11 @@ export default function QueueScreen() {
   const { colors, isDark }    = useTheme();
   const { entranceStyle }     = useScreenEntrance();
   const { t }              = useTranslation();
-  const [refreshing, setRefreshing] = useState(false);
-  const [activeTab,  setActiveTab]  = useState<'active' | 'history'>('active');
-  const [dialog,     setDialog]     = useState<DialogConfig | null>(null);
+  const [refreshing,    setRefreshing]    = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [activeTab,     setActiveTab]     = useState<'active' | 'history'>('active');
+  const [dialog,        setDialog]        = useState<DialogConfig | null>(null);
+  const didInitialSync = useRef(false);
 
   const activeQueues           = useStore((s) => s.activeQueues);
   const queueHistory           = useStore((s) => s.queueHistory);
@@ -33,7 +36,12 @@ export default function QueueScreen() {
   const isAuthenticated        = useStore((s) => s.isAuthenticated);
 
   useEffect(() => {
-    if (isAuthenticated) syncQueuesFromSupabase();
+    if (isAuthenticated && !didInitialSync.current) {
+      didInitialSync.current = true;
+      syncQueuesFromSupabase().finally(() => setInitialLoading(false));
+    } else if (!isAuthenticated) {
+      setInitialLoading(false);
+    }
   }, [isAuthenticated]);
 
   const onRefresh = async () => {
@@ -134,7 +142,13 @@ export default function QueueScreen() {
         }
         contentContainerStyle={styles.scrollContent}
       >
-        {activeTab === 'active' ? (
+        {initialLoading ? (
+          <View style={styles.list}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonQueueItem key={i} />
+            ))}
+          </View>
+        ) : activeTab === 'active' ? (
           activeQueues.length > 0 ? (
             <View style={styles.list}>
               {activeQueues.map((q) => (

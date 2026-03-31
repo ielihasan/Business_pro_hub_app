@@ -46,7 +46,7 @@ export default function HomeScreen() {
   const [searchQuery,               setSearchQuery]               = useState('');
   const [notificationsPanelVisible, setNotificationsPanelVisible] = useState(false);
 
-  const { businesses, refresh: refreshBusinesses } = useNearbyBusinesses({
+  const { businesses, loading: businessesLoading, refresh: refreshBusinesses } = useNearbyBusinesses({
     category: selectedCategory,
     query: searchQuery,
   });
@@ -168,7 +168,7 @@ export default function HomeScreen() {
         <CategoryFilter selected={selectedCategory} onSelect={setSelectedCategory} />
 
         {/* ── Available Businesses (capped at 3 on home) ── */}
-        <NearbyBusinesses businesses={businesses} limit={3} />
+        <NearbyBusinesses businesses={businesses} loading={businessesLoading} limit={3} />
 
         <View style={{ height: 96 }} />
       </ScrollView>

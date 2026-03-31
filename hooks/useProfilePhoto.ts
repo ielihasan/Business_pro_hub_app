@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
@@ -10,6 +10,27 @@ export function useProfilePhoto() {
   const { user, updateProfile } = useStore();
   const { t } = useTranslation();
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startProgressSimulation = () => {
+    setUploadProgress(0);
+    let current = 0;
+    progressTimer.current = setInterval(() => {
+      current += Math.random() * 12 + 4; // advance 4–16% per tick
+      if (current >= 88) {
+        current = 88; // stall at 88% until upload completes
+        clearInterval(progressTimer.current!);
+      }
+      setUploadProgress(Math.round(current));
+    }, 200);
+  };
+
+  const completeProgress = () => {
+    if (progressTimer.current) clearInterval(progressTimer.current);
+    setUploadProgress(100);
+    setTimeout(() => setUploadProgress(0), 600);
+  };
 
   const uploadNewPhoto = async () => {
     try {
@@ -24,6 +45,7 @@ export function useProfilePhoto() {
       if ((result as any).canceled || !result.assets || !result.assets[0].base64) return;
 
       setIsUploading(true);
+      startProgressSimulation();
       const file = (result as any).assets[0];
       const fileExt = file.uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${user?.id}/${Date.now()}.${fileExt}`;
@@ -40,9 +62,12 @@ export function useProfilePhoto() {
       const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
       const response = await updateProfile({ avatar_url: data.publicUrl });
       if (!response.success) throw response.error;
+      completeProgress();
 
       Alert.alert(t('common.success'), t('profile.photo.updated'));
     } catch (error: any) {
+      if (progressTimer.current) clearInterval(progressTimer.current);
+      setUploadProgress(0);
       Alert.alert(t('common.error'), error.message || t('common.generic_error'));
     } finally {
       setIsUploading(false);
@@ -52,6 +77,7 @@ export function useProfilePhoto() {
   const removePhoto = async () => {
     try {
       setIsUploading(true);
+      startProgressSimulation();
 
       if (user?.avatar) {
         const urlParts = user.avatar.split('/avatars/');
@@ -64,9 +90,12 @@ export function useProfilePhoto() {
 
       const response = await updateProfile({ avatar_url: null });
       if (!response.success) throw response.error;
+      completeProgress();
 
       Alert.alert(t('common.success'), t('profile.photo.removed'));
     } catch (error: any) {
+      if (progressTimer.current) clearInterval(progressTimer.current);
+      setUploadProgress(0);
       Alert.alert(t('common.error'), error.message || t('common.generic_error'));
     } finally {
       setIsUploading(false);
@@ -108,5 +137,5 @@ export function useProfilePhoto() {
     }
   };
 
-  return { isUploading, handleEditPhoto };
+  return { isUploading, uploadProgress, handleEditPhoto };
 }
