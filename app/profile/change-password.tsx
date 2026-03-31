@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { useStore } from '@/store/useStore';
@@ -19,7 +19,9 @@ import { Spacing, BorderRadius } from '@/constants/theme';
 
 export default function ChangePasswordScreen() {
   const { colors } = useTheme();
-  const { changePassword, isLoading } = useStore();
+  const { changePassword, addPassword, isLoading } = useStore();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const isAddMode = mode === 'add';
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -56,7 +58,7 @@ export default function ChangePasswordScreen() {
     const e = { current: '', new: '', confirm: '' };
     let ok = true;
 
-    if (!currentPassword.trim()) {
+    if (!isAddMode && !currentPassword.trim()) {
       e.current = 'Current password is required.';
       ok = false;
     }
@@ -66,7 +68,7 @@ export default function ChangePasswordScreen() {
     } else if (newPassword.length < 8) {
       e.new = 'Password must be at least 8 characters.';
       ok = false;
-    } else if (newPassword === currentPassword) {
+    } else if (!isAddMode && newPassword === currentPassword) {
       e.new = 'New password must be different from current.';
       ok = false;
     }
@@ -86,13 +88,17 @@ export default function ChangePasswordScreen() {
   const handleSubmit = async () => {
     if (!validate()) return;
     setSaving(true);
-    const result = await changePassword(currentPassword, newPassword);
+    const result = isAddMode
+      ? await addPassword(newPassword)
+      : await changePassword(currentPassword, newPassword);
     setSaving(false);
 
     if (result.success) {
       setDialog({
-        title: 'Password Changed',
-        message: 'Your password has been updated successfully.',
+        title: isAddMode ? 'Password Added' : 'Password Changed',
+        message: isAddMode
+          ? 'Password set! You can now sign in with your email and this password.'
+          : 'Your password has been updated successfully.',
         icon: 'checkmark-circle',
         iconVariant: 'success',
         actions: [{ label: 'OK', onPress: () => { setDialog(null); router.back(); } }],
@@ -100,7 +106,7 @@ export default function ChangePasswordScreen() {
     } else {
       setDialog({
         title: 'Error',
-        message: result.error ?? 'Failed to change password.',
+        message: result.error ?? (isAddMode ? 'Failed to set password.' : 'Failed to change password.'),
         icon: 'alert-circle-outline',
         iconVariant: 'destructive',
         actions: [{ label: 'OK', onPress: () => setDialog(null) }],
@@ -155,7 +161,7 @@ export default function ChangePasswordScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={24} color={colors.foreground} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]}>Change Password</Text>
+        <Text style={[styles.headerTitle, { color: colors.foreground }]}>{isAddMode ? 'Add Password' : 'Change Password'}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -169,23 +175,28 @@ export default function ChangePasswordScreen() {
           <View style={[styles.banner, { backgroundColor: colors.info + '15', borderColor: colors.info + '40' }]}>
             <Ionicons name="information-circle-outline" size={18} color={colors.info} style={{ marginRight: 8 }} />
             <Text style={[styles.bannerText, { color: colors.info }]}>
-              Choose a strong password with at least 8 characters, including uppercase, numbers, and symbols.
+              {isAddMode
+                ? 'Set a password to enable email + password sign-in alongside your Google account.'
+                : 'Choose a strong password with at least 8 characters, including uppercase, numbers, and symbols.'}
             </Text>
           </View>
 
           {/* Fields */}
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <PasswordField
-              label="Current Password"
-              value={currentPassword}
-              onChangeText={(v) => { setCurrentPassword(v); setErrors(e => ({ ...e, current: '' })); }}
-              show={showCurrent}
-              onToggleShow={() => setShowCurrent(s => !s)}
-              error={errors.current}
-              placeholder="Enter current password"
-            />
-
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            {!isAddMode && (
+              <>
+                <PasswordField
+                  label="Current Password"
+                  value={currentPassword}
+                  onChangeText={(v) => { setCurrentPassword(v); setErrors(e => ({ ...e, current: '' })); }}
+                  show={showCurrent}
+                  onToggleShow={() => setShowCurrent(s => !s)}
+                  error={errors.current}
+                  placeholder="Enter current password"
+                />
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              </>
+            )}
 
             <PasswordField
               label="New Password"
@@ -258,7 +269,7 @@ export default function ChangePasswordScreen() {
             ) : (
               <>
                 <Ionicons name="checkmark-outline" size={20} color={colors.primaryForeground} />
-                <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>Update Password</Text>
+                <Text style={[styles.saveBtnText, { color: colors.primaryForeground }]}>{isAddMode ? 'Set Password' : 'Update Password'}</Text>
               </>
             )}
           </TouchableOpacity>

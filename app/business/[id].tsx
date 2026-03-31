@@ -12,6 +12,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
@@ -176,10 +177,16 @@ export default function BusinessDetailScreen() {
     const url = `tel:${phone}`;
     if (!(await Linking.canOpenURL(url))) {
       setDialog({
-        title: 'Not Supported',
-        message: 'This device cannot make phone calls.',
-        icon: 'alert-circle-outline', iconVariant: 'destructive',
-        actions: [{ label: 'OK', onPress: () => setDialog(null) }],
+        title: 'Copy Number',
+        message: `This device cannot make calls directly. Copy ${phone} to your clipboard?`,
+        icon: 'copy-outline', iconVariant: 'warning',
+        actions: [
+          { label: 'Cancel', variant: 'secondary', onPress: () => setDialog(null) },
+          { label: 'Copy', variant: 'primary', onPress: async () => {
+            await Clipboard.setStringAsync(phone);
+            setDialog({ title: 'Copied', message: 'Phone number copied to clipboard.', icon: 'checkmark-circle-outline', iconVariant: 'success', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
+          }},
+        ],
       });
       return;
     }

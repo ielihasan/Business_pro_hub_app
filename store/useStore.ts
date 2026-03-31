@@ -191,6 +191,7 @@ interface AppState {
   updateProfile: (updates: { avatar_url?: string | null; full_name?: string }) => Promise<{ success: boolean; error?: any }>;
   updateFullProfile: (updates: { name: string; phone: string }) => Promise<{ success: boolean; error?: any }>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; error?: any }>;
+  addPassword: (newPassword: string) => Promise<{ success: boolean; error?: any }>;
   deleteAccount: () => Promise<{ success: boolean; error?: string }>;
 
   // Queue actions
@@ -553,6 +554,19 @@ export const useStore = create<AppState>()(
         } catch (error: any) {
           set({ isLoading: false });
           return { success: false, error: error.message || 'Failed to change password' };
+        }
+      },
+
+      addPassword: async (newPassword: string) => {
+        set({ isLoading: true });
+        try {
+          const { error } = await supabase.auth.updateUser({ password: newPassword });
+          set({ isLoading: false });
+          if (error) return { success: false, error: error.message };
+          return { success: true };
+        } catch (error: any) {
+          set({ isLoading: false });
+          return { success: false, error: error.message || 'Failed to set password' };
         }
       },
 

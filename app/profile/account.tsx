@@ -66,10 +66,13 @@ export default function AccountScreen() {
   const SEC    = colors.secondary;
 
   const ROWS = [
-    ...(!isGoogleUser ? [{
+    ...(isGoogleUser ? [{
+      icon: 'key-outline', label: 'Add Password', sub: 'Set a password to also sign in with email',
+      onPress: () => router.push('/profile/change-password?mode=add'), destructive: false,
+    }] : [{
       icon: 'lock-closed-outline', label: 'Change Password', sub: 'Update your account password',
       onPress: () => router.push('/profile/change-password'), destructive: false,
-    }] : []),
+    }]),
     { icon: 'trash-bin-outline', label: 'Clear Cache',    sub: 'Free up space by clearing cached data', onPress: handleClearCache,     destructive: false },
     { icon: 'trash-outline',     label: 'Delete Account', sub: 'Permanently remove all your data',       onPress: handleDeleteAccount,   destructive: true  },
   ];
