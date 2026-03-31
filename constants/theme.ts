@@ -3,88 +3,114 @@
  * Light and Dark themes.
  */
 
+/**
+ * 60 – 30 – 10 colour rule
+ * ─────────────────────────
+ * 60 %  Neutral base  →  background, card, secondary, muted
+ * 30 %  Brand         →  brand / brandForeground / brandMuted  (deep forest green)
+ * 10 %  CTA / accent  →  primary / primaryForeground           (rich amber)
+ */
 export const Colors = {
   light: {
-    background: '#FFFFFF',
-    foreground: '#0a0a0a',
-    primary: '#000000',
+    // ── 60 % Neutral base ──────────────────────────────────────────────────
+    background: '#F7F9F7',          // off-white with slight green warmth
+    foreground: '#0E1510',          // near-black with green undertone
+    card: '#FFFFFF',
+    cardForeground: '#0E1510',
+    secondary: '#EEF2EE',           // very light surface
+    secondaryForeground: '#1A2B1A',
+    muted: '#E4EAE5',
+    mutedForeground: '#6A7A6B',     // accessible grey-green
+    accent: '#DDE8DE',
+    accentForeground: '#1A2B1A',
+    input: '#EEF2EE',
+    border: '#D9E3DA',
+    ring: '#A3BFA5',
+    popover: '#FFFFFF',
+    popoverForeground: '#0E1510',
+
+    // ── 10 % CTA / action buttons ──────────────────────────────────────────
+    primary: '#D97706',             // rich amber — every primary button/CTA
     primaryForeground: '#FFFFFF',
-    secondary: '#F5F5F5',
-    secondaryForeground: '#0a0a0a',
-    muted: '#F0F0F0',
-    mutedForeground: '#737373',
-    accent: '#E5E5E5',
-    accentForeground: '#0a0a0a',
-    // Brand — olive green synced from dashboard landing page (#3D4127 palette)
-    brand: '#636B2F',               // medium olive — CTAs, active states, accents
-    brandForeground: '#FFFFFF',     // white text/icons on brand bg
-    brandMuted: '#E8EDD0',          // very light olive tint for subtle surfaces
+
+    // ── 30 % Brand (deep forest green) ────────────────────────────────────
+    brand: '#2D6A4F',               // deep forest green
+    brandForeground: '#FFFFFF',
+    brandMuted: '#E0F0E8',          // very light green tint
+
+    // ── Semantic ───────────────────────────────────────────────────────────
     destructive: '#DC2626',
     destructiveForeground: '#FFFFFF',
     success: '#16A34A',
     successForeground: '#FFFFFF',
     warning: '#F59E0B',
     warningForeground: '#000000',
-    info: '#3B82F6',
+    info: '#2563EB',
     infoForeground: '#FFFFFF',
-    border: '#E5E5E5',
-    input: '#F5F5F5',
-    ring: '#A3A3A3',
-    card: '#FFFFFF',
-    cardForeground: '#0a0a0a',
-    popover: '#FFFFFF',
-    popoverForeground: '#0a0a0a',
-    chart1: '#404040',
-    chart2: '#5C5C5C',
-    chart3: '#787878',
-    chart4: '#949494',
-    chart5: '#B0B0B0',
-    statusWaiting: '#F59E0B',
-    statusInProgress: '#3B82F6',
+
+    // ── Charts ─────────────────────────────────────────────────────────────
+    chart1: '#2D6A4F',
+    chart2: '#40916C',
+    chart3: '#52B788',
+    chart4: '#74C69D',
+    chart5: '#B7E4C7',
+
+    // ── Status ─────────────────────────────────────────────────────────────
+    statusWaiting: '#D97706',
+    statusInProgress: '#2563EB',
     statusCompleted: '#16A34A',
     statusCancelled: '#DC2626',
   },
 
   dark: {
-    // Surfaces — from Stitch design token spec
-    background: '#131313',          // surface / surface-dim
-    foreground: '#e2e2e2',          // on-surface
-    primary: '#ffffff',             // primary (white)
-    primaryForeground: '#1a1c1c',   // on-primary (near-black)
-    secondary: '#2a2a2a',           // surface-container-high
-    secondaryForeground: '#e2e2e2',
-    muted: '#1b1b1b',               // surface-container-low
-    mutedForeground: '#c6c6c6',     // on-surface-variant
-    accent: '#353535',              // surface-container-highest
-    accentForeground: '#e2e2e2',
-    // Brand — olive green synced from dashboard landing page (#BAC095 on dark)
-    brand: '#BAC095',               // light sage — readable on dark surfaces
-    brandForeground: '#1E2210',     // very dark olive text/icons on brand bg
-    brandMuted: '#2A3018',          // dark olive tinted surface
-    destructive: '#ffb4ab',         // error
+    // ── 60 % Neutral base ──────────────────────────────────────────────────
+    background: '#111614',          // deep dark with faint green undertone
+    foreground: '#E8F0EA',          // near-white with green warmth
+    card: '#1A211C',                // slightly lighter surface
+    cardForeground: '#E8F0EA',
+    secondary: '#232C25',           // surface-container-high
+    secondaryForeground: '#C8D8CA',
+    muted: '#1C2420',               // surface-container-low
+    mutedForeground: '#8FA890',     // muted accessible text
+    accent: '#2C3B2E',              // surface-container-highest
+    accentForeground: '#C8D8CA',
+    input: '#1C2420',
+    border: '#2A3A2C',
+    ring: '#52B788',
+    popover: '#1A211C',
+    popoverForeground: '#E8F0EA',
+
+    // ── 10 % CTA / action buttons ──────────────────────────────────────────
+    primary: '#F59E0B',             // amber (lighter for dark bg contrast)
+    primaryForeground: '#1C1100',
+
+    // ── 30 % Brand (sage green — readable on dark) ────────────────────────
+    brand: '#52B788',               // sage/mint green
+    brandForeground: '#071A11',
+    brandMuted: '#112B1C',          // dark green tinted surface
+
+    // ── Semantic ───────────────────────────────────────────────────────────
+    destructive: '#FF8A80',
     destructiveForeground: '#690005',
-    success: '#22c55e',
+    success: '#22C55E',
     successForeground: '#FFFFFF',
     warning: '#F59E0B',
     warningForeground: '#000000',
-    info: '#3B82F6',
+    info: '#60A5FA',
     infoForeground: '#FFFFFF',
-    border: '#2e2e2e',              // subtle border
-    input: '#1b1b1b',
-    ring: '#919191',
-    card: '#1f1f1f',                // surface-container
-    cardForeground: '#e2e2e2',
-    popover: '#1f1f1f',
-    popoverForeground: '#e2e2e2',
-    chart1: '#B0B0B0',
-    chart2: '#949494',
-    chart3: '#787878',
-    chart4: '#5C5C5C',
-    chart5: '#404040',
+
+    // ── Charts ─────────────────────────────────────────────────────────────
+    chart1: '#B7E4C7',
+    chart2: '#74C69D',
+    chart3: '#52B788',
+    chart4: '#40916C',
+    chart5: '#2D6A4F',
+
+    // ── Status ─────────────────────────────────────────────────────────────
     statusWaiting: '#F59E0B',
-    statusInProgress: '#3B82F6',
-    statusCompleted: '#22c55e',
-    statusCancelled: '#ffb4ab',
+    statusInProgress: '#60A5FA',
+    statusCompleted: '#22C55E',
+    statusCancelled: '#FF8A80',
   },
 };
 

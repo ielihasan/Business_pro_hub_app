@@ -220,6 +220,8 @@ export default function WalletPaymentScreen() {
   const FG       = colors.foreground;
   const BRAND    = colors.brand;
   const BRAND_FG = colors.brandForeground;
+  const CTA      = colors.primary;
+  const CTA_FG   = colors.primaryForeground;
   const MUTED    = colors.mutedForeground;
   const BORDER   = colors.border;
   const CARD     = colors.card;
@@ -480,12 +482,12 @@ export default function WalletPaymentScreen() {
 
           {/* Add button */}
           <TouchableOpacity
-            style={[styles.addBtn, { backgroundColor: BRAND }]}
+            style={[styles.addBtn, { backgroundColor: CTA }]}
             onPress={() => { resetForm(); setShowAdd(true); }}
             activeOpacity={0.85}
           >
             <Ionicons name="add-circle-outline" size={20} color={BRAND_FG} />
-            <Text style={[styles.addBtnText, { color: BRAND_FG }]}>Add Payment Method</Text>
+            <Text style={[styles.addBtnText, { color: CTA_FG }]}>Add Payment Method</Text>
           </TouchableOpacity>
         </View>
 
@@ -664,20 +666,20 @@ export default function WalletPaymentScreen() {
 
               {/* Pay button */}
               <TouchableOpacity
-                style={[styles.saveBtn, { backgroundColor: BRAND, opacity: topping ? 0.7 : 1, marginTop: 22 }]}
+                style={[styles.saveBtn, { backgroundColor: CTA, opacity: topping ? 0.7 : 1, marginTop: 22 }]}
                 onPress={handleTopUp}
                 activeOpacity={0.85}
                 disabled={topping}
               >
                 {topping ? (
                   <>
-                    <ActivityIndicator color={BRAND_FG} />
-                    <Text style={[styles.saveBtnText, { color: BRAND_FG }]}>Processing…</Text>
+                    <ActivityIndicator color={CTA_FG} />
+                    <Text style={[styles.saveBtnText, { color: CTA_FG }]}>Processing…</Text>
                   </>
                 ) : (
                   <>
-                    <Ionicons name="add-circle-outline" size={20} color={BRAND_FG} />
-                    <Text style={[styles.saveBtnText, { color: BRAND_FG }]}>
+                    <Ionicons name="add-circle-outline" size={20} color={CTA_FG} />
+                    <Text style={[styles.saveBtnText, { color: CTA_FG }]}>
                       {topUpAmt ? `Add Rs ${parseInt(topUpAmt || '0').toLocaleString('en-PK')} to Wallet` : 'Add Funds'}
                     </Text>
                   </>
@@ -883,16 +885,16 @@ export default function WalletPaymentScreen() {
 
               {/* Save */}
               <TouchableOpacity
-                style={[styles.saveBtn, { backgroundColor: BRAND, opacity: saving ? 0.6 : 1 }]}
+                style={[styles.saveBtn, { backgroundColor: CTA, opacity: saving ? 0.6 : 1 }]}
                 onPress={handleAdd}
                 activeOpacity={0.85}
                 disabled={saving}
               >
                 {saving
-                  ? <ActivityIndicator color={BRAND_FG} />
+                  ? <ActivityIndicator color={CTA_FG} />
                   : <>
-                      <Ionicons name="checkmark-circle-outline" size={20} color={BRAND_FG} />
-                      <Text style={[styles.saveBtnText, { color: BRAND_FG }]}>Save Payment Method</Text>
+                      <Ionicons name="checkmark-circle-outline" size={20} color={CTA_FG} />
+                      <Text style={[styles.saveBtnText, { color: CTA_FG }]}>Save Payment Method</Text>
                     </>
                 }
               </TouchableOpacity>

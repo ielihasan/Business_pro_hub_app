@@ -255,7 +255,8 @@ export default function BusinessDetailScreen() {
   const BG       = colors.background;
   const FG       = colors.foreground;
   const BRAND    = colors.brand;
-  const BRAND_FG = colors.brandForeground;
+  const CTA      = colors.primary;
+  const CTA_FG   = colors.primaryForeground;
   const MUTED    = colors.mutedForeground;
   const BORDER   = colors.border;
   const CARD   = colors.card;
@@ -378,17 +379,17 @@ export default function BusinessDetailScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.joinBtn, { backgroundColor: BRAND }]}
+              style={[styles.joinBtn, { backgroundColor: CTA }]}
               onPress={handleJoinQueue}
               activeOpacity={0.85}
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator size="small" color={BRAND_FG} />
+                <ActivityIndicator size="small" color={CTA_FG} />
               ) : (
                 <>
-                  <Ionicons name="add-circle-outline" size={20} color={BRAND_FG} />
-                  <Text style={[styles.joinBtnText, { color: BRAND_FG }]}>
+                  <Ionicons name="add-circle-outline" size={20} color={CTA_FG} />
+                  <Text style={[styles.joinBtnText, { color: CTA_FG }]}>
                     {advanceFee > 0 ? `JOIN & PAY Rs ${advanceFee}` : 'JOIN QUEUE'}
                   </Text>
                 </>

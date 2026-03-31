@@ -23,7 +23,7 @@ const SURFACE = '#141414';
 const BORDER  = '#2a2a2a';
 const FG      = '#ffffff';
 const MUTED   = '#919191';
-const BRAND   = '#636B2F';   // olive green — synced from dashboard
+const BRAND   = '#D97706';   // amber CTA
 const BRAND_FG = '#FFFFFF';
 const PLACEHOLDER = '#555555';
 

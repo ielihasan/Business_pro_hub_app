@@ -48,7 +48,8 @@ export function BusinessCard({ business }: BusinessCardProps) {
 
   const FG       = colors.foreground;
   const BRAND    = colors.brand;
-  const BRAND_FG = colors.brandForeground;
+  const CTA      = colors.primary;
+  const CTA_FG   = colors.primaryForeground;
   const MUTED    = colors.mutedForeground;
   const CARD     = colors.card;
   const BORDER   = colors.border;
@@ -140,11 +141,11 @@ export function BusinessCard({ business }: BusinessCardProps) {
               </Text>
             </View>
             <TouchableOpacity
-              style={[styles.joinBtn, { backgroundColor: BRAND }]}
+              style={[styles.joinBtn, { backgroundColor: CTA }]}
               onPress={() => router.push(`/business/${business.id}`)}
               activeOpacity={0.8}
             >
-              <Ionicons name="arrow-forward" size={14} color={BRAND_FG} />
+              <Ionicons name="arrow-forward" size={14} color={CTA_FG} />
             </TouchableOpacity>
           </View>
         </View>
