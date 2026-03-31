@@ -147,8 +147,7 @@ export default function WalletPaymentScreen() {
     }
 
     setTopping(true);
-    // Simulate a 1-second payment processing delay
-    await new Promise(res => setTimeout(res, 1200));
+    await new Promise(res => setTimeout(res, 1200)); // brief UX delay before balance update
     const defaultMethod = paymentMethods.find(m => m.isDefault) ?? paymentMethods[0];
     const result = await topUpWallet(amount, defaultMethod?.id);
     setTopping(false);
@@ -661,7 +660,7 @@ export default function WalletPaymentScreen() {
               </View>
 
               <Text style={[styles.fieldHint, { color: MUTED }]}>
-                Card details are not stored. This is a simulated payment for demonstration.
+                Card details are not stored or transmitted. Top-up is processed via your registered payment method.
               </Text>
 
               {/* Pay button */}

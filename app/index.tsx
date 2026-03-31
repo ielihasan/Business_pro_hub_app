@@ -34,8 +34,8 @@ export default function SplashIndex() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.logoContainer}>
-        <View style={[styles.logo, { backgroundColor: colors.primary }]}>
-          <Text style={[styles.logoText, { color: colors.primaryForeground }]}>
+        <View style={[styles.logo, { backgroundColor: colors.brand }]}>
+          <Text style={[styles.logoText, { color: colors.brandForeground }]}>
             BH
           </Text>
         </View>

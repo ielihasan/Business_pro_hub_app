@@ -89,18 +89,28 @@ export default function HomeScreen() {
 
           <Text style={[styles.wordmark, { color: FG }]}>BUSINESSHUB PRO</Text>
 
-          <TouchableOpacity
-            style={[styles.bellBtn, { backgroundColor: CARD, borderColor: BORDER }]}
-            onPress={() => setNotificationsPanelVisible(true)}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="notifications-outline" size={18} color={FG} />
-            {totalBadge > 0 && (
-              <View style={[styles.badge, { backgroundColor: colors.destructive }]}>
-                <Text style={[styles.badgeText, { color: colors.destructiveForeground }]}>{totalBadge > 9 ? '9+' : totalBadge}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <View style={styles.topBarRight}>
+            <TouchableOpacity
+              style={[styles.iconBtn, { backgroundColor: CARD, borderColor: BORDER }]}
+              onPress={() => router.push('/(tabs)/scan')}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="qr-code-outline" size={18} color={FG} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.bellBtn, { backgroundColor: CARD, borderColor: BORDER }]}
+              onPress={() => setNotificationsPanelVisible(true)}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="notifications-outline" size={18} color={FG} />
+              {totalBadge > 0 && (
+                <View style={[styles.badge, { backgroundColor: colors.destructive }]}>
+                  <Text style={[styles.badgeText, { color: colors.destructiveForeground }]}>{totalBadge > 9 ? '9+' : totalBadge}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
 
@@ -199,6 +209,11 @@ const styles = StyleSheet.create({
   },
   avatarInitial: { fontSize: 14, fontWeight: '800' },
 
+  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    borderWidth: 1, justifyContent: 'center', alignItems: 'center',
+  },
   bellBtn: {
     width: 36, height: 36, borderRadius: 18,
     borderWidth: 1, justifyContent: 'center', alignItems: 'center',

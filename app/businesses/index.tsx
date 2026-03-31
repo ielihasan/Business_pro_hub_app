@@ -6,9 +6,9 @@ import {
   FlatList,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
   StatusBar,
 } from 'react-native';
+import { SkeletonBusinessCard } from '@/components/ui/Skeleton';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -100,9 +100,10 @@ export default function AllBusinessesScreen() {
 
       {/* ── List ── */}
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={FG} />
-          <Text style={[styles.loadingText, { color: MUTED }]}>Loading businesses…</Text>
+        <View style={styles.skeletonList}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <SkeletonBusinessCard key={i} />
+          ))}
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.center}>
@@ -172,14 +173,14 @@ const styles = StyleSheet.create({
   countText: { fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
 
   /* ── List ── */
-  list: { paddingHorizontal: 16, paddingTop: 14 },
+  list:         { paddingHorizontal: 16, paddingTop: 14 },
+  skeletonList: { paddingHorizontal: 16, paddingTop: 14 },
 
   /* ── States ── */
   center: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     padding: 40, gap: 12,
   },
-  loadingText: { fontSize: 13, marginTop: 8 },
 
   emptyIcon: {
     width: 80, height: 80, borderRadius: 20, borderWidth: 1,

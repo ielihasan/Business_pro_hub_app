@@ -6,7 +6,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Spacing, Typography, BorderRadius } from '@/constants/theme';
 
 const APP_VERSION   = '1.0.0';
-const BUILD_NUMBER  = '2026.02.25';
+const BUILD_NUMBER  = '2026.03.31';
 const CONTACT_EMAIL = 'support@businesshubpro.app';
 
 const FEATURES = [

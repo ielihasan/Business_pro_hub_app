@@ -120,26 +120,8 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="auth/callback" options={{ animation: 'fade' }} />
-        <Stack.Screen
-          name="business/[id]"
-          options={{
-            headerShown: true,
-            headerTitle: 'Business Details',
-            headerStyle: { backgroundColor: colors.background },
-            headerTintColor: colors.foreground,
-            headerShadowVisible: false,
-          }}
-        />
-        <Stack.Screen
-          name="queue/[id]"
-          options={{
-            headerShown: true,
-            headerTitle: 'Queue Status',
-            headerStyle: { backgroundColor: colors.background },
-            headerTintColor: colors.foreground,
-            headerShadowVisible: false,
-          }}
-        />
+        <Stack.Screen name="business/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="queue/[id]"   options={{ headerShown: false }} />
         <Stack.Screen
           name="profile/terms"
           options={{

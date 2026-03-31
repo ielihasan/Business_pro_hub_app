@@ -95,7 +95,7 @@ export default function SettingsScreen() {
         </View>
 
         <Text style={[styles.version, { color: MUTED }]}>
-          BusinessHub Pro · v1.0.0 · Build 2026.02.25
+          BusinessHub Pro · v1.0.0 · Build 2026.03.31
         </Text>
         <View style={{ height: 56 }} />
       </ScrollView>
