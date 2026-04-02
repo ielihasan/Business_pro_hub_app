@@ -162,8 +162,8 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 9, fontWeight: '700' },
 
   info:    { flex: 1, gap: 8 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  name:    { fontSize: 15, fontWeight: '800', flex: 1 },
+  nameRow: { flexDirection: 'column', gap: 4 },
+  name:    { fontSize: 15, fontWeight: '800' },
   catPill: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 7, paddingVertical: 3,
