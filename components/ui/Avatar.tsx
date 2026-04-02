@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   initials: {
-    fontWeight: Typography.fontWeight.medium,
+    fontWeight: Typography.fontWeight.bold,
   },
   group: {
     flexDirection: 'row',
