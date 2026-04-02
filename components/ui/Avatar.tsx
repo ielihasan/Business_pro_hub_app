@@ -176,6 +176,8 @@ const styles = StyleSheet.create({
   },
   initials: {
     fontWeight: Typography.fontWeight.bold,
+    fontStyle: 'italic',
+    letterSpacing: -0.5,
   },
   group: {
     flexDirection: 'row',
