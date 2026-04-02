@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
+import { Avatar } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 
 // Maps business_type values (synced from dashboard) to Ionicons names
@@ -55,13 +56,6 @@ export function BusinessCard({ business }: BusinessCardProps) {
   const BORDER   = colors.border;
   const SEC      = colors.secondary;
 
-  const initials = (business.name ?? '??')
-    .split(' ')
-    .slice(0, 2)
-    .map((w: string) => w[0])
-    .join('')
-    .toUpperCase();
-
   const isOpen = business.is_open ?? false;
 
   return (
@@ -73,9 +67,11 @@ export function BusinessCard({ business }: BusinessCardProps) {
       <View style={styles.body}>
         {/* Avatar column */}
         <View style={styles.avatarCol}>
-          <View style={[styles.avatar, { backgroundColor: SEC, borderColor: BORDER }]}>
-            <Text style={[styles.initials, { color: FG }]}>{initials}</Text>
-          </View>
+          <Avatar
+            name={business.name}
+            source={business.avatar_url ? { uri: business.avatar_url } : null}
+            size="lg"
+          />
           {/* Open/Closed dot */}
           <View style={styles.statusRow}>
             <View style={[styles.dot, { backgroundColor: isOpen ? colors.success : MUTED }]} />
@@ -161,11 +157,6 @@ const styles = StyleSheet.create({
   },
   body:      { flexDirection: 'row', padding: 16, gap: 14 },
   avatarCol: { alignItems: 'center', gap: 8 },
-  avatar: {
-    width: 56, height: 56, borderRadius: 14, borderWidth: 1,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  initials:   { fontSize: 18, fontWeight: '800' },
   statusRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dot:        { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 9, fontWeight: '700' },
