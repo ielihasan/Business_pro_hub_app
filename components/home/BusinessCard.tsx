@@ -166,6 +166,7 @@ const styles = StyleSheet.create({
   name:    { fontSize: 15, fontWeight: '800' },
   catPill: {
     flexDirection: 'row', alignItems: 'center',
+    alignSelf: 'flex-start',
     paddingHorizontal: 7, paddingVertical: 3,
     borderRadius: 20, borderWidth: 1, gap: 4,
   },
