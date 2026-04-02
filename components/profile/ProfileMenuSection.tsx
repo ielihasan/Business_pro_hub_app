@@ -12,6 +12,7 @@ type MenuItem = {
   subtitle?: string;
   type: 'link' | 'toggle';
   badge?: string;
+  badgeVariant?: 'default' | 'destructive';
   value?: boolean | string;
 };
 
@@ -64,8 +65,14 @@ export function ProfileMenuSection({ title, items, toggleStates, onToggle, onMen
                 ) : (
                   <View style={styles.rightRow}>
                     {!!item.badge && (
-                      <View style={[styles.badgePill, { backgroundColor: colors.secondary }]}>
-                        <Text style={[styles.badgeText, { color: colors.foreground }]}>{item.badge}</Text>
+                      <View style={[
+                        styles.badgePill,
+                        { backgroundColor: item.badgeVariant === 'destructive' ? colors.destructive : colors.secondary },
+                      ]}>
+                        <Text style={[
+                          styles.badgeText,
+                          { color: item.badgeVariant === 'destructive' ? '#fff' : colors.foreground },
+                        ]}>{item.badge}</Text>
                       </View>
                     )}
                     {!item.badge && typeof item.value === 'string' && (

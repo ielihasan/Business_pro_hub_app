@@ -4,9 +4,8 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Avatar } from '@/components/ui';
-import { useTranslation } from 'react-i18next';
+import { useStore } from '@/store/useStore';
 
-// Maps business_type values (synced from dashboard) to Ionicons names
 const CATEGORY_ICONS: Record<string, string> = {
   'coffee shop':       'cafe-outline',
   'restaurant':        'restaurant-outline',
@@ -22,7 +21,6 @@ const CATEGORY_ICONS: Record<string, string> = {
   'pharmacy':          'medkit-outline',
   'bakery':            'storefront-outline',
   'other':             'ellipsis-horizontal-outline',
-  // legacy short-form ids
   'food':              'restaurant-outline',
   'health':            'medical-outline',
   'repair':            'construct-outline',
@@ -34,7 +32,6 @@ function getCategoryIcon(cat?: string): string {
   if (!cat) return CATEGORY_ICONS.default;
   const lower = cat.toLowerCase();
   if (CATEGORY_ICONS[lower]) return CATEGORY_ICONS[lower];
-  // partial match for compound types like "Clinic / Healthcare"
   const key = Object.keys(CATEGORY_ICONS).find((k) => lower.includes(k));
   return key ? CATEGORY_ICONS[key] : CATEGORY_ICONS.default;
 }
@@ -44,104 +41,113 @@ interface BusinessCardProps {
 }
 
 export function BusinessCard({ business }: BusinessCardProps) {
-  const { colors } = useTheme();
-  const { t }      = useTranslation();
+  const { colors }         = useTheme();
+  const favoriteBusinesses = useStore((s) => s.favoriteBusinesses);
+  const toggleFavorite     = useStore((s) => s.toggleFavorite);
 
-  const FG       = colors.foreground;
-  const BRAND    = colors.brand;
-  const CTA      = colors.primary;
-  const CTA_FG   = colors.primaryForeground;
-  const MUTED    = colors.mutedForeground;
-  const CARD     = colors.card;
-  const BORDER   = colors.border;
-  const SEC      = colors.secondary;
+  const FG     = colors.foreground;
+  const CTA    = colors.primary;
+  const CTA_FG = colors.primaryForeground;
+  const MUTED  = colors.mutedForeground;
+  const CARD   = colors.card;
+  const BORDER = colors.border;
+  const SEC    = colors.secondary;
 
-  const isOpen = business.is_open ?? false;
+  const isOpen   = business.is_open ?? false;
+  const isFav    = favoriteBusinesses.includes(business.id);
+  const accent   = isOpen ? colors.success : MUTED;
+
+  const locationText = business.distanceKm != null
+    ? `${(business.distanceKm as number).toFixed(1)} km away`
+    : business.address ?? 'Location not listed';
 
   return (
     <TouchableOpacity
-      activeOpacity={0.88}
+      activeOpacity={0.85}
       onPress={() => router.push(`/business/${business.id}`)}
       style={[styles.card, { backgroundColor: CARD, borderColor: BORDER }]}
     >
-      <View style={styles.body}>
-        {/* Avatar column */}
-        <View style={styles.avatarCol}>
+      {/* Left accent bar */}
+      <View style={[styles.accentBar, { backgroundColor: accent }]} />
+
+      <View style={styles.inner}>
+        {/* ── Top row: avatar + info + heart ── */}
+        <View style={styles.topRow}>
           <Avatar
             name={business.name}
             source={business.avatar_url ? { uri: business.avatar_url } : null}
             size="lg"
           />
-          {/* Open/Closed dot */}
-          <View style={styles.statusRow}>
-            <View style={[styles.dot, { backgroundColor: isOpen ? colors.success : MUTED }]} />
-            <Text style={[styles.statusText, { color: isOpen ? colors.success : MUTED }]}>
-              {isOpen ? t('common.open') : t('common.closed')}
-            </Text>
-          </View>
-        </View>
 
-        {/* Info */}
-        <View style={styles.info}>
-          {/* Name + category */}
-          <View style={styles.nameRow}>
+          <View style={styles.infoBlock}>
             <Text style={[styles.name, { color: FG }]} numberOfLines={1}>
               {business.name}
             </Text>
+
+            {/* Category pill */}
             <View style={[styles.catPill, { backgroundColor: SEC, borderColor: BORDER }]}>
               <Ionicons name={getCategoryIcon(business.category) as any} size={10} color={MUTED} />
               <Text style={[styles.catText, { color: MUTED }]} numberOfLines={1}>
                 {business.category ?? 'General'}
               </Text>
             </View>
-          </View>
 
-          {/* Distance / address + rating */}
-          <View style={styles.metaRow}>
-            <View style={[styles.metaChip, { flex: 1, flexShrink: 1 }]}>
+            {/* Location */}
+            <View style={styles.locRow}>
               <Ionicons name="location-outline" size={11} color={MUTED} />
-              <Text style={[styles.metaText, { color: MUTED }]} numberOfLines={1}>
-                {business.distanceKm != null
-                  ? `${(business.distanceKm as number).toFixed(1)} km away`
-                  : business.address ?? 'Address not listed'}
+              <Text style={[styles.locText, { color: MUTED }]} numberOfLines={1}>
+                {locationText}
               </Text>
             </View>
+          </View>
+
+          {/* Heart */}
+          <TouchableOpacity
+            onPress={() => toggleFavorite(business.id)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
+            style={styles.heartBtn}
+          >
+            <Ionicons
+              name={isFav ? 'heart' : 'heart-outline'}
+              size={20}
+              color={isFav ? colors.destructive : MUTED}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Divider ── */}
+        <View style={[styles.divider, { backgroundColor: BORDER }]} />
+
+        {/* ── Bottom row: status + rating + CTA ── */}
+        <View style={styles.bottomRow}>
+          {/* Status badge */}
+          <View style={[styles.statusBadge, { backgroundColor: accent + '20' }]}>
+            <View style={[styles.statusDot, { backgroundColor: accent }]} />
+            <Text style={[styles.statusText, { color: accent }]}>
+              {isOpen ? 'Open Now' : 'Closed'}
+            </Text>
+          </View>
+
+          <View style={styles.rightCluster}>
+            {/* Rating */}
             {business.rating != null && (
-              <View style={styles.metaChip}>
-                <Ionicons name="star-outline" size={11} color={MUTED} />
-                <Text style={[styles.metaText, { color: MUTED }]}>{business.rating}</Text>
+              <View style={styles.ratingChip}>
+                <Ionicons name="star" size={11} color={colors.warning ?? '#F59E0B'} />
+                <Text style={[styles.ratingText, { color: FG }]}>
+                  {typeof business.rating === 'number' ? business.rating.toFixed(1) : business.rating}
+                </Text>
               </View>
             )}
-          </View>
 
-          {/* Divider */}
-          <View style={[styles.divider, { backgroundColor: BORDER }]} />
-
-          {/* Stats + join */}
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={[styles.statVal, { color: FG }]}>
-                {business.queue_length ?? 0}
-              </Text>
-              <Text style={[styles.statLbl, { color: MUTED }]}>
-                {t('home.nearby.in_queue')}
-              </Text>
-            </View>
-            <View style={[styles.statSep, { backgroundColor: BORDER }]} />
-            <View style={styles.statItem}>
-              <Text style={[styles.statVal, { color: FG }]}>
-                {business.wait_time ?? '–'}
-              </Text>
-              <Text style={[styles.statLbl, { color: MUTED }]}>
-                {t('home.nearby.wait_time')}
-              </Text>
-            </View>
+            {/* CTA */}
             <TouchableOpacity
-              style={[styles.joinBtn, { backgroundColor: CTA }]}
+              style={[styles.ctaBtn, { backgroundColor: CTA }]}
               onPress={() => router.push(`/business/${business.id}`)}
               activeOpacity={0.8}
             >
-              <Ionicons name="arrow-forward" size={14} color={CTA_FG} />
+              <Text style={[styles.ctaText, { color: CTA_FG }]}>View</Text>
+              <Ionicons name="arrow-forward" size={13} color={CTA_FG} />
             </TouchableOpacity>
           </View>
         </View>
@@ -152,40 +158,59 @@ export function BusinessCard({ business }: BusinessCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16, borderWidth: 1,
-    marginBottom: 10, overflow: 'hidden',
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 12,
+    flexDirection: 'row',
+    overflow: 'hidden',
   },
-  body:      { flexDirection: 'row', padding: 16, gap: 14 },
-  avatarCol: { alignItems: 'center', gap: 8 },
-  statusRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dot:        { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 9, fontWeight: '700' },
+  accentBar: {
+    width: 4,
+    borderTopLeftRadius: 18,
+    borderBottomLeftRadius: 18,
+  },
+  inner: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 12,
+  },
 
-  info:    { flex: 1, gap: 8 },
-  nameRow: { flexDirection: 'column', gap: 4 },
-  name:    { fontSize: 15, fontWeight: '800' },
+  /* Top row */
+  topRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  infoBlock: { flex: 1, gap: 5 },
+  name:      { fontSize: 15, fontWeight: '800', letterSpacing: -0.3 },
+
   catPill: {
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 4,
     alignSelf: 'flex-start',
-    paddingHorizontal: 7, paddingVertical: 3,
-    borderRadius: 20, borderWidth: 1, gap: 4,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 20, borderWidth: 1,
   },
   catText: { fontSize: 10, fontWeight: '600' },
 
-  metaRow:  { flexDirection: 'row', gap: 14 },
-  metaChip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  metaText: { fontSize: 11 },
+  locRow:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  locText: { fontSize: 11, flex: 1 },
 
-  divider: { height: 1 },
+  heartBtn: { paddingTop: 2 },
 
-  statsRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  statItem: { alignItems: 'center' },
-  statVal:  { fontSize: 15, fontWeight: '800' },
-  statLbl:  { fontSize: 10, fontWeight: '500' },
-  statSep:  { width: 1, height: 24, marginHorizontal: 2 },
-  joinBtn: {
-    marginLeft: 'auto',
-    width: 44, height: 44, borderRadius: 12,
-    justifyContent: 'center', alignItems: 'center',
+  /* Divider */
+  divider: { height: StyleSheet.hairlineWidth },
+
+  /* Bottom row */
+  bottomRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  statusBadge:  { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  statusDot:    { width: 6, height: 6, borderRadius: 3 },
+  statusText:   { fontSize: 11, fontWeight: '700' },
+
+  rightCluster: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  ratingChip:   { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  ratingText:   { fontSize: 12, fontWeight: '700' },
+
+  ctaBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 10,
   },
+  ctaText: { fontSize: 12, fontWeight: '800' },
 });

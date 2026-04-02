@@ -212,6 +212,7 @@ interface AppState {
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
 
   // Favorites
+  loadFavorites: () => Promise<void>;
   toggleFavorite: (businessId: string) => void;
 
   // Wallet & Payment Methods
@@ -358,10 +359,11 @@ export const useStore = create<AppState>()(
           set({ isAuthenticated: true, user, session: result.session, isLoading: false, authError: null });
           _setupQueueSubscription(result.user.id);
 
-          // Initialize wallet (no-op if already initialized) + load payment methods
+          // Initialize wallet (no-op if already initialized) + load payment methods + favorites
           const [walletBalance, methods] = await Promise.all([
             initializeWallet(result.user.id),
             getSavedPaymentMethods(result.user.id),
+            get().loadFavorites(),
           ]);
           set((state) => ({
             paymentMethods: methods,
@@ -454,10 +456,11 @@ export const useStore = create<AppState>()(
             const user = mapSupabaseUserToUser(session.user, profile);
             set({ isAuthenticated: true, user, session, isLoading: false });
             _setupQueueSubscription(session.user.id);
-            // Load wallet + payment methods in background
+            // Load wallet + payment methods + favorites in background
             const [walletBalance, methods] = await Promise.all([
               initializeWallet(session.user.id),
               getSavedPaymentMethods(session.user.id),
+              get().loadFavorites(),
             ]);
             set((state) => ({
               paymentMethods: methods,
@@ -482,6 +485,7 @@ export const useStore = create<AppState>()(
             const user = mapSupabaseUserToUser(session.user, profile);
             set({ isAuthenticated: true, user, session });
             _setupQueueSubscription(session.user.id);
+            get().loadFavorites();
           }
         } catch (error) {
           console.error('activateSession error:', error);
@@ -946,7 +950,33 @@ export const useStore = create<AppState>()(
       },
 
       // Favorites
-      toggleFavorite: (businessId) => set((state) => ({ favoriteBusinesses: state.favoriteBusinesses.includes(businessId) ? state.favoriteBusinesses.filter(id => id !== businessId) : [...state.favoriteBusinesses, businessId] })),
+      loadFavorites: async () => {
+        const user = get().user;
+        if (!user) return;
+        const { data } = await supabase
+          .from('user_favorites')
+          .select('business_id')
+          .eq('user_id', user.id);
+        if (data) set({ favoriteBusinesses: data.map((r: any) => r.business_id) });
+      },
+
+      toggleFavorite: (businessId) => {
+        const state = get();
+        const user = state.user;
+        const isFav = state.favoriteBusinesses.includes(businessId);
+        // Optimistic update
+        set({ favoriteBusinesses: isFav
+          ? state.favoriteBusinesses.filter(id => id !== businessId)
+          : [...state.favoriteBusinesses, businessId],
+        });
+        if (!user) return;
+        if (isFav) {
+          supabase.from('user_favorites').delete()
+            .eq('user_id', user.id).eq('business_id', businessId);
+        } else {
+          supabase.from('user_favorites').insert({ user_id: user.id, business_id: businessId });
+        }
+      },
 
       // Feedback
       submitFeedback: async ({ rating, category, message }) => {
@@ -1164,10 +1194,11 @@ export const setupAuthListener = () => {
         const user = mapSupabaseUserToUser(session.user, profile);
         useStore.setState({ isAuthenticated: true, user, session });
         _setupQueueSubscription(session.user.id);
+        useStore.getState().loadFavorites();
       }
     } else if (event === 'SIGNED_OUT') {
       _teardownQueueSubscription();
-      useStore.setState({ isAuthenticated: false, user: null, session: null, activeQueues: [], queueHistory: [], orders: [], notifications: [], unreadCount: 0 });
+      useStore.setState({ isAuthenticated: false, user: null, session: null, activeQueues: [], queueHistory: [], orders: [], notifications: [], unreadCount: 0, favoriteBusinesses: [] });
     } else if (event === 'TOKEN_REFRESHED' && session) {
       useStore.setState({ session });
     }

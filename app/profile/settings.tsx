@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -54,11 +54,15 @@ export default function SettingsScreen() {
         {/* Identity — read only */}
         {user && (
           <View style={[styles.identity, { backgroundColor: CARD, borderColor: BORDER }]}>
-            <View style={[styles.avatar, { backgroundColor: BRAND }]}>
-              <Text style={[styles.avatarText, { color: BRAND_FG }]}>
-                {(user.name?.[0] ?? 'U').toUpperCase()}
-              </Text>
-            </View>
+            {user.avatar ? (
+              <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: BRAND }]}>
+                <Text style={[styles.avatarText, { color: BRAND_FG }]}>
+                  {(user.name?.[0] ?? 'U').toUpperCase()}
+                </Text>
+              </View>
+            )}
             <View style={{ flex: 1 }}>
               <Text style={[styles.identityName, { color: FG }]}>{user.name}</Text>
               <Text style={[styles.identityEmail, { color: MUTED }]}>{user.email}</Text>

@@ -29,6 +29,7 @@ type MenuItem = {
   subtitle?: string;
   type: 'link' | 'toggle';
   badge?: string;
+  badgeVariant?: 'default' | 'destructive';
   value?: boolean | string;
 };
 
@@ -62,9 +63,9 @@ export default function ProfileScreen() {
     {
       title: t('profile.sections.account'),
       items: [
-        { id: 'edit-profile', icon: 'person-outline',   label: t('profile.menu.edit_profile'), subtitle: 'Update your info & photo', type: 'link' },
+        { id: 'saved',        icon: 'heart-outline',    label: 'Saved Businesses',               subtitle: 'Your favorited businesses', type: 'link' },
         { id: 'loyalty',      icon: 'star-outline',     label: t('profile.menu.loyalty'),        subtitle: 'Points & rewards',          type: 'link', badge: loyaltyBadge },
-        { id: 'payment',      icon: 'card-outline',     label: t('profile.menu.payment'),        subtitle: 'Saved cards & billing',     type: 'link' },
+        { id: 'payment',      icon: 'card-outline',     label: t('profile.menu.payment'),        subtitle: 'Saved cards & billing',     type: 'link', badge: paymentMethods.length === 0 ? '!' : undefined, badgeVariant: 'destructive' },
       ],
     },
     {
@@ -85,7 +86,7 @@ export default function ProfileScreen() {
   const handleMenuPress = (itemId: string) => {
     switch (itemId) {
       case 'settings':     router.push('/profile/settings'); break;
-      case 'edit-profile': router.push('/profile/edit');     break;
+      case 'saved':        router.push('/profile/saved');    break;
       case 'payment':      router.push('/profile/payment');  break;
       case 'feedback':     router.push('/profile/feedback'); break;
       case 'help':         router.push('/profile/help');     break;
@@ -132,22 +133,6 @@ export default function ProfileScreen() {
             <Text style={[styles.screenLabel, { color: MUTED }]}>ACCOUNT</Text>
             <Text style={[styles.screenTitle, { color: FG }]}>PROFILE</Text>
           </View>
-          <TouchableOpacity
-            style={[styles.bellBtn, { backgroundColor: CARD, borderColor: BORDER }]}
-            onPress={() => setNotificationsPanelVisible(true)}
-            activeOpacity={0.75}
-          >
-            <Ionicons
-              name={notificationsEnabled ? 'notifications' : 'notifications-off-outline'}
-              size={18}
-              color={FG}
-            />
-            {totalBadge > 0 && (
-              <View style={[styles.bellDot, { backgroundColor: colors.destructive }]}>
-                <Text style={[styles.bellDotText, { color: colors.destructiveForeground }]}>{totalBadge > 9 ? '9+' : totalBadge}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
         </View>
       </SafeAreaView>
 

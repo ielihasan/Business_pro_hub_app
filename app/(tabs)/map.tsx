@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
+import { useStore } from '@/store/useStore';
 import { fetchBusinesses, BusinessRecord } from '@/lib/business';
 
 // ── City → Province mapping (2023 census) ───────────────────────────────────
@@ -152,8 +153,10 @@ const POPULAR_CITIES = [
 type BizResult = BusinessRecord & { distanceKm: number; address?: string | null };
 
 export default function DiscoverScreen() {
-  const { colors }        = useTheme();
-  const { entranceStyle } = useScreenEntrance();
+  const { colors }         = useTheme();
+  const { entranceStyle }  = useScreenEntrance();
+  const favoriteBusinesses = useStore((s) => s.favoriteBusinesses);
+  const toggleFavorite     = useStore((s) => s.toggleFavorite);
 
   const [query,      setQuery]      = useState('');
   const [activeCity, setActiveCity] = useState<string | null>(null);
@@ -227,14 +230,22 @@ export default function DiscoverScreen() {
                 <Ionicons name="arrow-back" size={18} color={FG} />
               </TouchableOpacity>
             ) : (
-              <View style={[styles.iconBtn, { backgroundColor: SEC }]}>
-                <Ionicons name="location-outline" size={18} color={FG} />
-              </View>
+              <View style={{ width: 40 }} />
             )}
             <Text style={[styles.headerTitle, { color: FG }]}>
               {activeCity ? activeCity.toUpperCase() : 'DISCOVER'}
             </Text>
-            <View style={{ width: 40 }} />
+            <TouchableOpacity
+              style={[styles.iconBtn, { backgroundColor: favoriteBusinesses.length > 0 ? colors.brand + '22' : SEC, borderWidth: favoriteBusinesses.length > 0 ? 1 : 0, borderColor: colors.brand }]}
+              onPress={() => router.push('/profile/saved')}
+              activeOpacity={0.75}
+            >
+              <Ionicons
+                name={favoriteBusinesses.length > 0 ? 'bookmark' : 'bookmark-outline'}
+                size={18}
+                color={favoriteBusinesses.length > 0 ? colors.brand : FG}
+              />
+            </TouchableOpacity>
           </View>
 
           {/* ── Search bar ── */}
@@ -372,49 +383,63 @@ export default function DiscoverScreen() {
                 {results.length} BUSINESS{results.length !== 1 ? 'ES' : ''} IN {activeCity?.toUpperCase()}
               </Text>
             }
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[styles.bizCard, { backgroundColor: CARD, borderColor: BORDER }]}
-                onPress={() => router.push(`/business/${item.id}`)}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.bizAvatar, { backgroundColor: SEC }]}>
-                  <Text style={[styles.bizAvatarText, { color: FG }]}>
-                    {item.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.bizInfo}>
-                  <Text style={[styles.bizName, { color: FG }]} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text style={[styles.bizMeta, { color: MUTED }]} numberOfLines={1}>
-                    {item.category || 'Business'}
-                  </Text>
-                  {!!(item as any).address && (
-                    <Text style={[styles.bizMeta, { color: MUTED }]} numberOfLines={1}>
-                      {(item as any).address}
+            renderItem={({ item }) => {
+              const isFav = favoriteBusinesses.includes(item.id);
+              return (
+                <TouchableOpacity
+                  style={[styles.bizCard, { backgroundColor: CARD, borderColor: BORDER }]}
+                  onPress={() => router.push(`/business/${item.id}`)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.bizAvatar, { backgroundColor: SEC }]}>
+                    <Text style={[styles.bizAvatarText, { color: FG }]}>
+                      {item.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
                     </Text>
-                  )}
-                </View>
-                <View style={styles.bizRight}>
-                  {item.is_open != null && (
-                    <View style={[styles.openBadge, {
-                      backgroundColor: item.is_open ? colors.success + '20' : SEC,
-                    }]}>
-                      <View style={[styles.openDot, {
-                        backgroundColor: item.is_open ? colors.success : MUTED,
-                      }]} />
-                      <Text style={[styles.openText, {
-                        color: item.is_open ? colors.success : MUTED,
-                      }]}>
-                        {item.is_open ? 'Open' : 'Closed'}
+                  </View>
+                  <View style={styles.bizInfo}>
+                    <Text style={[styles.bizName, { color: FG }]} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={[styles.bizMeta, { color: MUTED }]} numberOfLines={1}>
+                      {item.category || 'Business'}
+                    </Text>
+                    {!!(item as any).address && (
+                      <Text style={[styles.bizMeta, { color: MUTED }]} numberOfLines={1}>
+                        {(item as any).address}
                       </Text>
-                    </View>
-                  )}
-                  <Ionicons name="chevron-forward" size={14} color={MUTED} style={{ marginTop: 6 }} />
-                </View>
-              </TouchableOpacity>
-            )}
+                    )}
+                  </View>
+                  <View style={styles.bizRight}>
+                    {item.is_open != null && (
+                      <View style={[styles.openBadge, {
+                        backgroundColor: item.is_open ? colors.success + '20' : SEC,
+                      }]}>
+                        <View style={[styles.openDot, {
+                          backgroundColor: item.is_open ? colors.success : MUTED,
+                        }]} />
+                        <Text style={[styles.openText, {
+                          color: item.is_open ? colors.success : MUTED,
+                        }]}>
+                          {item.is_open ? 'Open' : 'Closed'}
+                        </Text>
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      onPress={() => toggleFavorite(item.id)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      activeOpacity={0.7}
+                      style={{ marginTop: 6 }}
+                    >
+                      <Ionicons
+                        name={isFav ? 'heart' : 'heart-outline'}
+                        size={18}
+                        color={isFav ? colors.destructive : MUTED}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
           />
         )}
 

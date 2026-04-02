@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   ActivityIndicator,
   Linking,
   Share,
@@ -20,32 +19,21 @@ import { Avatar, Button, SkeletonBusinessDetail } from '@/components/ui';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { resolveBusinessById } from '@/lib/queue';
 import { useStore } from '@/store/useStore';
-import { COMMITMENT_RATE, calculateCommitmentFee } from '@/lib/wallet';
 
-const METHOD_LABEL: Record<string, string> = {
-  easypaisa: 'Easypaisa',
-  jazzcash:  'JazzCash',
-  bank:      'Bank Account',
-};
 
 export default function BusinessDetailScreen() {
   const { id }     = useLocalSearchParams<{ id: string }>();
   const { colors, isDark } = useTheme();
 
-  const [loading,       setLoading]       = useState(false);
-  const [business,      setBusiness]      = useState<any | null>(null);
-  const [fetchError,    setFetchError]    = useState<string | null>(null);
-  const [dialog,        setDialog]        = useState<DialogConfig | null>(null);
-  const [serviceAmount, setServiceAmount] = useState('');
+  const [loading,    setLoading]    = useState(false);
+  const [business,   setBusiness]   = useState<any | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [dialog,     setDialog]     = useState<DialogConfig | null>(null);
 
   const joinQueueInSupabase = useStore((s) => s.joinQueueInSupabase);
   const toggleFavorite      = useStore((s) => s.toggleFavorite);
   const favoriteBusinesses  = useStore((s) => s.favoriteBusinesses);
   const isAuthenticated     = useStore((s) => s.isAuthenticated);
-  const user                = useStore((s) => s.user);
-  const paymentMethods      = useStore((s) => s.paymentMethods);
-  const walletBalance       = user?.walletBalance ?? null;
-  const defaultMethod       = paymentMethods.find(m => m.isDefault) ?? paymentMethods[0] ?? null;
   const isFavorite          = !!(business?.id && favoriteBusinesses.includes(business.id));
 
   useEffect(() => {
@@ -56,11 +44,6 @@ export default function BusinessDetailScreen() {
       else                setBusiness(data);
     })();
   }, [id]);
-
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-  const parsedAmount  = parseFloat(serviceAmount) || 0;
-  const advanceFee    = calculateCommitmentFee(parsedAmount);
-  const advancePct    = Math.round(COMMITMENT_RATE * 100);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleJoinQueue = () => {
@@ -79,80 +62,27 @@ export default function BusinessDetailScreen() {
       return;
     }
 
-    // ── No payment method set up yet ────────────────────────────────────────
-    if (advanceFee > 0 && paymentMethods.length === 0) {
-      setDialog({
-        title:   'Payment Method Required',
-        message: `A ${advancePct}% advance (Rs ${advanceFee}) is needed to join this queue.\n\nPlease add a payment method to your wallet first.`,
-        icon:    'card-outline',
-        iconVariant: 'warning',
-        actions: [
-          { label: 'Cancel',  variant: 'secondary', onPress: () => setDialog(null) },
-          { label: 'Set Up',  variant: 'primary',   onPress: () => { setDialog(null); router.push('/profile/payment'); } },
-        ],
-      });
-      return;
-    }
-
-    // ── Insufficient wallet balance ──────────────────────────────────────────
-    if (advanceFee > 0 && (walletBalance === null || walletBalance < advanceFee)) {
-      setDialog({
-        title:   'Insufficient Balance',
-        message: `Required: Rs ${advanceFee} (${advancePct}% of Rs ${parsedAmount})\nYour wallet: Rs ${walletBalance ?? 0}\n\nTop up your wallet to continue.`,
-        icon:    'wallet-outline',
-        iconVariant: 'warning',
-        actions: [
-          { label: 'Cancel',   variant: 'secondary', onPress: () => setDialog(null) },
-          { label: 'Top Up',   variant: 'primary',   onPress: () => { setDialog(null); router.push('/profile/payment'); } },
-        ],
-      });
-      return;
-    }
-
-    // ── Confirm dialog ───────────────────────────────────────────────────────
-    const methodLine = advanceFee > 0 && defaultMethod
-      ? `Paid via: ${METHOD_LABEL[defaultMethod.type] ?? defaultMethod.type}  •••${defaultMethod.accountNumber.slice(-4)}`
-      : '';
-    const feeText = advanceFee > 0
-      ? `Advance: Rs ${advanceFee}  (${advancePct}% of Rs ${parsedAmount})\nWallet after: Rs ${(walletBalance ?? 0) - advanceFee}`
-      : 'No advance payment required.';
-
     setDialog({
-      title:   advanceFee > 0 ? `Pay Rs ${advanceFee} & Join` : 'Confirm Queue Join',
-      message: `${business.name}\n\nQueue: ${business.queue_length ?? 0} waiting  ·  Wait: ${business.wait_time ?? 'N/A'}\n\n${feeText}${methodLine ? `\n${methodLine}` : ''}`,
-      icon:    advanceFee > 0 ? 'wallet-outline' : 'people-outline',
+      title:   'Confirm Queue Join',
+      message: `${business.name}\n\nQueue: ${business.queue_length ?? 0} waiting  ·  Wait: ${business.wait_time ?? 'N/A'}`,
+      icon:    'people-outline',
       iconVariant: 'default',
       actions: [
         { label: 'Cancel', variant: 'secondary', onPress: () => setDialog(null) },
         {
-          label: advanceFee > 0 ? `Pay Rs ${advanceFee} & Join` : 'Join Queue',
+          label: 'Join Queue',
           variant: 'primary',
           onPress: async () => {
             setDialog(null);
             setLoading(true);
-            const result = await joinQueueInSupabase(
-              business.id,
-              undefined,
-              parsedAmount > 0 ? { totalAmount: parsedAmount } : undefined,
-            );
+            const result = await joinQueueInSupabase(business.id);
             setLoading(false);
             if (!result.success || !result.queueEntryId) {
-              const isBalErr    = result.error?.startsWith('INSUFFICIENT_BALANCE');
-              const isNoMethod  = result.error === 'NO_PAYMENT_METHOD';
               setDialog({
-                title: isBalErr   ? 'Insufficient Balance'
-                     : isNoMethod ? 'No Payment Method'
-                     : 'Could Not Join',
-                message: isBalErr
-                  ? `Your wallet balance is too low. Please top up and try again.`
-                  : isNoMethod
-                  ? 'Please add a payment method before joining a priced queue.'
-                  : (result.error ?? 'An error occurred. Please try again.'),
+                title: 'Could Not Join',
+                message: result.error ?? 'An error occurred. Please try again.',
                 icon: 'alert-circle-outline', iconVariant: 'destructive',
-                actions: [
-                  ...(isBalErr || isNoMethod ? [{ label: 'Set Up', variant: 'primary' as const, onPress: () => { setDialog(null); router.push('/profile/payment'); } }] : []),
-                  { label: 'OK', variant: 'secondary' as const, onPress: () => setDialog(null) },
-                ],
+                actions: [{ label: 'OK', variant: 'secondary', onPress: () => setDialog(null) }],
               });
               return;
             }
@@ -174,11 +104,12 @@ export default function BusinessDetailScreen() {
       });
       return;
     }
-    const url = `tel:${phone}`;
-    if (!(await Linking.canOpenURL(url))) {
+    try {
+      await Linking.openURL(`tel:${phone}`);
+    } catch {
       setDialog({
         title: 'Copy Number',
-        message: `This device cannot make calls directly. Copy ${phone} to your clipboard?`,
+        message: `Could not open dialer. Copy ${phone} to your clipboard?`,
         icon: 'copy-outline', iconVariant: 'warning',
         actions: [
           { label: 'Cancel', variant: 'secondary', onPress: () => setDialog(null) },
@@ -188,9 +119,7 @@ export default function BusinessDetailScreen() {
           }},
         ],
       });
-      return;
     }
-    await Linking.openURL(url);
   };
 
   const handleDirections = async () => {
@@ -347,36 +276,6 @@ export default function BusinessDetailScreen() {
                 <Text style={[styles.queueCountLabel, { color: MUTED }]}>IN QUEUE</Text>
               </View>
             </View>
-            {/* ── Service amount input ── */}
-            <View style={[styles.amountRow, { borderColor: BORDER, backgroundColor: BG }]}>
-              <Text style={[styles.amountPrefix, { color: MUTED }]}>Rs</Text>
-              <TextInput
-                style={[styles.amountInput, { color: FG }]}
-                placeholder="Estimated service cost (optional)"
-                placeholderTextColor={MUTED}
-                value={serviceAmount}
-                onChangeText={(v) => setServiceAmount(v.replace(/[^0-9.]/g, ''))}
-                keyboardType="decimal-pad"
-                returnKeyType="done"
-              />
-            </View>
-
-            {/* ── 20% advance preview ── */}
-            <View style={[styles.advanceRow, {
-              backgroundColor: advanceFee > 0 ? FG + '0E' : 'transparent',
-              borderColor: advanceFee > 0 ? BORDER : 'transparent',
-            }]}>
-              <Ionicons
-                name="wallet-outline"
-                size={12}
-                color={advanceFee > 0 ? FG : MUTED}
-              />
-              <Text style={[styles.advanceText, { color: advanceFee > 0 ? FG : MUTED }]}>
-                {advanceFee > 0
-                  ? `${advancePct}% advance: Rs ${advanceFee}  ·  Wallet: Rs ${walletBalance ?? '—'}`
-                  : `${advancePct}% advance applies to priced services  ·  Wallet: Rs ${walletBalance ?? '—'}`}
-              </Text>
-            </View>
           </View>
         </View>
 
@@ -476,9 +375,7 @@ export default function BusinessDetailScreen() {
           ) : (
             <>
               <Ionicons name="add-circle-outline" size={20} color={CTA_FG} />
-              <Text style={[styles.joinBtnText, { color: CTA_FG }]}>
-                {advanceFee > 0 ? `JOIN & PAY Rs ${advanceFee}` : 'JOIN QUEUE'}
-              </Text>
+              <Text style={[styles.joinBtnText, { color: CTA_FG }]}>JOIN QUEUE</Text>
             </>
           )}
         </TouchableOpacity>
@@ -564,21 +461,6 @@ const styles = StyleSheet.create({
     gap: 8, borderRadius: 14, paddingVertical: 18,
   },
   joinBtnText: { fontSize: 15, fontWeight: '900', letterSpacing: 1 },
-
-  amountRow: {
-    flexDirection: 'row', alignItems: 'center',
-    borderRadius: 10, borderWidth: 1,
-    paddingHorizontal: 12, paddingVertical: 10, gap: 6,
-  },
-  amountPrefix: { fontSize: 13, fontWeight: '700' },
-  amountInput:  { flex: 1, fontSize: 14, padding: 0 },
-
-  advanceRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderRadius: 8, borderWidth: 1,
-    paddingHorizontal: 10, paddingVertical: 7,
-  },
-  advanceText: { fontSize: 11, fontWeight: '600', flex: 1 },
 
   /* ── Quick actions ── */
   actionBtn: {

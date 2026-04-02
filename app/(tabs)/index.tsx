@@ -135,7 +135,7 @@ export default function HomeScreen() {
           </Text>
           <View style={styles.greetRow}>
             <Text style={[styles.greetTag, { color: MUTED }]}>Your queue status at a glance.</Text>
-            {walletBalance !== null && (
+            {walletBalance !== null && paymentMethods.length > 0 && (
               <View style={[styles.balancePill, { backgroundColor: CARD, borderColor: BORDER }]}>
                 <Text style={[styles.balanceText, { color: FG }]}>
                   Rs {walletBalance.toLocaleString()}

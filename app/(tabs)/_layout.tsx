@@ -212,6 +212,7 @@ export default function TabLayout() {
   return (
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}
+      backBehavior="history"
       screenOptions={{ headerShown: false, sceneStyle: { paddingBottom: BOTTOM_PAD, backgroundColor: colors.background } }}
     >
       <Tabs.Screen name="queue"   options={{ title: t('tabs.queue')   }} />

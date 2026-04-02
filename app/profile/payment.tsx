@@ -28,12 +28,12 @@ type MethodType = WalletPaymentType;
 
 const METHOD_META: Record<
   MethodType,
-  { label: string; sublabel: string; icon: string; color: string; bgAlpha: string; placeholder: string; hint: string }
+  { label: string; sublabel: string; badge: string; color: string; bgAlpha: string; placeholder: string; hint: string }
 > = {
   easypaisa: {
     label:       'Easypaisa',
     sublabel:    'Mobile Wallet',
-    icon:        'phone-portrait-outline',
+    badge:       'EP',
     color:       '#37B34A',
     bgAlpha:     '#37B34A18',
     placeholder: '03XX-XXXXXXX',
@@ -42,7 +42,7 @@ const METHOD_META: Record<
   jazzcash: {
     label:       'JazzCash',
     sublabel:    'Mobile Wallet',
-    icon:        'phone-portrait-outline',
+    badge:       'JC',
     color:       '#BF202F',
     bgAlpha:     '#BF202F18',
     placeholder: '03XX-XXXXXXX',
@@ -51,13 +51,22 @@ const METHOD_META: Record<
   bank: {
     label:       'Bank Account',
     sublabel:    'IBFT / IBAN',
-    icon:        'business-outline',
+    badge:       '🏦',
     color:       '#2563EB',
     bgAlpha:     '#2563EB18',
     placeholder: 'PK00XXXX0000000000000000',
     hint:        'Enter your full IBAN (e.g. PK36MEZN0001234567890123)',
   },
 };
+
+function BrandBadge({ badge, color, bg, size = 22 }: { badge: string; color: string; bg: string; size?: number }) {
+  const isEmoji = /\p{Emoji}/u.test(badge);
+  return (
+    <View style={{ width: size + 10, height: size + 10, borderRadius: (size + 10) / 2.5, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: isEmoji ? size - 2 : size * 0.52, fontWeight: '900', color, letterSpacing: -0.5 }}>{badge}</Text>
+    </View>
+  );
+}
 
 function maskNumber(num: string, type: MethodType): string {
   if (type === 'bank') {
@@ -176,7 +185,7 @@ export default function WalletPaymentScreen() {
       return setDialog({ title: 'Missing Number', message: 'Please enter your account / mobile number.', icon: 'call-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
     }
     if (selType === 'bank' && !bankName.trim()) {
-      return setDialog({ title: 'Select Bank', message: 'Please select your bank from the list.', icon: 'business-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
+      return setDialog({ title: 'Select Bank', message: 'Please select your bank from the list.', icon: 'card-outline', iconVariant: 'warning', actions: [{ label: 'OK', onPress: () => setDialog(null) }] });
     }
 
     setSaving(true);
@@ -405,7 +414,7 @@ export default function WalletPaymentScreen() {
 
                     {/* Icon */}
                     <View style={[styles.methodIcon, { backgroundColor: meta.bgAlpha, borderColor: meta.color + '40' }]}>
-                      <Ionicons name={meta.icon as any} size={24} color={meta.color} />
+                      <BrandBadge badge={meta.badge} color={meta.color} bg="transparent" size={24} />
                     </View>
 
                     {/* Info */}
@@ -441,7 +450,7 @@ export default function WalletPaymentScreen() {
                       {/* Bank name (bank type) */}
                       {m.bankName ? (
                         <View style={styles.bankRow}>
-                          <Ionicons name="business-outline" size={11} color={MUTED} />
+                          <Text style={{ fontSize: 11 }}>🏦</Text>
                           <Text style={[styles.bankRowText, { color: MUTED }]}>
                             {m.bankName}
                           </Text>
@@ -496,8 +505,10 @@ export default function WalletPaymentScreen() {
           onPress={() => setShowBanks(!showBanks)}
           activeOpacity={0.8}
         >
-          <View style={[styles.acceptedCompactIcon, { backgroundColor: '#2563EB18' }]}>
-            <Ionicons name="business-outline" size={18} color="#2563EB" />
+          <View style={styles.acceptedBrandRow}>
+            <BrandBadge badge="EP" color="#37B34A" bg="#37B34A22" size={14} />
+            <BrandBadge badge="JC" color="#BF202F" bg="#BF202F22" size={14} />
+            <BrandBadge badge="🏦" color="#2563EB" bg="#2563EB22" size={14} />
           </View>
           <View style={styles.acceptedCompactBody}>
             <Text style={[styles.acceptedCompactTitle, { color: FG }]}>We Accept</Text>
@@ -732,9 +743,12 @@ export default function WalletPaymentScreen() {
                       onPress={() => { setSelType(t); setAccountNumber(''); setBankName(''); }}
                       activeOpacity={0.8}
                     >
-                      <View style={[styles.typeRowIcon, { backgroundColor: active ? meta.color + '22' : SEC }]}>
-                        <Ionicons name={meta.icon as any} size={22} color={active ? meta.color : MUTED} />
-                      </View>
+                      <BrandBadge
+                        badge={meta.badge}
+                        color={active ? meta.color : MUTED}
+                        bg={active ? meta.color + '22' : SEC}
+                        size={22}
+                      />
                       <View style={styles.typeRowBody}>
                         <Text style={[styles.typeRowName, { color: active ? meta.color : FG }]}>{meta.label}</Text>
                         <Text style={[styles.typeRowSub, { color: MUTED }]}>{meta.sublabel}</Text>
@@ -796,7 +810,7 @@ export default function WalletPaymentScreen() {
                     onPress={() => setShowBankList(!showBankList)}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="business-outline" size={16} color={bankName ? '#2563EB' : MUTED} />
+                    <Text style={{ fontSize: 16 }}>🏦</Text>
                     <Text style={[styles.inputText, { color: bankName ? FG : MUTED, flex: 1 }]}>
                       {bankName || 'Select your bank…'}
                     </Text>
@@ -847,7 +861,7 @@ export default function WalletPaymentScreen() {
                   <View style={[styles.previewCard, { backgroundColor: BRAND }]}>
                     <View style={styles.previewTopRow}>
                       <View style={[styles.previewIconBox, { backgroundColor: BRAND_FG + '22' }]}>
-                        <Ionicons name={METHOD_META[selType].icon as any} size={15} color={BRAND_FG} />
+                        <BrandBadge badge={METHOD_META[selType].badge} color={BRAND_FG} bg="transparent" size={15} />
                       </View>
                       <Text style={[styles.previewTypeLabel, { color: BRAND_FG + 'AA' }]}>
                         {METHOD_META[selType].sublabel.toUpperCase()}
@@ -1076,6 +1090,7 @@ const styles = StyleSheet.create({
     borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 6,
   },
   acceptedCompactIcon:  { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  acceptedBrandRow:     { flexDirection: 'row', gap: 4, alignItems: 'center', flexShrink: 0 },
   acceptedCompactBody:  { flex: 1 },
   acceptedCompactTitle: { fontSize: 14, fontWeight: '800' },
   acceptedCompactSub:   { fontSize: 11, marginTop: 2 },
