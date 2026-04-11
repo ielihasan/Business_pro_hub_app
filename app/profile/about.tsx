@@ -7,7 +7,7 @@ import { Spacing, Typography, BorderRadius } from '@/constants/theme';
 
 const APP_VERSION   = '1.0.0';
 const BUILD_NUMBER  = '2026.03.31';
-const CONTACT_EMAIL = 'support@businessprohub.me';
+const CONTACT_EMAIL = 'hello.elixa@gmail.com';
 
 const FEATURES = [
   { icon: 'people-outline',           label: 'Virtual Queue Management',   desc: 'Join & track queues remotely — no physical waiting' },

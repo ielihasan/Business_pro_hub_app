@@ -131,8 +131,19 @@ export default function BusinessDetailScreen() {
           message: 'You need to add a payment method before joining a queue. Set one up in your wallet — it only takes a moment.',
           icon: 'card-outline', iconVariant: 'warning',
           actions: [
-            { label: 'Not Now',   variant: 'secondary', onPress: () => setDialog(null) },
-            { label: 'Add Method', variant: 'primary',  onPress: () => { setDialog(null); router.push('/profile/payment'); } },
+            { label: 'Not Now',    variant: 'secondary', onPress: () => setDialog(null) },
+            { label: 'Add Method', variant: 'primary',   onPress: () => { setDialog(null); router.push('/profile/payment'); } },
+          ],
+        });
+      } else if (result.error?.startsWith('INSUFFICIENT_BALANCE:')) {
+        const [, balance, required] = result.error.split(':');
+        setDialog({
+          title: 'Insufficient Wallet Balance',
+          message: `Your wallet has Rs ${Number(balance).toLocaleString('en-PK')} but Rs ${Number(required).toLocaleString('en-PK')} is required as a 20% advance. Top up your wallet to continue.`,
+          icon: 'wallet-outline', iconVariant: 'warning',
+          actions: [
+            { label: 'Not Now', variant: 'secondary', onPress: () => setDialog(null) },
+            { label: 'Top Up',  variant: 'primary',   onPress: () => { setDialog(null); router.push('/profile/payment'); } },
           ],
         });
       } else {

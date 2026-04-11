@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { useTheme } from '@/hooks/useTheme';
 import { Avatar, Progress } from '@/components/ui';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { getTier } from '@/lib/loyalty';
 
 interface ProfileHeaderProps {
   name: string;
@@ -17,16 +18,17 @@ interface ProfileHeaderProps {
   onAvatarPress: () => void;
 }
 
-function getMemberTier(pts: number): { label: string; icon: string } {
-  if (pts >= 1000) return { label: 'Gold Member',   icon: 'trophy'               };
-  if (pts >= 500)  return { label: 'Silver Member', icon: 'ribbon-outline'        };
-  if (pts >= 100)  return { label: 'Bronze Member', icon: 'medal-outline'         };
-  return                   { label: 'Member',        icon: 'person-circle-outline' };
-}
+const TIER_ICONS: Record<string, string> = {
+  bronze:   'medal-outline',
+  silver:   'ribbon-outline',
+  gold:     'trophy',
+  platinum: 'diamond-outline',
+};
 
 export function ProfileHeader({ name, email, phone, avatarUri, isUploading, uploadProgress = 0, loyaltyPoints = 0, onAvatarPress }: ProfileHeaderProps) {
   const { colors } = useTheme();
-  const tier = getMemberTier(loyaltyPoints);
+  const tierData = getTier(loyaltyPoints);
+  const tier = { label: `${tierData.label} Member`, icon: TIER_ICONS[tierData.key] ?? 'person-circle-outline' };
 
   return (
     <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>

@@ -90,15 +90,7 @@ export default function ProfileScreen() {
       case 'payment':      router.push('/profile/payment');  break;
       case 'help-support': router.push('/profile/support');    break;
       case 'about':        router.push('/profile/about-menu'); break;
-      case 'loyalty':
-        setDialog({
-          title: loyaltyBadge,
-          message: `You have ${displayUser.loyaltyPoints.toLocaleString()} loyalty points.\n\nEarn points by joining queues (+10 pts), submitting feedback (+50 pts), and completing orders (+25 pts).\n\nPoints can be redeemed for discounts at participating businesses.`,
-          icon: 'star',
-          iconVariant: 'warning',
-          actions: [{ label: 'Got It', variant: 'primary', onPress: () => setDialog(null) }],
-        });
-        break;
+      case 'loyalty': router.push('/profile/loyalty'); break;
       default: break;
     }
   };

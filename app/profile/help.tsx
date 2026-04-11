@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Spacing, Typography, BorderRadius } from '@/constants/theme';
 
-const CONTACT_EMAIL = 'support@businessprohub.me';
+const CONTACT_EMAIL = 'hello.elixa@gmail.com';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@ const CATEGORIES: Category[] = [
       {
         id: 'o2',
         question: 'My order status hasn\'t updated. What should I do?',
-        answer: 'Status updates depend on the business updating their side. If it has been unusually long:\n\n1. Pull down to refresh the Orders screen\n2. Contact the business directly using the phone number on their profile\n3. If the issue persists, contact us at support@businesshubpro.app with your Order ID.',
+        answer: 'Status updates depend on the business updating their side. If it has been unusually long:\n\n1. Pull down to refresh the Orders screen\n2. Contact the business directly using the phone number on their profile\n3. If the issue persists, contact us at hello.elixa@gmail.com with your Order ID.',
       },
       {
         id: 'o3',
@@ -93,7 +93,7 @@ const CATEGORIES: Category[] = [
       {
         id: 'o4',
         question: 'I didn\'t receive my order but it shows "Completed".',
-        answer: 'If your order is marked complete but you didn\'t receive it:\n\n1. Check with the business staff directly first\n2. Email us at support@businesshubpro.app with:\n   • Your Order ID\n   • Business name\n   • Date and time\n   • Screenshot of the order\n\nWe will investigate and resolve within 48 hours.',
+        answer: 'If your order is marked complete but you didn\'t receive it:\n\n1. Check with the business staff directly first\n2. Email us at hello.elixa@gmail.com with:\n   • Your Order ID\n   • Business name\n   • Date and time\n   • Screenshot of the order\n\nWe will investigate and resolve within 48 hours.',
       },
     ],
   },
@@ -115,12 +115,12 @@ const CATEGORIES: Category[] = [
       {
         id: 'p3',
         question: 'I was charged but the transaction failed. What now?',
-        answer: 'This can happen due to network issues. Steps to resolve:\n\n1. Check your bank/wallet app for the deduction status\n2. Wait 10 minutes — auto-reversals often happen automatically\n3. If not reversed within 24 hours, email us at support@businesshubpro.app with:\n   • Transaction ID or screenshot\n   • Amount and date\n   • Payment method used\n\nWe\'ll coordinate with the payment provider to resolve it.',
+        answer: 'This can happen due to network issues. Steps to resolve:\n\n1. Check your bank/wallet app for the deduction status\n2. Wait 10 minutes — auto-reversals often happen automatically\n3. If not reversed within 24 hours, email us at hello.elixa@gmail.com with:\n   • Transaction ID or screenshot\n   • Amount and date\n   • Payment method used\n\nWe\'ll coordinate with the payment provider to resolve it.',
       },
       {
         id: 'p4',
         question: 'How do I get a refund?',
-        answer: 'Refunds are processed by the business you transacted with. To request one:\n\n1. Contact the business directly using their profile contact info\n2. If unresolved, email support@businesshubpro.app with your transaction details\n3. Raise a dispute within 7 days of the transaction\n\nRefunds typically take 3–7 business days depending on your bank/wallet.',
+        answer: 'Refunds are processed by the business you transacted with. To request one:\n\n1. Contact the business directly using their profile contact info\n2. If unresolved, email hello.elixa@gmail.com with your transaction details\n3. Raise a dispute within 7 days of the transaction\n\nRefunds typically take 3–7 business days depending on your bank/wallet.',
       },
     ],
   },
@@ -142,7 +142,7 @@ const CATEGORIES: Category[] = [
       {
         id: 'l3',
         question: 'Why aren\'t my points updating?',
-        answer: 'Points update in real-time in the app. If you don\'t see recent points:\n\n1. Pull down to refresh the Profile screen\n2. Log out and log back in\n3. Check the Notifications panel — earned points show as notifications\n\nIf still missing, contact us at support@businesshubpro.app with details of the activity.',
+        answer: 'Points update in real-time in the app. If you don\'t see recent points:\n\n1. Pull down to refresh the Profile screen\n2. Log out and log back in\n3. Check the Notifications panel — earned points show as notifications\n\nIf still missing, contact us at hello.elixa@gmail.com with details of the activity.',
       },
     ],
   },
@@ -164,12 +164,12 @@ const CATEGORIES: Category[] = [
       {
         id: 'a3',
         question: 'How do I delete my account?',
-        answer: 'To request account deletion:\n\n1. Email support@businesshubpro.app from your registered email address\n2. Subject: "Account Deletion Request"\n3. Include your full name and registered email\n\nWe will delete your account and personal data within 30 days. Transaction records may be retained up to 5 years for legal compliance.',
+        answer: 'To request account deletion:\n\n1. Email hello.elixa@gmail.com from your registered email address\n2. Subject: "Account Deletion Request"\n3. Include your full name and registered email\n\nWe will delete your account and personal data within 30 days. Transaction records may be retained up to 5 years for legal compliance.',
       },
       {
         id: 'a4',
         question: 'I forgot my email or can\'t log in. Help!',
-        answer: 'If you can\'t access your account:\n\n1. Try "Forgot Password" on the Login screen\n2. Check your spam/junk folder for the reset email\n3. If you no longer have access to the email, contact us at support@businesshubpro.app with your full name and phone number so we can verify your identity.',
+        answer: 'If you can\'t access your account:\n\n1. Try "Forgot Password" on the Login screen\n2. Check your spam/junk folder for the reset email\n3. If you no longer have access to the email, contact us at hello.elixa@gmail.com with your full name and phone number so we can verify your identity.',
       },
       {
         id: 'a5',
@@ -186,7 +186,7 @@ const CATEGORIES: Category[] = [
       {
         id: 't1',
         question: 'The app is running slowly or crashing. What should I do?',
-        answer: 'Try these steps in order:\n\n1. Force close and reopen the app\n2. Check your internet connection (WiFi or mobile data)\n3. Clear app cache from your phone\'s Settings → Apps → BusinessHub Pro → Clear Cache\n4. Restart your phone\n5. Uninstall and reinstall the app\n\nIf the problem persists, report it to support@businesshubpro.app with your device model and OS version.',
+        answer: 'Try these steps in order:\n\n1. Force close and reopen the app\n2. Check your internet connection (WiFi or mobile data)\n3. Clear app cache from your phone\'s Settings → Apps → BusinessHub Pro → Clear Cache\n4. Restart your phone\n5. Uninstall and reinstall the app\n\nIf the problem persists, report it to hello.elixa@gmail.com with your device model and OS version.',
       },
       {
         id: 't2',

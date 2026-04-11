@@ -283,6 +283,18 @@ export default function ScanScreen() {
             { label: 'Add Method', variant: 'primary', onPress: () => { setDialog(null); setScanned(false); router.push('/profile/payment'); } },
           ],
         });
+      } else if (result.error?.startsWith('INSUFFICIENT_BALANCE:')) {
+        const [, balance, required] = result.error.split(':');
+        setDialog({
+          title: 'Insufficient Wallet Balance',
+          message: `Your wallet has Rs ${Number(balance).toLocaleString('en-PK')} but Rs ${Number(required).toLocaleString('en-PK')} is required as a 20% advance. Top up your wallet to continue.`,
+          icon: 'wallet-outline',
+          iconVariant: 'warning',
+          actions: [
+            { label: 'Not Now',   variant: 'secondary', onPress: () => { setDialog(null); setScanned(false); } },
+            { label: 'Top Up',    variant: 'primary',   onPress: () => { setDialog(null); setScanned(false); router.push('/profile/payment'); } },
+          ],
+        });
       } else {
         setDialog({
           title: 'Could Not Join',

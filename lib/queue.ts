@@ -46,7 +46,7 @@ export interface QueueEntryRecord {
   payment_left?: number;
   ticket_no?: string;
   position: number;
-  status: 'waiting' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'waiting' | 'called' | 'in_progress' | 'completed' | 'cancelled';
   priority?: string;
   notes?: string;
   /** Wait time in integer minutes */

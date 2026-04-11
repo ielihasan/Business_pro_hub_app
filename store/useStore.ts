@@ -42,6 +42,7 @@ import {
 } from '@/lib/wallet';
 
 export { WalletInfo };
+import { awardPoints, calcQueueJoinPoints, POINTS_QUEUE_COMPLETE, getTier } from '@/lib/loyalty';
 import {
   requestNotificationPermissions,
   notifyQueueJoined,
@@ -69,6 +70,7 @@ export interface User {
   phone: string;
   avatar?: string | null;
   loyaltyPoints: number;
+  loyaltyTier: string;
   totalVisits: number;
   memberSince: string;
   walletBalance: number | null;
@@ -101,7 +103,7 @@ export interface QueueEntry {
   position: number;
   totalInQueue: number;
   estimatedWait: string;
-  status: 'waiting' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'waiting' | 'called' | 'in_progress' | 'completed' | 'cancelled';
   joinedAt: string;
   /** Set when the entry is completed or cancelled (from DB completed_at / cancelled_at) */
   completedAt?: string;
@@ -264,6 +266,7 @@ const mapSupabaseUserToUser = (supabaseUser: SupabaseUser, profile?: any): User 
     avatar: profile?.avatar_url || metadata.avatar_url || null,
     // DB column takes priority; fall back to metadata so points survive without SQL migration
     loyaltyPoints: profile?.loyalty_points ?? metadata.loyalty_points ?? 0,
+    loyaltyTier:   profile?.loyalty_tier  ?? metadata.loyalty_tier  ?? 'bronze',
     totalVisits: profile?.total_visits ?? metadata.total_visits ?? 0,
     memberSince: new Date(supabaseUser.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
     walletBalance: profile?.wallet_balance != null ? Number(profile.wallet_balance) : null,
@@ -374,11 +377,12 @@ export const useStore = create<AppState>()(
           set({ isAuthenticated: true, user, session: result.session, isLoading: false, authError: null });
           _setupQueueSubscription(result.user.id);
 
-          // Initialize wallet (no-op if already initialized) + load payment methods + favorites
+          // Initialize wallet (no-op if already initialized) + load payment methods + favorites + queues
           const [walletBalance, methods] = await Promise.all([
             initializeWallet(result.user.id),
             getSavedPaymentMethods(result.user.id),
             get().loadFavorites(),
+            get().syncQueuesFromSupabase(),
           ]);
           set((state) => ({
             paymentMethods: methods,
@@ -471,11 +475,12 @@ export const useStore = create<AppState>()(
             const user = mapSupabaseUserToUser(session.user, profile);
             set({ isAuthenticated: true, user, session, isLoading: false });
             _setupQueueSubscription(session.user.id);
-            // Load wallet + payment methods + favorites in background
+            // Load wallet + payment methods + favorites + queues in background
             const [walletBalance, methods] = await Promise.all([
               initializeWallet(session.user.id),
               getSavedPaymentMethods(session.user.id),
               get().loadFavorites(),
+              get().syncQueuesFromSupabase(),
             ]);
             set((state) => ({
               paymentMethods: methods,
@@ -501,6 +506,7 @@ export const useStore = create<AppState>()(
             set({ isAuthenticated: true, user, session });
             _setupQueueSubscription(session.user.id);
             get().loadFavorites();
+            get().syncQueuesFromSupabase();
           }
         } catch (error) {
           console.error('activateSession error:', error);
@@ -663,11 +669,29 @@ export const useStore = create<AppState>()(
           }
         }
       },
-      completeQueue: (queueId) => set((state) => {
-        const queue = state.activeQueues.find(q => q.id === queueId);
-        if (!queue) return state;
-        return { activeQueues: state.activeQueues.filter(q => q.id !== queueId), queueHistory: [...state.queueHistory, { ...queue, status: 'completed' as const }] };
-      }),
+      completeQueue: (queueId) => {
+        set((state) => {
+          const queue = state.activeQueues.find(q => q.id === queueId);
+          if (!queue) return state;
+          return { activeQueues: state.activeQueues.filter(q => q.id !== queueId), queueHistory: [...state.queueHistory, { ...queue, status: 'completed' as const }] };
+        });
+        // Award completion bonus points
+        const user = get().user;
+        if (user) {
+          awardPoints(user.id, POINTS_QUEUE_COMPLETE, 'queue_complete', 'Queue completed — bonus points', queueId)
+            .then(({ newPoints }) => {
+              if (newPoints != null) {
+                const tier = getTier(newPoints);
+                set((state) => ({
+                  user: state.user
+                    ? { ...state.user, loyaltyPoints: newPoints, loyaltyTier: tier.key }
+                    : null,
+                }));
+                supabase.auth.updateUser({ data: { loyalty_points: newPoints, loyalty_tier: tier.key } });
+              }
+            });
+        }
+      },
 
       // Supabase-backed queue actions
       joinQueueInSupabase: async (
@@ -795,6 +819,24 @@ export const useStore = create<AppState>()(
         set((state) => ({
           user: state.user ? { ...state.user, totalVisits: currentVisits } : null,
         }));
+
+        // Award loyalty points for joining (base + spend multiplier)
+        const joinPoints = calcQueueJoinPoints(pricing?.totalAmount ?? 0);
+        const joinDesc   = pricing?.totalAmount
+          ? `Queue joined · Rs ${pricing.totalAmount.toLocaleString('en-PK')} spent`
+          : 'Queue joined';
+        awardPoints(user.id, joinPoints, 'queue_join', joinDesc, data.id, businessId, pricing?.totalAmount ?? 0)
+          .then(({ newPoints }) => {
+            if (newPoints != null) {
+              const tier = getTier(newPoints);
+              set((state) => ({
+                user: state.user
+                  ? { ...state.user, loyaltyPoints: newPoints, loyaltyTier: tier.key }
+                  : null,
+              }));
+              supabase.auth.updateUser({ data: { loyalty_points: newPoints, loyalty_tier: tier.key } });
+            }
+          });
 
         return { success: true, queueEntryId: data.id };
       },
@@ -1013,45 +1055,11 @@ export const useStore = create<AppState>()(
         const POINTS_PER_FEEDBACK = 50;
 
         try {
-          // ── 1. Atomically increment points on the server via RPC ─────────────
-          // The RPC does: UPDATE users SET loyalty_points = loyalty_points + p_points
-          //               WHERE id = auth.uid() RETURNING loyalty_points
-          // SECURITY DEFINER ensures it runs as superuser but enforces auth.uid() match,
-          // preventing any client from manipulating another user's balance.
-          //
-          // Required SQL (run once in Supabase SQL editor):
-          // CREATE OR REPLACE FUNCTION award_loyalty_points(p_user_id uuid, p_points int)
-          // RETURNS int LANGUAGE plpgsql SECURITY DEFINER AS $$
-          // DECLARE new_pts int;
-          // BEGIN
-          //   IF auth.uid() <> p_user_id THEN RAISE EXCEPTION 'Unauthorized'; END IF;
-          //   UPDATE users SET loyalty_points = coalesce(loyalty_points,0) + p_points,
-          //                    updated_at = now()
-          //   WHERE id = p_user_id RETURNING loyalty_points INTO new_pts;
-          //   RETURN new_pts;
-          // END; $$;
-          const { data: newPoints, error: rpcError } = await supabase.rpc('award_loyalty_points', {
-            p_user_id: user.id,
-            p_points: POINTS_PER_FEEDBACK,
-          });
-
-          // Fall back to local calculation only if the RPC is not yet deployed
-          const resolvedPoints = (rpcError || newPoints == null)
-            ? (user.loyaltyPoints ?? 0) + POINTS_PER_FEEDBACK
-            : (newPoints as number);
-
-          if (rpcError) {
-            console.warn('award_loyalty_points RPC not available (deploy the SQL migration):', rpcError.message);
-            // Fallback: update auth metadata and users table directly
-            await supabase.auth.updateUser({ data: { loyalty_points: resolvedPoints } });
-            await supabase
-              .from('users')
-              .update({ loyalty_points: resolvedPoints, updated_at: new Date().toISOString() })
-              .eq('id', user.id);
-          } else {
-            // Keep auth metadata in sync with the server-computed value
-            await supabase.auth.updateUser({ data: { loyalty_points: resolvedPoints } });
-          }
+          // ── 1. Award points via RPC ───────────────────────────────────────────
+          const { newPoints: resolvedPoints } = await awardPoints(
+            user.id, POINTS_PER_FEEDBACK, 'feedback',
+            'Feedback submitted', undefined, undefined, 0,
+          );
 
           // ── 2. Try to insert Feedback record ──────────────────────────────────
           await supabase.from('Feedback').insert({
@@ -1068,9 +1076,13 @@ export const useStore = create<AppState>()(
           });
 
           // ── 3. Update local store ──────────────────────────────────────────────
-          set((state) => ({
-            user: state.user ? { ...state.user, loyaltyPoints: resolvedPoints } : null,
-          }));
+          if (resolvedPoints != null) {
+            const tier = getTier(resolvedPoints);
+            set((state) => ({
+              user: state.user ? { ...state.user, loyaltyPoints: resolvedPoints, loyaltyTier: tier.key } : null,
+            }));
+            supabase.auth.updateUser({ data: { loyalty_points: resolvedPoints, loyalty_tier: tier.key } });
+          }
 
           // ── 4. In-app notification ──────────────────────────────────────────────
           const { addNotification, notificationsEnabled, promoNotificationsEnabled, soundEnabled, vibrationEnabled, unreadCount } = get();

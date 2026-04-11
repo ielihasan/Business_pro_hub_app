@@ -43,13 +43,15 @@ function buildTimeline(entry: QueueEntryRecord) {
     hour: '2-digit',
     minute: '2-digit',
   });
-  const isActive = entry.status === 'waiting' || entry.status === 'in_progress';
+  const isActive = entry.status === 'waiting' || entry.status === 'called' || entry.status === 'in_progress';
+  const isCalled  = entry.status === 'called';
+  const isServing = entry.status === 'in_progress';
   return [
     { time: joinedTime, event: 'Joined queue', status: 'completed' },
     {
-      time: entry.status === 'in_progress' ? 'Now' : (isActive ? 'Pending' : 'Done'),
-      event: 'Currently being served',
-      status: entry.status === 'in_progress' ? 'active' : (entry.status === 'completed' ? 'completed' : 'pending'),
+      time: isCalled ? 'Called!' : isServing ? 'Now' : (isActive ? 'Pending' : 'Done'),
+      event: isCalled ? 'Your turn — please proceed' : 'Currently being served',
+      status: (isCalled || isServing) ? 'active' : (entry.status === 'completed' ? 'completed' : 'pending'),
     },
     {
       time: entry.status === 'completed' ? 'Done' : 'Pending',
@@ -61,6 +63,7 @@ function buildTimeline(entry: QueueEntryRecord) {
 
 function statusColor(status: string, colors: any) {
   if (status === 'waiting')     return colors.statusWaiting ?? '#F59E0B';
+  if (status === 'called')      return colors.brand;
   if (status === 'in_progress') return colors.statusInProgress ?? '#3B82F6';
   if (status === 'completed')   return colors.success;
   if (status === 'cancelled')   return colors.destructive;
@@ -69,6 +72,7 @@ function statusColor(status: string, colors: any) {
 
 function statusLabel(status: string) {
   if (status === 'waiting')     return 'WAITING';
+  if (status === 'called')      return 'CALLED';
   if (status === 'in_progress') return 'IN PROGRESS';
   if (status === 'completed')   return 'COMPLETED';
   if (status === 'cancelled')   return 'CANCELLED';

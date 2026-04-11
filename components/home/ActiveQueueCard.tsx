@@ -10,15 +10,16 @@ interface ActiveQueue {
   businessName: string;
   position: number;
   estimatedWait: string;
-  status: 'waiting' | 'in_progress' | 'serving' | 'completed' | 'cancelled';
+  status: 'waiting' | 'called' | 'in_progress' | 'completed' | 'cancelled';
   businessCategory?: string;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: string }> = {
-  waiting:   { label: 'WAITING',      icon: 'time-outline'           },
-  serving:   { label: 'BEING SERVED', icon: 'checkmark-circle-outline' },
-  completed: { label: 'COMPLETED',    icon: 'checkmark-done-outline' },
-  cancelled: { label: 'CANCELLED',    icon: 'close-circle-outline'   },
+  waiting:     { label: 'WAITING',      icon: 'time-outline'             },
+  called:      { label: 'CALLED',       icon: 'notifications-outline'    },
+  in_progress: { label: 'BEING SERVED', icon: 'checkmark-circle-outline' },
+  completed:   { label: 'COMPLETED',    icon: 'checkmark-done-outline'   },
+  cancelled:   { label: 'CANCELLED',    icon: 'close-circle-outline'     },
 };
 
 export function ActiveQueueCard({ queue }: { queue: ActiveQueue }) {
@@ -34,7 +35,7 @@ export function ActiveQueueCard({ queue }: { queue: ActiveQueue }) {
   const SEC      = colors.secondary;
   const FG       = colors.foreground;
 
-  const isServing   = queue.status === 'serving';
+  const isServing   = queue.status === 'called' || queue.status === 'in_progress';
   const statusCfg   = STATUS_CONFIG[queue.status] ?? STATUS_CONFIG.waiting;
   const statusColor = isServing ? colors.success : BRAND;
 

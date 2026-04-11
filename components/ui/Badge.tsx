@@ -112,7 +112,7 @@ export function Badge({
 
 // Queue status specific badge
 interface QueueStatusBadgeProps {
-  status: 'waiting' | 'in_progress' | 'serving' | 'completed' | 'cancelled';
+  status: 'waiting' | 'called' | 'in_progress' | 'completed' | 'cancelled';
   style?: ViewStyle;
 }
 
@@ -126,6 +126,12 @@ export function QueueStatusBadge({ status, style }: QueueStatusBadgeProps) {
           label: 'Waiting',
           backgroundColor: colors.statusWaiting,
           textColor: '#000000',
+        };
+      case 'called':
+        return {
+          label: 'Called',
+          backgroundColor: colors.brand,
+          textColor: '#FFFFFF',
         };
       case 'in_progress':
         return {

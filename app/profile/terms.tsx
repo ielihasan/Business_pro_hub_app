@@ -15,7 +15,7 @@ import { Spacing, Typography, BorderRadius } from '@/constants/theme';
 
 const EFFECTIVE_DATE = 'February 25, 2026';
 const APP_NAME = 'BusinessHub Pro';
-const CONTACT_EMAIL = 'support@businessprohub.me';
+const CONTACT_EMAIL = 'hello.elixa@gmail.com';
 
 type Tab = 'terms' | 'privacy';
 
