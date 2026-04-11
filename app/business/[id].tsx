@@ -78,12 +78,24 @@ export default function BusinessDetailScreen() {
             const result = await joinQueueInSupabase(business.id);
             setLoading(false);
             if (!result.success || !result.queueEntryId) {
-              setDialog({
-                title: 'Could Not Join',
-                message: result.error ?? 'An error occurred. Please try again.',
-                icon: 'alert-circle-outline', iconVariant: 'destructive',
-                actions: [{ label: 'OK', variant: 'secondary', onPress: () => setDialog(null) }],
-              });
+              if (result.error === 'NO_PAYMENT_METHOD') {
+                setDialog({
+                  title: 'Payment Method Required',
+                  message: 'You need to add a payment method before joining a queue. Set one up in your wallet — it only takes a moment.',
+                  icon: 'card-outline', iconVariant: 'warning',
+                  actions: [
+                    { label: 'Not Now', variant: 'secondary', onPress: () => setDialog(null) },
+                    { label: 'Add Method', variant: 'primary', onPress: () => { setDialog(null); router.push('/profile/payment'); } },
+                  ],
+                });
+              } else {
+                setDialog({
+                  title: 'Could Not Join',
+                  message: result.error ?? 'An error occurred. Please try again.',
+                  icon: 'alert-circle-outline', iconVariant: 'destructive',
+                  actions: [{ label: 'OK', variant: 'secondary', onPress: () => setDialog(null) }],
+                });
+              }
               return;
             }
             router.push(`/queue/${result.queueEntryId}`);

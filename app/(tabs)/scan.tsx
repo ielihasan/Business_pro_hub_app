@@ -271,13 +271,26 @@ export default function ScanScreen() {
     setJoining(false);
 
     if (!result.success || !result.queueEntryId) {
-      setDialog({
-        title: 'Could Not Join',
-        message: result.error ?? 'An error occurred while joining the queue.',
-        icon: 'alert-circle-outline',
-        iconVariant: 'destructive',
-        actions: [{ label: 'OK', onPress: () => { setDialog(null); setScanned(false); } }],
-      });
+      if (result.error === 'NO_PAYMENT_METHOD') {
+        setDialog({
+          title: 'Payment Method Required',
+          message: 'You need to add a payment method before joining a queue. Set one up in your wallet — it only takes a moment.',
+          icon: 'card-outline',
+          iconVariant: 'warning',
+          actions: [
+            { label: 'Not Now', variant: 'secondary', onPress: () => { setDialog(null); setScanned(false); } },
+            { label: 'Add Method', variant: 'primary', onPress: () => { setDialog(null); setScanned(false); router.push('/profile/payment'); } },
+          ],
+        });
+      } else {
+        setDialog({
+          title: 'Could Not Join',
+          message: result.error ?? 'An error occurred while joining the queue.',
+          icon: 'alert-circle-outline',
+          iconVariant: 'destructive',
+          actions: [{ label: 'OK', onPress: () => { setDialog(null); setScanned(false); } }],
+        });
+      }
       setPendingJoin(null);
       return;
     }

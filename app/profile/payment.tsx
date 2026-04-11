@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  FlatList,
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
@@ -28,14 +27,12 @@ type MethodType = WalletPaymentType;
 
 const METHOD_META: Record<
   MethodType,
-  { label: string; sublabel: string; badge: string; color: string; bgAlpha: string; placeholder: string; hint: string }
+  { label: string; sublabel: string; badge: string; placeholder: string; hint: string }
 > = {
   easypaisa: {
     label:       'Easypaisa',
     sublabel:    'Mobile Wallet',
     badge:       'EP',
-    color:       '#37B34A',
-    bgAlpha:     '#37B34A18',
     placeholder: '03XX-XXXXXXX',
     hint:        'Enter your registered Easypaisa mobile number',
   },
@@ -43,8 +40,6 @@ const METHOD_META: Record<
     label:       'JazzCash',
     sublabel:    'Mobile Wallet',
     badge:       'JC',
-    color:       '#BF202F',
-    bgAlpha:     '#BF202F18',
     placeholder: '03XX-XXXXXXX',
     hint:        'Enter your registered JazzCash mobile number',
   },
@@ -52,8 +47,6 @@ const METHOD_META: Record<
     label:       'Bank Account',
     sublabel:    'IBFT / IBAN',
     badge:       '🏦',
-    color:       '#2563EB',
-    bgAlpha:     '#2563EB18',
     placeholder: 'PK00XXXX0000000000000000',
     hint:        'Enter your full IBAN (e.g. PK36MEZN0001234567890123)',
   },
@@ -406,15 +399,15 @@ export default function WalletPaymentScreen() {
                     key={m.id}
                     style={[
                       styles.methodCard,
-                      { backgroundColor: CARD, borderColor: m.isDefault ? meta.color + '80' : BORDER },
+                      { backgroundColor: CARD, borderColor: m.isDefault ? BRAND + '80' : BORDER },
                     ]}
                   >
                     {/* Colored left accent */}
-                    <View style={[styles.methodAccent, { backgroundColor: meta.color }]} />
+                    <View style={[styles.methodAccent, { backgroundColor: BRAND }]} />
 
                     {/* Icon */}
-                    <View style={[styles.methodIcon, { backgroundColor: meta.bgAlpha, borderColor: meta.color + '40' }]}>
-                      <BrandBadge badge={meta.badge} color={meta.color} bg="transparent" size={24} />
+                    <View style={[styles.methodIcon, { backgroundColor: BRAND + '18', borderColor: BRAND + '40' }]}>
+                      <BrandBadge badge={meta.badge} color={BRAND} bg="transparent" size={24} />
                     </View>
 
                     {/* Info */}
@@ -423,9 +416,9 @@ export default function WalletPaymentScreen() {
                       <View style={styles.methodTopRow}>
                         <Text style={[styles.methodType, { color: FG }]}>{meta.label}</Text>
                         {m.isDefault && (
-                          <View style={[styles.defaultPill, { backgroundColor: meta.color + '22', borderColor: meta.color + '60' }]}>
-                            <Ionicons name="star" size={9} color={meta.color} />
-                            <Text style={[styles.defaultPillText, { color: meta.color }]}>DEFAULT</Text>
+                          <View style={[styles.defaultPill, { backgroundColor: BRAND + '22', borderColor: BRAND + '60' }]}>
+                            <Ionicons name="star" size={9} color={BRAND} />
+                            <Text style={[styles.defaultPillText, { color: BRAND }]}>DEFAULT</Text>
                           </View>
                         )}
                       </View>
@@ -454,8 +447,8 @@ export default function WalletPaymentScreen() {
                           <Text style={[styles.bankRowText, { color: MUTED }]}>
                             {m.bankName}
                           </Text>
-                          <View style={[styles.ibanBadge, { backgroundColor: '#2563EB18', borderColor: '#2563EB44' }]}>
-                            <Text style={[styles.ibanBadgeText, { color: '#2563EB' }]}>IBAN</Text>
+                          <View style={[styles.ibanBadge, { backgroundColor: BRAND + '18', borderColor: BRAND + '44' }]}>
+                            <Text style={[styles.ibanBadgeText, { color: BRAND }]}>IBAN</Text>
                           </View>
                         </View>
                       ) : (
@@ -501,14 +494,14 @@ export default function WalletPaymentScreen() {
 
         {/* ── We Accept ──────────────────────────────────────────────────────── */}
         <TouchableOpacity
-          style={[styles.acceptedCompact, { backgroundColor: CARD, borderColor: showBanks ? '#2563EB60' : BORDER }]}
+          style={[styles.acceptedCompact, { backgroundColor: CARD, borderColor: showBanks ? BRAND + '60' : BORDER }]}
           onPress={() => setShowBanks(!showBanks)}
           activeOpacity={0.8}
         >
           <View style={styles.acceptedBrandRow}>
-            <BrandBadge badge="EP" color="#37B34A" bg="#37B34A22" size={14} />
-            <BrandBadge badge="JC" color="#BF202F" bg="#BF202F22" size={14} />
-            <BrandBadge badge="🏦" color="#2563EB" bg="#2563EB22" size={14} />
+            <BrandBadge badge="EP" color={BRAND} bg={BRAND + '22'} size={14} />
+            <BrandBadge badge="JC" color={BRAND} bg={BRAND + '22'} size={14} />
+            <BrandBadge badge="🏦" color={BRAND} bg={BRAND + '22'} size={14} />
           </View>
           <View style={styles.acceptedCompactBody}>
             <Text style={[styles.acceptedCompactTitle, { color: FG }]}>We Accept</Text>
@@ -516,8 +509,8 @@ export default function WalletPaymentScreen() {
               Easypaisa · JazzCash · {PAKISTAN_BANKS.length} Pakistan Banks
             </Text>
           </View>
-          <View style={[styles.bankExpandBtn, { backgroundColor: showBanks ? '#2563EB18' : SEC, borderColor: showBanks ? '#2563EB44' : BORDER }]}>
-            <Ionicons name={showBanks ? 'chevron-up' : 'chevron-down'} size={15} color={showBanks ? '#2563EB' : MUTED} />
+          <View style={[styles.bankExpandBtn, { backgroundColor: showBanks ? BRAND + '18' : SEC, borderColor: showBanks ? BRAND + '44' : BORDER }]}>
+            <Ionicons name={showBanks ? 'chevron-up' : 'chevron-down'} size={15} color={showBanks ? BRAND : MUTED} />
           </View>
         </TouchableOpacity>
 
@@ -535,8 +528,8 @@ export default function WalletPaymentScreen() {
                 <View style={[styles.bankListNum, { backgroundColor: SEC }]}>
                   <Text style={[styles.bankListNumText, { color: MUTED }]}>{idx + 1}</Text>
                 </View>
-                <View style={[styles.bankListShortBox, { backgroundColor: '#2563EB12', borderColor: '#2563EB30' }]}>
-                  <Text style={[styles.bankListShort, { color: '#2563EB' }]}>{bank.shortName}</Text>
+                <View style={[styles.bankListShortBox, { backgroundColor: BRAND + '12', borderColor: BRAND + '30' }]}>
+                  <Text style={[styles.bankListShort, { color: BRAND }]}>{bank.shortName}</Text>
                 </View>
                 <Text style={[styles.bankListName, { color: FG }]}>{bank.name}</Text>
                 <View style={[styles.bankListIban, { backgroundColor: SEC, borderColor: BORDER }]}>
@@ -735,8 +728,8 @@ export default function WalletPaymentScreen() {
                       style={[
                         styles.typeRow,
                         {
-                          backgroundColor: active ? meta.color + '10' : CARD,
-                          borderColor:     active ? meta.color : BORDER,
+                          backgroundColor: active ? BRAND + '10' : CARD,
+                          borderColor:     active ? BRAND : BORDER,
                           borderWidth:     active ? 1.5 : 1,
                         },
                       ]}
@@ -745,19 +738,19 @@ export default function WalletPaymentScreen() {
                     >
                       <BrandBadge
                         badge={meta.badge}
-                        color={active ? meta.color : MUTED}
-                        bg={active ? meta.color + '22' : SEC}
+                        color={active ? BRAND : MUTED}
+                        bg={active ? BRAND + '22' : SEC}
                         size={22}
                       />
                       <View style={styles.typeRowBody}>
-                        <Text style={[styles.typeRowName, { color: active ? meta.color : FG }]}>{meta.label}</Text>
+                        <Text style={[styles.typeRowName, { color: active ? BRAND : FG }]}>{meta.label}</Text>
                         <Text style={[styles.typeRowSub, { color: MUTED }]}>{meta.sublabel}</Text>
                       </View>
                       <View style={[
                         styles.typeRowRadio,
                         {
-                          borderColor:     active ? meta.color : BORDER,
-                          backgroundColor: active ? meta.color : 'transparent',
+                          borderColor:     active ? BRAND : BORDER,
+                          backgroundColor: active ? BRAND : 'transparent',
                         },
                       ]}>
                         {active && <Ionicons name="checkmark" size={11} color="#fff" />}
@@ -806,7 +799,7 @@ export default function WalletPaymentScreen() {
                 <>
                   <Text style={[styles.fieldLabel, { color: MUTED }]}>BANK NAME</Text>
                   <TouchableOpacity
-                    style={[styles.inputRow, { backgroundColor: CARD, borderColor: bankName ? '#2563EB' : BORDER }]}
+                    style={[styles.inputRow, { backgroundColor: CARD, borderColor: bankName ? BRAND : BORDER }]}
                     onPress={() => setShowBankList(!showBankList)}
                     activeOpacity={0.8}
                   >
@@ -819,17 +812,17 @@ export default function WalletPaymentScreen() {
 
                   {showBankList && (
                     <View style={[styles.bankDrop, { backgroundColor: CARD, borderColor: BORDER }]}>
-                      <FlatList
-                        data={PAKISTAN_BANKS}
-                        keyExtractor={(b) => b.id}
-                        scrollEnabled
-                        nestedScrollEnabled
+                      <ScrollView
                         style={{ maxHeight: 260 }}
+                        nestedScrollEnabled
                         keyboardShouldPersistTaps="handled"
-                        renderItem={({ item: bank }) => {
+                        showsVerticalScrollIndicator={false}
+                      >
+                        {PAKISTAN_BANKS.map((bank) => {
                           const selected = bankName === bank.name;
                           return (
                             <TouchableOpacity
+                              key={bank.id}
                               style={[
                                 styles.bankDropRow,
                                 { borderBottomColor: BORDER },
@@ -838,17 +831,17 @@ export default function WalletPaymentScreen() {
                               onPress={() => { setBankName(bank.name); setShowBankList(false); }}
                               activeOpacity={0.75}
                             >
-                              <View style={[styles.bankDropShortBox, { backgroundColor: selected ? '#2563EB22' : BG }]}>
-                                <Text style={[styles.bankDropShort, { color: selected ? '#2563EB' : MUTED }]}>
+                              <View style={[styles.bankDropShortBox, { backgroundColor: selected ? BRAND + '22' : BG }]}>
+                                <Text style={[styles.bankDropShort, { color: selected ? BRAND : MUTED }]}>
                                   {bank.shortName}
                                 </Text>
                               </View>
                               <Text style={[styles.bankDropName, { color: FG }]}>{bank.name}</Text>
-                              {selected && <Ionicons name="checkmark-circle" size={18} color="#2563EB" />}
+                              {selected && <Ionicons name="checkmark-circle" size={18} color={BRAND} />}
                             </TouchableOpacity>
                           );
-                        }}
-                      />
+                        })}
+                      </ScrollView>
                     </View>
                   )}
                 </>

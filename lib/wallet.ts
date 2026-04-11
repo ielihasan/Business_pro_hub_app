@@ -102,10 +102,11 @@ export async function initializeWallet(userId: string): Promise<number> {
     ? Number(userRow.wallet_balance)
     : 500 + Math.floor(Math.random() * 31) * 50; // Rs 500–2000
 
-  // 3. Create the wallet row
+  // 3. Create the wallet row — ignoreDuplicates prevents a concurrent init
+  //    call from overwriting an already-inserted row with a different balance.
   await supabase.from('wallets').upsert(
     { user_id: userId, balance, currency: 'PKR', is_active: false },
-    { onConflict: 'user_id' },
+    { onConflict: 'user_id', ignoreDuplicates: true },
   );
 
   // 4. Keep users.wallet_balance in sync (backward compat)

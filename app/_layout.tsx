@@ -9,6 +9,7 @@ import { Colors } from '@/constants/theme';
 import { useStore, setupAuthListener } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
 import { oauthState } from '@/lib/oauthState';
+import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import '@/lib/i18n';
 
 // Keep the splash screen visible while we fetch resources
@@ -107,6 +108,7 @@ export default function RootLayout() {
   }
 
   return (
+    <ErrorBoundary>
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'} />
       <Stack
@@ -152,5 +154,6 @@ export default function RootLayout() {
         />
       </Stack>
     </View>
+    </ErrorBoundary>
   );
 }

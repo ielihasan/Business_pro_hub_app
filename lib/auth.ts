@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { Session, User, AuthError } from '@supabase/supabase-js';
+import { DEEP_LINKS } from './deepLinks';
 
 export interface AuthResponse {
   success: boolean;
@@ -156,7 +157,7 @@ export async function sendGoogleVerificationEmail(email: string): Promise<AuthRe
       email: normalizedEmail,
       options: {
         shouldCreateUser: false,
-        emailRedirectTo: 'businesshubpro://auth/callback',
+        emailRedirectTo: DEEP_LINKS.authCallback,
       },
     });
 
@@ -417,13 +418,13 @@ export async function resetPassword(email: string): Promise<AuthResponse> {
     const normalizedEmail = normalizeEmail(email);
 
     const primary = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: 'businesshubpro://auth/callback',
+      redirectTo: DEEP_LINKS.authCallback,
     });
 
     if (primary.error) {
       // Fallback for projects where only reset-password deep link is allow-listed.
       const fallback = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-        redirectTo: 'businesshubpro://reset-password',
+        redirectTo: DEEP_LINKS.resetPassword,
       });
 
       if (fallback.error) {

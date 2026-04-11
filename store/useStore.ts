@@ -270,6 +270,12 @@ const mapSupabaseUserToUser = (supabaseUser: SupabaseUser, profile?: any): User 
   };
 };
 
+// ─── In-flight guards (module-level, not persisted) ──────────────────────────
+/** Prevents duplicate leaveQueueInSupabase calls for the same entry ID. */
+const _leavingQueueIds = new Set<string>();
+/** Prevents concurrent topUpWallet calls. */
+let _toppingUp = false;
+
 // ─── Realtime subscription for current user's queue entries ──────────────────
 let _queueRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 
@@ -286,7 +292,18 @@ function _setupQueueSubscription(userId: string) {
         useStore.getState().syncQueuesFromSupabase();
       }
     )
-    .subscribe();
+    .subscribe((status, err) => {
+      if (status === 'CHANNEL_ERROR') {
+        console.warn('[Queue realtime] Channel error:', err?.message);
+      } else if (status === 'TIMED_OUT') {
+        // Reconnect on timeout
+        console.warn('[Queue realtime] Timed out — reconnecting…');
+        _setupQueueSubscription(userId);
+      } else if (status === 'CLOSED') {
+        // Channel closed unexpectedly; do a one-time resync to avoid stale data
+        useStore.getState().syncQueuesFromSupabase();
+      }
+    });
 }
 
 function _teardownQueueSubscription() {
@@ -785,18 +802,24 @@ export const useStore = create<AppState>()(
       },
 
       leaveQueueInSupabase: async (entryId: string) => {
-        const { error } = await leaveQueueEntry(entryId);
-        if (error) return { success: false, error };
-        set((state) => ({
-          activeQueues: state.activeQueues.filter(q => q.id !== entryId),
-          queueHistory: [
-            ...state.queueHistory,
-            ...state.activeQueues
-              .filter(q => q.id === entryId)
-              .map(q => ({ ...q, status: 'cancelled' as const })),
-          ],
-        }));
-        return { success: true };
+        if (_leavingQueueIds.has(entryId)) return { success: false, error: 'Already leaving this queue' };
+        _leavingQueueIds.add(entryId);
+        try {
+          const { error } = await leaveQueueEntry(entryId);
+          if (error) return { success: false, error };
+          set((state) => ({
+            activeQueues: state.activeQueues.filter(q => q.id !== entryId),
+            queueHistory: [
+              ...state.queueHistory,
+              ...state.activeQueues
+                .filter(q => q.id === entryId)
+                .map(q => ({ ...q, status: 'cancelled' as const })),
+            ],
+          }));
+          return { success: true };
+        } finally {
+          _leavingQueueIds.delete(entryId);
+        }
       },
 
       syncQueuesFromSupabase: async () => {
@@ -879,32 +902,38 @@ export const useStore = create<AppState>()(
       },
 
       topUpWallet: async (amount: number, paymentMethodId?: string) => {
+        if (_toppingUp) return { success: false, error: 'Top-up already in progress' };
+        _toppingUp = true;
         const user = get().user;
-        if (!user) return { success: false, error: 'Not authenticated' };
-        if (amount <= 0) return { success: false, error: 'Invalid amount' };
+        if (!user) { _toppingUp = false; return { success: false, error: 'Not authenticated' }; }
+        if (amount <= 0) { _toppingUp = false; return { success: false, error: 'Invalid amount' }; }
 
-        const { newBalance, balanceBefore, error } = await topUpWalletBalance(user.id, amount);
-        if (error || newBalance === null) return { success: false, error: error ?? 'Top-up failed' };
+        try {
+          const { newBalance, balanceBefore, error } = await topUpWalletBalance(user.id, amount);
+          if (error || newBalance === null) return { success: false, error: error ?? 'Top-up failed' };
 
-        // Record credit transaction
-        await recordWalletTransaction({
-          userId:          user.id,
-          paymentMethodId,
-          amount,
-          type:            'credit',
-          reason:          'Wallet top-up via card',
-          balanceBefore:   balanceBefore ?? 0,
-          balanceAfter:    newBalance,
-        });
+          // Record credit transaction
+          await recordWalletTransaction({
+            userId:          user.id,
+            paymentMethodId,
+            amount,
+            type:            'credit',
+            reason:          'Wallet top-up via card',
+            balanceBefore:   balanceBefore ?? 0,
+            balanceAfter:    newBalance,
+          });
 
-        // Reload full wallet info from DB
-        const freshInfo = await getWalletInfo(user.id);
-        set((state) => ({
-          walletInfo: freshInfo,
-          user: state.user ? { ...state.user, walletBalance: newBalance } : null,
-        }));
+          // Reload full wallet info from DB
+          const freshInfo = await getWalletInfo(user.id);
+          set((state) => ({
+            walletInfo: freshInfo,
+            user: state.user ? { ...state.user, walletBalance: newBalance } : null,
+          }));
 
-        return { success: true, newBalance, walletInfo: freshInfo ?? undefined };
+          return { success: true, newBalance, walletInfo: freshInfo ?? undefined };
+        } finally {
+          _toppingUp = false;
+        }
       },
 
       addWalletPaymentMethod: async (params) => {
