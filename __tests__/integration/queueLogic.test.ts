@@ -8,17 +8,22 @@ import { ticketLabel, formatWait, isUuidFormat } from '@/lib/queue';
 describe('Queue display — end-to-end formatting', () => {
   describe('Ticket label pipeline', () => {
     const scenarios = [
-      { position: 1,   expected: 'Q-001', desc: 'first customer' },
-      { position: 10,  expected: 'Q-010', desc: 'tenth customer' },
-      { position: 50,  expected: 'Q-050', desc: 'busy queue' },
-      { position: 100, expected: 'Q-100', desc: 'very busy queue' },
-      { position: 999, expected: 'Q-999', desc: 'max standard queue' },
+      { position: 1,   expected: 'BHP-0000-0000-001', desc: 'first customer' },
+      { position: 10,  expected: 'BHP-0000-0000-010', desc: 'tenth customer' },
+      { position: 50,  expected: 'BHP-0000-0000-050', desc: 'busy queue' },
+      { position: 100, expected: 'BHP-0000-0000-100', desc: 'very busy queue' },
+      { position: 999, expected: 'BHP-0000-0000-999', desc: 'max standard queue' },
     ];
 
     scenarios.forEach(({ position, expected, desc }) => {
       it(`position ${position} (${desc}) formats as ${expected}`, () => {
         expect(ticketLabel(position)).toBe(expected);
       });
+    });
+
+    it('encodes date/time when joinedAt is provided', () => {
+      const label = ticketLabel(1, '2026-04-11T14:56:00.000Z');
+      expect(label).toMatch(/^BHP-\d{4}-\d{4}-001$/);
     });
   });
 

@@ -9,6 +9,8 @@ import {
   Linking,
   Share,
   StatusBar,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -17,7 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Avatar, Button, SkeletonBusinessDetail } from '@/components/ui';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
-import { resolveBusinessById } from '@/lib/queue';
+import { resolveBusinessById, fetchServicesByBusiness, ServiceRecord } from '@/lib/queue';
+import { COMMITMENT_RATE } from '@/lib/wallet';
 import { useStore } from '@/store/useStore';
 
 
@@ -29,6 +32,17 @@ export default function BusinessDetailScreen() {
   const [business,   setBusiness]   = useState<any | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [dialog,     setDialog]     = useState<DialogConfig | null>(null);
+
+  // ── Service picker state ──
+  const [services,           setServices]           = useState<ServiceRecord[]>([]);
+  const [showServiceModal,   setShowServiceModal]   = useState(false);
+  const [showQuantityModal,  setShowQuantityModal]  = useState(false);
+  const [quantity,           setQuantity]           = useState(1);
+  const [pendingJoin, setPendingJoin] = useState<{
+    serviceType?: string;
+    serviceName?: string;
+    unitPrice: number;
+  } | null>(null);
 
   const joinQueueInSupabase = useStore((s) => s.joinQueueInSupabase);
   const toggleFavorite      = useStore((s) => s.toggleFavorite);
@@ -46,7 +60,7 @@ export default function BusinessDetailScreen() {
   }, [id]);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
-  const handleJoinQueue = () => {
+  const handleJoinQueue = async () => {
     if (!business) return;
     if (!isAuthenticated) {
       setDialog({
@@ -62,47 +76,79 @@ export default function BusinessDetailScreen() {
       return;
     }
 
-    setDialog({
-      title:   'Confirm Queue Join',
-      message: `${business.name}\n\nQueue: ${business.queue_length ?? 0} waiting  ·  Wait: ${business.wait_time ?? 'N/A'}`,
-      icon:    'people-outline',
-      iconVariant: 'default',
-      actions: [
-        { label: 'Cancel', variant: 'secondary', onPress: () => setDialog(null) },
-        {
-          label: 'Join Queue',
-          variant: 'primary',
-          onPress: async () => {
-            setDialog(null);
-            setLoading(true);
-            const result = await joinQueueInSupabase(business.id);
-            setLoading(false);
-            if (!result.success || !result.queueEntryId) {
-              if (result.error === 'NO_PAYMENT_METHOD') {
-                setDialog({
-                  title: 'Payment Method Required',
-                  message: 'You need to add a payment method before joining a queue. Set one up in your wallet — it only takes a moment.',
-                  icon: 'card-outline', iconVariant: 'warning',
-                  actions: [
-                    { label: 'Not Now', variant: 'secondary', onPress: () => setDialog(null) },
-                    { label: 'Add Method', variant: 'primary', onPress: () => { setDialog(null); router.push('/profile/payment'); } },
-                  ],
-                });
-              } else {
-                setDialog({
-                  title: 'Could Not Join',
-                  message: result.error ?? 'An error occurred. Please try again.',
-                  icon: 'alert-circle-outline', iconVariant: 'destructive',
-                  actions: [{ label: 'OK', variant: 'secondary', onPress: () => setDialog(null) }],
-                });
-              }
-              return;
-            }
-            router.push(`/queue/${result.queueEntryId}`);
-          },
-        },
-      ],
-    });
+    // Fetch available services for this business
+    setLoading(true);
+    const { data: svcs } = await fetchServicesByBusiness(business.id);
+    setLoading(false);
+
+    setServices(svcs);
+    setQuantity(1);
+
+    if (svcs.length === 0) {
+      // No services — join as a general queue (no service type, free)
+      setPendingJoin({ unitPrice: 0 });
+      setShowQuantityModal(true);
+    } else if (svcs.length === 1) {
+      // Only one service — skip picker, go straight to quantity
+      const svc = svcs[0];
+      setPendingJoin({ serviceType: svc.id, serviceName: svc.name, unitPrice: svc.price ?? 0 });
+      setShowQuantityModal(true);
+    } else {
+      // Multiple services — show picker
+      setShowServiceModal(true);
+    }
+  };
+
+  const handleSelectService = (svc: ServiceRecord | null) => {
+    setShowServiceModal(false);
+    setPendingJoin(
+      svc
+        ? { serviceType: svc.id, serviceName: svc.name, unitPrice: svc.price ?? 0 }
+        : { unitPrice: 0 }
+    );
+    setQuantity(1);
+    setShowQuantityModal(true);
+  };
+
+  const handleConfirmJoin = async () => {
+    if (!business || !pendingJoin) return;
+    const qty = Math.max(1, quantity);
+    const totalAmount = pendingJoin.unitPrice * qty;
+
+    setShowQuantityModal(false);
+    setLoading(true);
+    const result = await joinQueueInSupabase(
+      business.id,
+      pendingJoin.serviceType,
+      { quantity: qty, unitPrice: pendingJoin.unitPrice, totalAmount }
+    );
+    setLoading(false);
+
+    if (!result.success || !result.queueEntryId) {
+      if (result.error === 'NO_PAYMENT_METHOD') {
+        setDialog({
+          title: 'Payment Method Required',
+          message: 'You need to add a payment method before joining a queue. Set one up in your wallet — it only takes a moment.',
+          icon: 'card-outline', iconVariant: 'warning',
+          actions: [
+            { label: 'Not Now',   variant: 'secondary', onPress: () => setDialog(null) },
+            { label: 'Add Method', variant: 'primary',  onPress: () => { setDialog(null); router.push('/profile/payment'); } },
+          ],
+        });
+      } else {
+        setDialog({
+          title: 'Could Not Join',
+          message: result.error ?? 'An error occurred. Please try again.',
+          icon: 'alert-circle-outline', iconVariant: 'destructive',
+          actions: [{ label: 'OK', variant: 'secondary', onPress: () => setDialog(null) }],
+        });
+      }
+      setPendingJoin(null);
+      return;
+    }
+
+    setPendingJoin(null);
+    router.push(`/queue/${result.queueEntryId}`);
   };
 
   const handleCall = async () => {
@@ -300,6 +346,11 @@ export default function BusinessDetailScreen() {
           >
             <Ionicons name="call-outline" size={22} color={FG} />
             <Text style={[styles.actionBtnText, { color: FG }]}>Call</Text>
+            {!!business.phone && (
+              <Text style={[styles.actionBtnSub, { color: MUTED }]} numberOfLines={1}>
+                {business.phone}
+              </Text>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, { backgroundColor: CARD, borderColor: BORDER }]}
@@ -308,6 +359,11 @@ export default function BusinessDetailScreen() {
           >
             <Ionicons name="navigate-outline" size={22} color={FG} />
             <Text style={[styles.actionBtnText, { color: FG }]}>Directions</Text>
+            {!!business.address && (
+              <Text style={[styles.actionBtnSub, { color: MUTED }]} numberOfLines={1}>
+                {business.address}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -321,42 +377,6 @@ export default function BusinessDetailScreen() {
           </View>
         )}
 
-        {/* ── Contact Info ─────────────────────────────────────────────────── */}
-        {(business.phone || business.address) && (
-          <View style={styles.pad}>
-            <Text style={[styles.sectionLabel, { color: MUTED }]}>CONTACT</Text>
-            <View style={[styles.contactCard, { backgroundColor: CARD, borderColor: BORDER }]}>
-              {!!business.phone && (
-                <TouchableOpacity
-                  style={[styles.contactRow, { borderBottomColor: BORDER }]}
-                  onPress={handleCall}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.contactIcon, { backgroundColor: BG }]}>
-                    <Ionicons name="call-outline" size={16} color={FG} />
-                  </View>
-                  <Text style={[styles.contactText, { color: FG }]}>{business.phone}</Text>
-                  <Ionicons name="chevron-forward" size={14} color={MUTED} />
-                </TouchableOpacity>
-              )}
-              {!!business.address && (
-                <TouchableOpacity
-                  style={styles.contactRow}
-                  onPress={handleDirections}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.contactIcon, { backgroundColor: BG }]}>
-                    <Ionicons name="location-outline" size={16} color={FG} />
-                  </View>
-                  <Text style={[styles.contactText, { color: FG }]} numberOfLines={2}>
-                    {business.address}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={14} color={MUTED} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        )}
 
         {/* ── Rating (if available) ────────────────────────────────────────── */}
         {typeof business.rating === 'number' && business.rating > 0 && (
@@ -392,6 +412,139 @@ export default function BusinessDetailScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* ── Service Picker Modal ── */}
+      <Modal
+        visible={showServiceModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowServiceModal(false)}
+      >
+        <View style={styles.sheetOverlay}>
+          <View style={[styles.sheet, { backgroundColor: colors.card }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Select a Service</Text>
+            <Text style={[styles.sheetSub, { color: colors.mutedForeground }]}>{business?.name}</Text>
+
+            <FlatList
+              data={services}
+              keyExtractor={(s) => s.id}
+              style={{ maxHeight: 380 }}
+              ItemSeparatorComponent={() => <View style={[styles.sep, { backgroundColor: colors.border }]} />}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.svcRow}
+                  activeOpacity={0.7}
+                  onPress={() => handleSelectService(item)}
+                >
+                  <View style={[styles.svcIconBox, { backgroundColor: colors.brand + '20' }]}>
+                    <Ionicons name="storefront-outline" size={18} color={colors.brand} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.svcName, { color: colors.foreground }]}>{item.name}</Text>
+                    {!!item.description && (
+                      <Text style={[styles.svcDesc, { color: colors.mutedForeground }]} numberOfLines={1}>
+                        {item.description}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                    <Text style={[styles.svcPrice, { color: item.price ? colors.foreground : colors.mutedForeground }]}>
+                      {item.price ? `Rs ${item.price.toLocaleString('en-PK')}` : 'Free'}
+                    </Text>
+                    {!!item.estimated_duration && (
+                      <Text style={[styles.svcDuration, { color: colors.mutedForeground }]}>
+                        ~{item.estimated_duration} min
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity
+              style={[styles.cancelBtn, { backgroundColor: colors.secondary }]}
+              onPress={() => setShowServiceModal(false)}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.cancelBtnText, { color: colors.foreground }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Quantity Modal ── */}
+      <Modal
+        visible={showQuantityModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setShowQuantityModal(false); setPendingJoin(null); }}
+      >
+        <View style={styles.qtyOverlay}>
+          <View style={[styles.qtyBox, { backgroundColor: colors.background }]}>
+            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Select Quantity</Text>
+            <Text style={[styles.sheetSub, { color: colors.mutedForeground }]}>{business?.name}</Text>
+
+            {pendingJoin?.serviceName && (
+              <View style={[styles.svcChip, { backgroundColor: colors.secondary }]}>
+                <Text style={[styles.svcChipText, { color: colors.foreground }]}>{pendingJoin.serviceName}</Text>
+              </View>
+            )}
+
+            <View style={styles.stepperRow}>
+              <TouchableOpacity style={[styles.stepBtn, { backgroundColor: colors.secondary }]} onPress={() => setQuantity(q => Math.max(1, q - 1))}>
+                <Text style={[styles.stepBtnText, { color: colors.foreground }]}>−</Text>
+              </TouchableOpacity>
+              <View style={[styles.qtyVal, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                <Text style={[styles.qtyValText, { color: colors.foreground }]}>{quantity}</Text>
+              </View>
+              <TouchableOpacity style={[styles.stepBtn, { backgroundColor: colors.secondary }]} onPress={() => setQuantity(q => Math.min(99, q + 1))}>
+                <Text style={[styles.stepBtnText, { color: colors.foreground }]}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            {(() => {
+              const unitPrice = pendingJoin?.unitPrice ?? 0;
+              const total     = unitPrice * quantity;
+              const advance   = Math.ceil(total * COMMITMENT_RATE);
+              const pct       = Math.round(COMMITMENT_RATE * 100);
+              return (
+                <View style={[styles.priceSummary, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={styles.priceRow}>
+                    <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>Unit Price</Text>
+                    <Text style={[styles.priceValue, { color: colors.foreground }]}>Rs {unitPrice.toLocaleString('en-PK')}</Text>
+                  </View>
+                  <View style={styles.priceRow}>
+                    <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>Quantity</Text>
+                    <Text style={[styles.priceValue, { color: colors.foreground }]}>{quantity}</Text>
+                  </View>
+                  <View style={[styles.priceRow, { borderTopWidth: 1, borderTopColor: colors.border, marginTop: 4, paddingTop: 8 }]}>
+                    <Text style={[styles.priceLabel, { color: colors.brand, fontWeight: '700' }]}>Total</Text>
+                    <Text style={[styles.priceValue, { color: colors.brand, fontWeight: '700' }]}>Rs {total.toLocaleString('en-PK')}</Text>
+                  </View>
+                  {total > 0 && (
+                    <View style={styles.priceRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>Advance ({pct}%)</Text>
+                        <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Deducted from wallet</Text>
+                      </View>
+                      <Text style={[styles.priceValue, { color: colors.destructive, fontWeight: '700' }]}>− Rs {advance.toLocaleString('en-PK')}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
+
+            <View style={styles.qtyBtns}>
+              <TouchableOpacity style={[styles.qtyBtn, { backgroundColor: colors.secondary }]} onPress={() => { setShowQuantityModal(false); setPendingJoin(null); }}>
+                <Text style={[styles.qtyBtnText, { color: colors.foreground }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.qtyBtn, { backgroundColor: colors.brand }]} onPress={handleConfirmJoin}>
+                <Text style={[styles.qtyBtnText, { color: '#fff' }]}>Join Queue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
     </SafeAreaView>
@@ -476,11 +629,12 @@ const styles = StyleSheet.create({
 
   /* ── Quick actions ── */
   actionBtn: {
-    flex: 1, alignItems: 'center', gap: 8,
+    flex: 1, alignItems: 'center', gap: 4,
     borderRadius: 16, borderWidth: 1,
-    paddingVertical: 18,
+    paddingVertical: 18, paddingHorizontal: 10,
   },
   actionBtnText: { fontSize: 13, fontWeight: '700' },
+  actionBtnSub:  { fontSize: 11, fontWeight: '400', textAlign: 'center' },
 
   /* ── Section label ── */
   sectionLabel: {
@@ -512,4 +666,38 @@ const styles = StyleSheet.create({
   },
   ratingVal:   { fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
   ratingScale: { fontSize: 14, fontWeight: '500', marginTop: 4 },
+
+  /* ── Service picker sheet ── */
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet:        { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32, gap: 4 },
+  sheetHandle:  { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  sheetTitle:   { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+  sheetSub:     { fontSize: 13, marginBottom: 12 },
+  sep:          { height: 1 },
+  svcRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
+  svcIconBox:   { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  svcName:      { fontSize: 14, fontWeight: '700' },
+  svcDesc:      { fontSize: 12, marginTop: 2 },
+  svcPrice:     { fontSize: 13, fontWeight: '700' },
+  svcDuration:  { fontSize: 11 },
+  cancelBtn:    { borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
+  cancelBtnText:{ fontSize: 14, fontWeight: '700' },
+
+  /* ── Quantity modal ── */
+  qtyOverlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', paddingHorizontal: 20 },
+  qtyBox:       { borderRadius: 24, padding: 24, gap: 12 },
+  svcChip:      { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  svcChipText:  { fontSize: 12, fontWeight: '600' },
+  stepperRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginVertical: 4 },
+  stepBtn:      { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  stepBtnText:  { fontSize: 22, fontWeight: '700', lineHeight: 26 },
+  qtyVal:       { width: 64, height: 44, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  qtyValText:   { fontSize: 22, fontWeight: '800' },
+  priceSummary: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 8 },
+  priceRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  priceLabel:   { fontSize: 13 },
+  priceValue:   { fontSize: 13, fontWeight: '600' },
+  qtyBtns:      { flexDirection: 'row', gap: 10, marginTop: 4 },
+  qtyBtn:       { flex: 1, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+  qtyBtnText:   { fontSize: 14, fontWeight: '800' },
 });

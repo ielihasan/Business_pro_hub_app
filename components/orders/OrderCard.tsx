@@ -43,11 +43,11 @@ export function OrderCard({ order }: OrderCardProps) {
 
   const qty        = order.quantity ?? 1;
   const unitPrice  = order.unit_price ?? 0;
-  const total      = order.total_price ?? order.total_amount ?? (unitPrice * qty);
+  const total      = order.total_price ?? (unitPrice * qty);
   const hasAmount  = total > 0;
   const dateStr    = formatDate(order.joined_at);
   const timeStr    = formatTime(order.joined_at);
-  const ticket     = ticketLabel(order.position);
+  const ticket     = order.ticket_no ?? ticketLabel(order.position, order.joined_at);
 
   return (
     <TouchableOpacity

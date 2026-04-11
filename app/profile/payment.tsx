@@ -4,13 +4,14 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
   StatusBar,
   Modal,
-  KeyboardAvoidingView,
-  Platform,
+
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -556,7 +557,7 @@ export default function WalletPaymentScreen() {
 
       {/* ── Top Up Bottom Sheet ──────────────────────────────────────────────── */}
       <Modal visible={showTopUp} animationType="slide" transparent onRequestClose={() => setShowTopUp(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
+        <View style={styles.overlay}>
           <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => { if (!topping) setShowTopUp(false); }} />
 
           <View style={[styles.sheet, { backgroundColor: BG, borderColor: BORDER }]}>
@@ -572,7 +573,7 @@ export default function WalletPaymentScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} automaticallyAdjustKeyboardInsets>
 
               {/* Quick amounts */}
               <Text style={[styles.fieldLabel, { color: MUTED }]}>SELECT AMOUNT</Text>
@@ -692,30 +693,74 @@ export default function WalletPaymentScreen() {
               <View style={{ height: 28 }} />
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
-      {/* ── Add Method Bottom Sheet ──────────────────────────────────────────── */}
-      <Modal visible={showAdd} animationType="slide" transparent onRequestClose={() => setShowAdd(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
-          <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => { if (!showBankList) setShowAdd(false); }} />
+      {/* ── Add Method Full-Page Modal ───────────────────────────────────────── */}
+      <Modal visible={showAdd} animationType="slide" onRequestClose={() => { if (!showBankList) { setShowAdd(false); resetForm(); } }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top', 'bottom']}>
+          <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-          <View style={[styles.sheet, { backgroundColor: BG, borderColor: BORDER }]}>
-            <View style={[styles.sheetHandle, { backgroundColor: BORDER }]} />
-
-            {/* Sheet header */}
-            <View style={[styles.sheetHeaderRow, { borderBottomColor: BORDER }]}>
-              <View>
-                <Text style={[styles.sheetTitle, { color: FG }]}>Add Payment Method</Text>
-                <Text style={[styles.sheetSub, { color: MUTED }]}>Your details are stored securely</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowAdd(false)} hitSlop={12} style={[styles.closeBtn, { backgroundColor: SEC, borderColor: BORDER }]}>
-                <Ionicons name="close" size={18} color={FG} />
-              </TouchableOpacity>
+          {/* Header */}
+          <View style={[styles.addPageHeader, { borderBottomColor: BORDER }]}>
+            <TouchableOpacity
+              style={[styles.iconBtn, { backgroundColor: CARD, borderColor: BORDER }]}
+              onPress={() => { setShowAdd(false); resetForm(); }}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="arrow-back" size={20} color={FG} />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginHorizontal: 12 }}>
+              <Text style={[styles.headerSup, { color: MUTED }]}>WALLET</Text>
+              <Text style={[styles.headerTitle, { color: FG }]}>ADD PAYMENT METHOD</Text>
             </View>
+          </View>
 
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          {/* Preview card — always visible, updates as you type */}
+          <View style={[styles.previewCard, { backgroundColor: BRAND, margin: 16, marginBottom: 8 }]}>
+            <View style={styles.previewTopRow}>
+              <View style={[styles.previewIconBox, { backgroundColor: BRAND_FG + '22' }]}>
+                <BrandBadge badge={METHOD_META[selType].badge} color={BRAND_FG} bg="transparent" size={15} />
+              </View>
+              <Text style={[styles.previewTypeLabel, { color: BRAND_FG + 'AA' }]}>
+                {METHOD_META[selType].sublabel.toUpperCase()}
+              </Text>
+            </View>
+            <Text style={[styles.previewNum, { color: BRAND_FG }]}>
+              {accountNumber.trim()
+                ? maskNumber(accountNumber.trim(), selType)
+                : selType === 'bank' ? 'PK·· ···· ···· ···· ···· ··' : '03··  ···  ····'}
+            </Text>
+            <View style={[styles.previewDivider, { backgroundColor: BRAND_FG + '22' }]} />
+            <View style={styles.previewBottomRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.previewHolderLabel, { color: BRAND_FG + '66' }]}>ACCOUNT HOLDER</Text>
+                <Text style={[styles.previewHolder, { color: BRAND_FG }]} numberOfLines={1}>
+                  {accountTitle.trim() || 'Your Full Name'}
+                </Text>
+                {selType === 'bank' && bankName ? (
+                  <Text style={[styles.previewBank, { color: BRAND_FG + '88' }]} numberOfLines={1}>{bankName}</Text>
+                ) : null}
+              </View>
+              <View style={[styles.previewBadge, { backgroundColor: BRAND_FG + '22', borderColor: BRAND_FG + '33' }]}>
+                <Text style={[styles.previewBadgeText, { color: BRAND_FG }]}>
+                  {METHOD_META[selType].label.toUpperCase()}
+                </Text>
+              </View>
+            </View>
+          </View>
 
+          {/* Form — scrolls up with keyboard */}
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <ScrollView
+              contentContainerStyle={styles.sheetBody}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              automaticallyAdjustKeyboardInsets
+            >
               {/* Type selector */}
               <Text style={[styles.fieldLabel, { color: MUTED }]}>SELECT PAYMENT TYPE</Text>
               <View style={styles.typeList}>
@@ -847,68 +892,28 @@ export default function WalletPaymentScreen() {
                 </>
               )}
 
-              {/* Live preview card */}
-              {(accountTitle.trim().length > 0 || accountNumber.trim().length > 0) && (
-                <View style={{ marginTop: 22 }}>
-                  <Text style={[styles.fieldLabel, { color: MUTED }]}>PREVIEW</Text>
-                  <View style={[styles.previewCard, { backgroundColor: BRAND }]}>
-                    <View style={styles.previewTopRow}>
-                      <View style={[styles.previewIconBox, { backgroundColor: BRAND_FG + '22' }]}>
-                        <BrandBadge badge={METHOD_META[selType].badge} color={BRAND_FG} bg="transparent" size={15} />
-                      </View>
-                      <Text style={[styles.previewTypeLabel, { color: BRAND_FG + 'AA' }]}>
-                        {METHOD_META[selType].sublabel.toUpperCase()}
-                      </Text>
-                    </View>
-
-                    <Text style={[styles.previewNum, { color: BRAND_FG }]}>
-                      {accountNumber.trim()
-                        ? maskNumber(accountNumber.trim(), selType)
-                        : selType === 'bank' ? 'PK·· ···· ···· ···· ···· ··' : '03··  ···  ····'}
-                    </Text>
-
-                    <View style={[styles.previewDivider, { backgroundColor: BRAND_FG + '22' }]} />
-
-                    <View style={styles.previewBottomRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.previewHolderLabel, { color: BRAND_FG + '66' }]}>ACCOUNT HOLDER</Text>
-                        <Text style={[styles.previewHolder, { color: BRAND_FG }]} numberOfLines={1}>
-                          {accountTitle.trim() || 'Your Full Name'}
-                        </Text>
-                        {selType === 'bank' && bankName ? (
-                          <Text style={[styles.previewBank, { color: BRAND_FG + '88' }]} numberOfLines={1}>{bankName}</Text>
-                        ) : null}
-                      </View>
-                      <View style={[styles.previewBadge, { backgroundColor: BRAND_FG + '22', borderColor: BRAND_FG + '33' }]}>
-                        <Text style={[styles.previewBadgeText, { color: BRAND_FG }]}>
-                          {METHOD_META[selType].label.toUpperCase()}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              )}
-
-              {/* Save */}
-              <TouchableOpacity
-                style={[styles.saveBtn, { backgroundColor: CTA, opacity: saving ? 0.6 : 1 }]}
-                onPress={handleAdd}
-                activeOpacity={0.85}
-                disabled={saving}
-              >
-                {saving
-                  ? <ActivityIndicator color={CTA_FG} />
-                  : <>
-                      <Ionicons name="checkmark-circle-outline" size={20} color={CTA_FG} />
-                      <Text style={[styles.saveBtnText, { color: CTA_FG }]}>Save Payment Method</Text>
-                    </>
-                }
-              </TouchableOpacity>
-
-              <View style={{ height: 28 }} />
+              <View style={{ height: 16 }} />
             </ScrollView>
+          </KeyboardAvoidingView>
+
+          {/* Save button — pinned at bottom */}
+          <View style={[styles.addPageFooter, { borderTopColor: BORDER, backgroundColor: BG }]}>
+            <TouchableOpacity
+              style={[styles.saveBtn, { backgroundColor: CTA, opacity: saving ? 0.6 : 1 }]}
+              onPress={handleAdd}
+              activeOpacity={0.85}
+              disabled={saving}
+            >
+              {saving
+                ? <ActivityIndicator color={CTA_FG} />
+                : <>
+                    <Ionicons name="checkmark-circle-outline" size={20} color={CTA_FG} />
+                    <Text style={[styles.saveBtnText, { color: CTA_FG }]}>Save Payment Method</Text>
+                  </>
+              }
+            </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
 
       {dialog && <Dialog visible {...dialog} onDismiss={() => setDialog(null)} />}
@@ -1126,6 +1131,17 @@ const styles = StyleSheet.create({
   brandingPowered:{ fontSize: 8, fontWeight: '700', letterSpacing: 2 },
   brandingName:   { fontSize: 13, fontWeight: '900', letterSpacing: -0.3 },
   brandingPvt:    { fontSize: 9, fontWeight: '500' },
+
+  /* ── Add Method full-page header/footer */
+  addPageHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  addPageFooter: {
+    padding: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
 
   /* ── Modal sheet */
   overlay:   { flex: 1, justifyContent: 'flex-end' },

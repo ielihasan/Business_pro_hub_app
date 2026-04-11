@@ -293,14 +293,12 @@ function _setupQueueSubscription(userId: string) {
       }
     )
     .subscribe((status, err) => {
-      if (status === 'CHANNEL_ERROR') {
-        console.warn('[Queue realtime] Channel error:', err?.message);
+      if (status === 'CHANNEL_ERROR' && err) {
+        // Only log real errors (err is undefined on normal connection close)
+        console.warn('[Queue realtime] Channel error:', (err as any)?.message ?? err);
       } else if (status === 'TIMED_OUT') {
-        // Reconnect on timeout
-        console.warn('[Queue realtime] Timed out — reconnecting…');
         _setupQueueSubscription(userId);
       } else if (status === 'CLOSED') {
-        // Channel closed unexpectedly; do a one-time resync to avoid stale data
         useStore.getState().syncQueuesFromSupabase();
       }
     });
@@ -737,7 +735,7 @@ export const useStore = create<AppState>()(
           businessId: data.business_id,
           businessName: data.business?.name ?? '',
           businessCategory: data.business?.category ?? '',
-          ticketNumber: ticketLabel(data.position),
+          ticketNumber: ticketLabel(data.position, data.joined_at),
           position: data.position,
           totalInQueue: data.business?.queue_length ?? data.position,
           estimatedWait: formatWait(data.estimated_wait_time),
@@ -838,7 +836,7 @@ export const useStore = create<AppState>()(
           businessId: r.business_id,
           businessName: r.business?.name ?? '',
           businessCategory: r.business?.category ?? '',
-          ticketNumber: ticketLabel(r.position),
+          ticketNumber: ticketLabel(r.position, r.joined_at),
           position: r.position,
           totalInQueue: r.business?.queue_length ?? r.position,
           estimatedWait: formatWait(r.estimated_wait_time),

@@ -28,7 +28,8 @@ interface ActiveQueueItemProps {
 export function ActiveQueueItem({ queue, onLeave }: ActiveQueueItemProps) {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const progressPercent = ((queue.totalInQueue - queue.position + 1) / queue.totalInQueue) * 100;
+  const total = queue.totalInQueue > 0 ? queue.totalInQueue : queue.position;
+  const progressPercent = total > 0 ? ((total - queue.position + 1) / total) * 100 : 100;
 
   return (
     <TouchableOpacity onPress={() => router.push(`/queue/${queue.id}`)}>

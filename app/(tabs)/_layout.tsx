@@ -26,9 +26,8 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets      = useSafeAreaInsets();
   const bottomInset = insets.bottom;
 
-  const unreadCount    = useStore((s) => s.unreadCount);
   const paymentMethods = useStore((s) => s.paymentMethods);
-  const totalBadge     = unreadCount + (paymentMethods.length === 0 ? 1 : 0);
+  const profileBadge   = paymentMethods.length === 0 ? 1 : 0;
 
   const BAR_BG     = isDark
     ? colors.background + 'f5'   // slight transparency
@@ -102,7 +101,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             );
           }
 
-          const showBadge = route.name === 'profile' && totalBadge > 0;
+          const showBadge = route.name === 'profile' && profileBadge > 0;
 
           return (
             <TouchableOpacity key={route.key} onPress={onPress} style={styles.tab} activeOpacity={0.65}>
@@ -116,7 +115,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 </Animated.View>
                 {showBadge && (
                   <View style={[styles.tabBadge, { backgroundColor: colors.destructive }]}>
-                    <Text style={styles.tabBadgeText}>{totalBadge > 9 ? '9+' : totalBadge}</Text>
+                    <Text style={styles.tabBadgeText}>1</Text>
                   </View>
                 )}
               </View>

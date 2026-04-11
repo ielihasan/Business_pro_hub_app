@@ -1,29 +1,37 @@
 import { ticketLabel, formatWait, isUuidFormat } from '@/lib/queue';
 
 describe('ticketLabel', () => {
-  it('pads single-digit positions to 3 digits', () => {
-    expect(ticketLabel(1)).toBe('Q-001');
-    expect(ticketLabel(9)).toBe('Q-009');
+  it('returns placeholder prefix when no joinedAt provided', () => {
+    expect(ticketLabel(1)).toBe('BHP-0000-0000-001');
+    expect(ticketLabel(9)).toBe('BHP-0000-0000-009');
   });
 
-  it('pads double-digit positions', () => {
-    expect(ticketLabel(42)).toBe('Q-042');
-    expect(ticketLabel(99)).toBe('Q-099');
+  it('pads position to 3 digits with no joinedAt', () => {
+    expect(ticketLabel(42)).toBe('BHP-0000-0000-042');
+    expect(ticketLabel(100)).toBe('BHP-0000-0000-100');
+    expect(ticketLabel(0)).toBe('BHP-0000-0000-000');
   });
 
-  it('does not pad 3-digit positions', () => {
-    expect(ticketLabel(100)).toBe('Q-100');
-    expect(ticketLabel(999)).toBe('Q-999');
+  it('encodes date and time components from joinedAt', () => {
+    // 2026-04-11T14:56:00.000Z — day=11, month=04, hour=14, min=56 (UTC)
+    const joined = '2026-04-11T14:56:00.000Z';
+    const label = ticketLabel(1, joined);
+    expect(label).toMatch(/^BHP-\d{4}-\d{4}-001$/);
   });
 
-  it('handles position 0', () => {
-    expect(ticketLabel(0)).toBe('Q-000');
-  });
-
-  it('always starts with Q-', () => {
+  it('always starts with BHP-', () => {
     [1, 10, 100, 500].forEach(n => {
-      expect(ticketLabel(n)).toMatch(/^Q-/);
+      expect(ticketLabel(n)).toMatch(/^BHP-/);
     });
+  });
+
+  it('always has three dash-separated segments after BHP', () => {
+    const label = ticketLabel(7, '2026-01-05T09:03:00.000Z');
+    const parts = label.split('-');
+    // BHP, DDMM, HHMM, NNN → 4 parts
+    expect(parts).toHaveLength(4);
+    expect(parts[0]).toBe('BHP');
+    expect(parts[3]).toBe('007');
   });
 });
 

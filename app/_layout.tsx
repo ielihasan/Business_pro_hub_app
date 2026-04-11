@@ -2,7 +2,7 @@ import '@/lib/suppressWarnings'; // MUST be first — patches console before nat
 import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme, View, ActivityIndicator } from 'react-native';
+import { useColorScheme, View, Text, Animated, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
 import { Colors } from '@/constants/theme';
@@ -14,6 +14,59 @@ import '@/lib/i18n';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
+
+function AppLoadingScreen({ colors }: { colors: typeof Colors.dark }) {
+  const pulse = new Animated.Value(1);
+  const dot1  = new Animated.Value(0.3);
+  const dot2  = new Animated.Value(0.3);
+  const dot3  = new Animated.Value(0.3);
+
+  Animated.loop(
+    Animated.sequence([
+      Animated.timing(pulse, { toValue: 1.08, duration: 800, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 1,    duration: 800, useNativeDriver: true }),
+    ])
+  ).start();
+
+  const animateDot = (dot: Animated.Value, delay: number) =>
+    Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(dot, { toValue: 1,   duration: 300, useNativeDriver: true }),
+        Animated.timing(dot, { toValue: 0.3, duration: 300, useNativeDriver: true }),
+        Animated.delay(600 - delay),
+      ])
+    ).start();
+
+  animateDot(dot1, 0);
+  animateDot(dot2, 200);
+  animateDot(dot3, 400);
+
+  return (
+    <View style={[ls.root, { backgroundColor: colors.background }]}>
+      <Animated.View style={[ls.logoBox, { backgroundColor: colors.brand, transform: [{ scale: pulse }] }]}>
+        <Text style={[ls.logoText, { color: colors.brandForeground }]}>BH</Text>
+      </Animated.View>
+      <Text style={[ls.title, { color: colors.foreground }]}>BusinessHub Pro</Text>
+      <Text style={[ls.sub, { color: colors.mutedForeground }]}>Smart Queue Management</Text>
+      <View style={ls.dots}>
+        {[dot1, dot2, dot3].map((d, i) => (
+          <Animated.View key={i} style={[ls.dot, { backgroundColor: colors.brand, opacity: d }]} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const ls = StyleSheet.create({
+  root:    { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
+  logoBox: { width: 96, height: 96, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  logoText:{ fontSize: 38, fontWeight: '900', letterSpacing: -1 },
+  title:   { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+  sub:     { fontSize: 13, fontWeight: '500', marginTop: -4 },
+  dots:    { flexDirection: 'row', gap: 8, marginTop: 32 },
+  dot:     { width: 8, height: 8, borderRadius: 4 },
+});
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -100,11 +153,7 @@ export default function RootLayout() {
 
   // Show loading indicator while initializing auth for the first time
   if (!appReady) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.foreground} />
-      </View>
-    );
+    return <AppLoadingScreen colors={colors} />;
   }
 
   return (

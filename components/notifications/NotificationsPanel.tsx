@@ -29,14 +29,6 @@ const TYPE_ICONS: Record<Notification['type'], string> = {
   promo:        'megaphone-outline',
 };
 
-// Accent color per notification type
-const TYPE_COLORS: Record<Notification['type'], { icon: string; bg: string }> = {
-  queue_update: { icon: '#3B82F6', bg: '#3B82F618' }, // blue
-  order_ready:  { icon: '#22C55E', bg: '#22C55E18' }, // green
-  loyalty:      { icon: '#F59E0B', bg: '#F59E0B18' }, // amber
-  promo:        { icon: '#A855F7', bg: '#A855F718' }, // purple
-};
-
 function formatRelativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins  = Math.floor(diff / 60000);
@@ -60,7 +52,6 @@ function NotificationItem({
   onDelete: (id: string) => void;
 }) {
   const { colors } = useTheme();
-  const typeColor = TYPE_COLORS[item.type];
 
   return (
     <TouchableOpacity
@@ -74,14 +65,14 @@ function NotificationItem({
       activeOpacity={0.7}
       onPress={() => onPress(item.id)}
     >
-      {/* Unread dot — colored to match the type */}
+      {/* Unread dot */}
       {!item.read && (
-        <View style={[styles.unreadDot, { backgroundColor: typeColor.icon }]} />
+        <View style={[styles.unreadDot, { backgroundColor: colors.brand }]} />
       )}
 
-      {/* Icon — colored background + icon per type */}
-      <View style={[styles.notifIcon, { backgroundColor: typeColor.bg }]}>
-        <Ionicons name={TYPE_ICONS[item.type] as any} size={22} color={typeColor.icon} />
+      {/* Icon */}
+      <View style={[styles.notifIcon, { backgroundColor: colors.brand + '20' }]}>
+        <Ionicons name={TYPE_ICONS[item.type] as any} size={22} color={colors.brand} />
       </View>
 
       {/* Content */}
@@ -213,7 +204,7 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
           <View style={styles.headerLeft}>
             <Text style={[styles.headerTitle, { color: colors.foreground }]}>Notifications</Text>
             {(unreadCount + (needsPaymentSetup ? 1 : 0)) > 0 && (
-              <View style={[styles.headerBadge, { backgroundColor: colors.destructive }]}>
+              <View style={[styles.headerBadge, { backgroundColor: colors.brand }]}>
                 <Text style={[styles.headerBadgeText, { color: '#fff' }]}>
                   {(unreadCount + (needsPaymentSetup ? 1 : 0)) > 99 ? '99+' : (unreadCount + (needsPaymentSetup ? 1 : 0))}
                 </Text>
@@ -224,22 +215,20 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
           <View style={styles.headerActions}>
             {unreadCount > 0 && (
               <TouchableOpacity
-                style={[styles.markAllBtn, { backgroundColor: colors.secondary }]}
+                style={[styles.iconBtn, { backgroundColor: colors.secondary }]}
                 onPress={markAllNotificationsRead}
                 activeOpacity={0.7}
               >
-                <Ionicons name="checkmark-done-outline" size={16} color={colors.foreground} />
-                <Text style={[styles.markAllText, { color: colors.foreground }]}>Mark all read</Text>
+                <Ionicons name="checkmark-done-outline" size={18} color={colors.brand} />
               </TouchableOpacity>
             )}
             {notifications.length > 0 && (
               <TouchableOpacity
-                style={[styles.markAllBtn, { backgroundColor: colors.secondary }]}
+                style={[styles.iconBtn, { backgroundColor: colors.secondary }]}
                 onPress={clearAllNotifications}
                 activeOpacity={0.7}
               >
-                <Ionicons name="trash-outline" size={16} color={colors.destructive} />
-                <Text style={[styles.markAllText, { color: colors.destructive }]}>Clear all</Text>
+                <Ionicons name="trash-outline" size={18} color={colors.destructive} />
               </TouchableOpacity>
             )}
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
@@ -260,11 +249,10 @@ export function NotificationsPanel({ visible, onClose }: NotificationsPanelProps
                 loyalty: 'Rewards',
                 promo: 'Promos',
               };
-              const pillColor = TYPE_COLORS[type];
               return (
-                <View key={type} style={[styles.summaryPill, { backgroundColor: pillColor.bg }]}>
-                  <Ionicons name={TYPE_ICONS[type] as any} size={12} color={pillColor.icon} />
-                  <Text style={[styles.summaryPillText, { color: pillColor.icon }]}>
+                <View key={type} style={[styles.summaryPill, { backgroundColor: colors.brand + '20' }]}>
+                  <Ionicons name={TYPE_ICONS[type] as any} size={12} color={colors.brand} />
+                  <Text style={[styles.summaryPillText, { color: colors.brand }]}>
                     {labels[type]} {count}
                   </Text>
                 </View>
@@ -313,15 +301,10 @@ const styles = StyleSheet.create({
   headerBadgeText: { fontSize: 12, fontWeight: '700' },
 
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing[2] },
-  markAllBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: Spacing[3],
-    paddingVertical: Spacing[2],
-    borderRadius: BorderRadius.DEFAULT,
+  iconBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
   },
-  markAllText: { fontSize: Typography.fontSize.xs, fontWeight: '600' },
   closeBtn: { padding: Spacing[1] },
 
   summaryBar: {

@@ -42,7 +42,9 @@ export interface QueueEntryRecord {
   quantity?: number;
   unit_price?: number;
   total_price?: number;
-  total_amount?: number;
+  advance_paid?: number;
+  payment_left?: number;
+  ticket_no?: string;
   position: number;
   status: 'waiting' | 'in_progress' | 'completed' | 'cancelled';
   priority?: string;
@@ -60,9 +62,20 @@ export interface QueueEntryRecord {
   business?: BusinessDetail;
 }
 
-/** Generates a ticket-style label from position, e.g. Q-003 */
-export function ticketLabel(position: number): string {
-  return `Q-${String(position).padStart(3, '0')}`;
+/**
+ * Generates a rich ticket ID from position + optional join timestamp.
+ * With timestamp: BHP-DDMM-HHMM-NNN  e.g. BHP-1104-1456-001
+ * Without:        BHP-0000-0000-NNN   (fallback)
+ */
+export function ticketLabel(position: number, joinedAt?: string): string {
+  const pos = String(position).padStart(3, '0');
+  if (!joinedAt) return `BHP-0000-0000-${pos}`;
+  const d = new Date(joinedAt);
+  const dd   = String(d.getDate()).padStart(2, '0');
+  const mm   = String(d.getMonth() + 1).padStart(2, '0');
+  const hh   = String(d.getHours()).padStart(2, '0');
+  const min  = String(d.getMinutes()).padStart(2, '0');
+  return `BHP-${dd}${mm}-${hh}${min}-${pos}`;
 }
 
 /** Formats integer minutes as a human string, e.g. "~10 min" */
@@ -222,6 +235,23 @@ export async function fetchServiceById(
   return { data: data as ServiceRecord, error: null };
 }
 
+/**
+ * Fetch all active services for a business from the `services` table.
+ */
+export async function fetchServicesByBusiness(
+  businessId: string
+): Promise<{ data: ServiceRecord[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from('services')
+    .select('id, business_id, name, description, price, estimated_duration, is_active')
+    .eq('business_id', businessId)
+    .eq('is_active', true)
+    .order('name', { ascending: true });
+
+  if (error) return { data: [], error: error.message };
+  return { data: (data ?? []) as ServiceRecord[], error: null };
+}
+
 // ─── Queue ────────────────────────────────────────────────────────────────────
 
 /**
@@ -342,7 +372,6 @@ export async function joinBusinessQueue(
       (entry as any).quantity = quantity;
       (entry as any).unit_price = unitPrice;
       (entry as any).total_price = totalAmount;
-      (entry as any).total_amount = totalAmount;
     }
   }
 
@@ -377,7 +406,8 @@ export async function fetchQueueEntry(
     .from('queues')
     .select(
       `id, business_id, customer_id, customer_name, customer_phone, customer_email,
-       service_type, position, status, priority, notes,
+       service_type, quantity, unit_price, total_price, advance_paid, payment_left, ticket_no,
+       position, status, priority, notes,
        estimated_wait_time, joined_at, called_at, started_at, completed_at, cancelled_at,
        created_at, updated_at`
     )
@@ -433,10 +463,11 @@ export async function fetchUserActiveQueues(
     .from('queues')
     .select(
       `id, business_id, customer_id, customer_name, position, status,
+       service_type, quantity, unit_price, total_price, advance_paid, payment_left, ticket_no,
        estimated_wait_time, joined_at`
     )
     .eq('customer_id', userId)
-    .in('status', ['waiting', 'in_progress'])
+    .in('status', ['waiting', 'called', 'in_progress'])
     .order('joined_at', { ascending: false });
 
   if (error) return { data: [], error: error.message };
@@ -505,7 +536,7 @@ export async function fetchUserQueueHistory(
     .from('queues')
     .select(
       `id, business_id, customer_id, customer_name, customer_phone, customer_email,
-       service_type, quantity, unit_price, total_price,
+       service_type, quantity, unit_price, total_price, advance_paid, payment_left, ticket_no,
        position, status, notes, estimated_wait_time,
        joined_at, called_at, started_at, completed_at, cancelled_at, created_at`
     )

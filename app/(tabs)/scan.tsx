@@ -10,6 +10,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { CameraPermissionView, ScannerOverlay } from '@/components/scan';
 import { resolveBusinessById, fetchServiceById } from '@/lib/queue';
+import { COMMITMENT_RATE } from '@/lib/wallet';
 import { useStore } from '@/store/useStore';
 
 // ---------------------------------------------------------------------------
@@ -653,24 +654,45 @@ export default function ScanScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={[styles.priceSummary, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-              <View style={styles.priceRow}>
-                <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>Unit Price</Text>
-                <Text style={[styles.priceValue, { color: colors.foreground }]}>
-                  Rs. {(pendingJoin?.unitPrice ?? 0).toLocaleString()}
-                </Text>
-              </View>
-              <View style={styles.priceRow}>
-                <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>Quantity</Text>
-                <Text style={[styles.priceValue, { color: colors.foreground }]}>{quantity}</Text>
-              </View>
-              <View style={[styles.priceRow, styles.priceRowTotal]}>
-                <Text style={[styles.totalLabel, { color: colors.primary }]}>Total Amount</Text>
-                <Text style={[styles.totalValue, { color: colors.primary }]}>
-                  Rs. {((pendingJoin?.unitPrice ?? 0) * quantity).toLocaleString()}
-                </Text>
-              </View>
-            </View>
+            {(() => {
+              const unitPrice   = pendingJoin?.unitPrice ?? 0;
+              const total       = unitPrice * quantity;
+              const advance     = Math.ceil(total * COMMITMENT_RATE);
+              const advancePct  = Math.round(COMMITMENT_RATE * 100);
+              return (
+                <View style={[styles.priceSummary, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={styles.priceRow}>
+                    <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>Unit Price</Text>
+                    <Text style={[styles.priceValue, { color: colors.foreground }]}>
+                      Rs. {unitPrice.toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={styles.priceRow}>
+                    <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>Quantity</Text>
+                    <Text style={[styles.priceValue, { color: colors.foreground }]}>{quantity}</Text>
+                  </View>
+                  <View style={[styles.priceRow, styles.priceRowTotal]}>
+                    <Text style={[styles.totalLabel, { color: colors.primary }]}>Total Amount</Text>
+                    <Text style={[styles.totalValue, { color: colors.primary }]}>
+                      Rs. {total.toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={[styles.priceRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, marginTop: 6, paddingTop: 8 }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>
+                        Advance Deducted ({advancePct}%)
+                      </Text>
+                      <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1 }}>
+                        Refunded on arrival
+                      </Text>
+                    </View>
+                    <Text style={[styles.priceValue, { color: colors.destructive, fontWeight: '700' }]}>
+                      − Rs. {advance.toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })()}
 
             <View style={styles.modalButtons}>
               <TouchableOpacity

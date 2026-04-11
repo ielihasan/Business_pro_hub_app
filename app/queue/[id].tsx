@@ -24,6 +24,7 @@ import {
   formatWait,
 } from '@/lib/queue';
 import { useStore } from '@/store/useStore';
+import { COMMITMENT_RATE } from '@/lib/wallet';
 
 /** Compute a "Ready ~H:MM AM/PM" string from minutes-to-wait */
 function readyAtTime(waitMinutes: number | null | undefined): string | null {
@@ -115,15 +116,21 @@ export default function QueueDetailScreen() {
 
   const handleLeaveQueue = () => {
     if (!queue) return;
+    const advancePaid = queue.advance_paid
+      ?? (queue.total_price && queue.total_price > 0 ? Math.ceil(queue.total_price * 0.20) : 0);
+    const hasAdvance = advancePaid > 0;
+
     setDialog({
-      title: 'Leave Queue',
-      message: 'Are you sure you want to leave this queue? You will lose your position.',
-      icon: 'exit-outline',
+      title: 'Leave Queue?',
+      message: hasAdvance
+        ? `You will lose your position and your Rs ${advancePaid.toLocaleString('en-PK')} advance payment will not be refunded.\n\nThis action cannot be undone.`
+        : 'You will lose your current position in the queue.\n\nThis action cannot be undone.',
+      icon: hasAdvance ? 'wallet-outline' : 'exit-outline',
       iconVariant: 'destructive',
       actions: [
-        { label: 'Cancel', onPress: () => setDialog(null) },
+        { label: 'Stay in Queue', variant: 'secondary', onPress: () => setDialog(null) },
         {
-          label: 'Leave Queue',
+          label: 'Leave Anyway',
           variant: 'destructive',
           onPress: async () => {
             setDialog(null);
@@ -216,7 +223,7 @@ export default function QueueDetailScreen() {
 
           {/* Big ticket number */}
           <Text style={[styles.ticketNum, { color: colors.foreground }]}>
-            {ticketLabel(queue.position)}
+            {queue.ticket_no ?? ticketLabel(queue.position, queue.joined_at)}
           </Text>
           <Text style={[styles.ticketSub, { color: colors.mutedForeground }]}>
             YOUR TICKET NUMBER
@@ -291,31 +298,92 @@ export default function QueueDetailScreen() {
             <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
           </TouchableOpacity>
 
-          {/* Service & price strip if available */}
-          {(serviceName || queue.total_price) && (
-            <View style={[styles.serviceStrip, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              {serviceName && (
-                <View style={styles.serviceItem}>
-                  <Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>SERVICE</Text>
-                  <Text style={[styles.serviceValue, { color: colors.foreground }]} numberOfLines={2}>{serviceName}</Text>
+          {/* Payment breakdown */}
+          {(serviceName || queue.total_price || queue.quantity) && (() => {
+            const total      = queue.total_price ?? 0;
+            const advance    = queue.advance_paid  ?? (total > 0 ? Math.ceil(total * COMMITMENT_RATE) : 0);
+            const left       = queue.payment_left  ?? Math.max(0, total - advance);
+            const advancePct = Math.round(COMMITMENT_RATE * 100);
+            return (
+              <View style={[styles.payCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {/* Service + Quantity row */}
+                {(serviceName || queue.quantity != null) && (
+                  <View style={[styles.payRow, { borderBottomColor: colors.border }]}>
+                    {serviceName && (
+                      <View style={styles.payCell}>
+                        <Text style={[styles.payLabel, { color: colors.mutedForeground }]}>SERVICE</Text>
+                        <Text style={[styles.payValue, { color: colors.foreground }]} numberOfLines={1}>
+                          {serviceName}
+                        </Text>
+                      </View>
+                    )}
+                    {queue.quantity != null && (
+                      <View style={[styles.payCell, { alignItems: 'flex-end' }]}>
+                        <Text style={[styles.payLabel, { color: colors.mutedForeground }]}>QUANTITY</Text>
+                        <Text style={[styles.payValue, { color: colors.foreground }]}>
+                          ×{queue.quantity}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {/* Unit price + Total row */}
+                {total > 0 && (
+                  <View style={[styles.payRow, { borderBottomColor: colors.border }]}>
+                    {queue.unit_price != null && (
+                      <View style={styles.payCell}>
+                        <Text style={[styles.payLabel, { color: colors.mutedForeground }]}>UNIT PRICE</Text>
+                        <Text style={[styles.payValue, { color: colors.foreground }]}>
+                          Rs {queue.unit_price.toLocaleString('en-PK')}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={[styles.payCell, { alignItems: 'flex-end' }]}>
+                      <Text style={[styles.payLabel, { color: colors.mutedForeground }]}>TOTAL</Text>
+                      <Text style={[styles.payValue, { color: colors.foreground }]}>
+                        Rs {total.toLocaleString('en-PK')}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Advance paid */}
+                <View style={[styles.payRow, { borderBottomColor: colors.border }]}>
+                  <View style={styles.payCell}>
+                    <Text style={[styles.payLabel, { color: colors.mutedForeground }]}>
+                      ADVANCE PAID ({advancePct}%)
+                    </Text>
+                    <Text style={[styles.payHint, { color: colors.mutedForeground }]}>
+                      {advance > 0 ? 'Deducted from wallet' : 'No advance required'}
+                    </Text>
+                  </View>
+                  <View style={[styles.payCell, { alignItems: 'flex-end' }]}>
+                    <Text style={[styles.payValue, { color: advance > 0 ? colors.destructive : colors.mutedForeground }]}>
+                      {advance > 0 ? `− Rs ${advance.toLocaleString('en-PK')}` : 'Rs 0'}
+                    </Text>
+                  </View>
                 </View>
-              )}
-              {queue.quantity != null && (
-                <View style={styles.serviceItem}>
-                  <Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>QTY</Text>
-                  <Text style={[styles.serviceValue, { color: colors.foreground }]}>×{queue.quantity}</Text>
+
+                {/* Payment left */}
+                <View style={[styles.payRow, styles.payRowLast]}>
+                  <View style={styles.payCell}>
+                    <Text style={[styles.payLabel, { color: colors.mutedForeground }]}>
+                      PAYMENT LEFT
+                    </Text>
+                    <Text style={[styles.payHint, { color: colors.mutedForeground }]}>
+                      {left > 0 ? 'Pay at the counter' : 'Nothing due'}
+                    </Text>
+                  </View>
+                  <View style={[styles.payCell, { alignItems: 'flex-end' }]}>
+                    <Text style={[styles.payValueLarge, { color: colors.foreground }]}>
+                      Rs {left.toLocaleString('en-PK')}
+                    </Text>
+                  </View>
                 </View>
-              )}
-              {queue.total_price != null && (
-                <View style={styles.serviceItem}>
-                  <Text style={[styles.serviceLabel, { color: colors.mutedForeground }]}>TOTAL</Text>
-                  <Text style={[styles.serviceValue, { color: colors.foreground }]}>
-                    Rs {queue.total_price.toFixed(2)}
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
+              </View>
+            );
+          })()}
         </View>
 
         {/* ── Timeline ── */}
@@ -432,7 +500,7 @@ const styles = StyleSheet.create({
   },
   statusDot:      { width: 7, height: 7, borderRadius: 4 },
   statusPillText: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
-  ticketNum:      { fontSize: 80, fontWeight: '900', letterSpacing: -4, lineHeight: 84, marginBottom: 6 },
+  ticketNum:      { fontSize: 32, fontWeight: '900', letterSpacing: 1, lineHeight: 40, marginBottom: 6 },
   ticketSub:      { fontSize: 11, fontWeight: '700', letterSpacing: 2.5 },
 
   /* ── Stats row ── */
@@ -474,16 +542,21 @@ const styles = StyleSheet.create({
   bizName:     { fontSize: 15, fontWeight: '800', marginBottom: 3 },
   bizMeta:     { fontSize: 12, lineHeight: 16 },
 
-  /* ── Service strip ── */
-  serviceStrip: {
-    flexDirection: 'row', borderWidth: 1, borderRadius: 12,
-    marginTop: 12, overflow: 'hidden',
+  /* ── Payment card ── */
+  payCard: {
+    borderWidth: 1, borderRadius: 14, marginTop: 12, overflow: 'hidden',
   },
-  serviceItem: {
-    flex: 1, alignItems: 'center', paddingVertical: 12, paddingHorizontal: 8,
+  payRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  serviceLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, marginBottom: 4 },
-  serviceValue: { fontSize: 14, fontWeight: '800' },
+  payRowLast: { borderBottomWidth: 0 },
+  payCell:    { flex: 1 },
+  payLabel:   { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, marginBottom: 2 },
+  payHint:    { fontSize: 10, fontWeight: '400' },
+  payValue:   { fontSize: 14, fontWeight: '800' },
+  payValueLarge: { fontSize: 16, fontWeight: '900' },
 
   /* ── Timeline ── */
   timeline:     { gap: 0 },

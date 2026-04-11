@@ -64,7 +64,7 @@ export default function OrdersScreen() {
   const totalSpent = useMemo(() =>
     orders
       .filter(o => o.status === 'completed')
-      .reduce((sum, o) => sum + (o.total_price ?? o.total_amount ?? 0), 0),
+      .reduce((sum, o) => sum + (o.total_price ?? 0), 0),
     [orders]
   );
   const completedCount = orders.filter(o => o.status === 'completed').length;

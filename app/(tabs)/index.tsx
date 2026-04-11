@@ -38,8 +38,7 @@ export default function HomeScreen() {
   const user                = useStore((s) => s.user);
   const activeQueues        = useStore((s) => s.activeQueues);
   const unreadCount         = useStore((s) => s.unreadCount);
-  const paymentMethods      = useStore((s) => s.paymentMethods);
-  const totalBadge          = unreadCount + (paymentMethods.length === 0 ? 1 : 0);
+  const totalBadge          = unreadCount;
 
   const [refreshing,                setRefreshing]                = useState(false);
   const [selectedCategory,          setSelectedCategory]          = useState('all');
@@ -53,7 +52,7 @@ export default function HomeScreen() {
 
   const activeQueue            = activeQueues[0] ?? null;
   const syncQueuesFromSupabase = useStore((s) => s.syncQueuesFromSupabase);
-  const walletBalance          = user?.walletBalance ?? null;
+
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -135,13 +134,6 @@ export default function HomeScreen() {
           </Text>
           <View style={styles.greetRow}>
             <Text style={[styles.greetTag, { color: MUTED }]}>Your queue status at a glance.</Text>
-            {walletBalance !== null && paymentMethods.length > 0 && (
-              <View style={[styles.balancePill, { backgroundColor: CARD, borderColor: BORDER }]}>
-                <Text style={[styles.balanceText, { color: FG }]}>
-                  Rs {walletBalance.toLocaleString()}
-                </Text>
-              </View>
-            )}
           </View>
         </View>
 
@@ -243,11 +235,6 @@ const styles = StyleSheet.create({
   greetName: { fontSize: 44, fontWeight: '900', letterSpacing: -1.5, lineHeight: 46, marginBottom: 8 },
   greetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   greetTag:  { fontSize: 14, lineHeight: 20, flex: 1 },
-  balancePill: {
-    borderWidth: 1, borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 5,
-  },
-  balanceText: { fontSize: 12, fontWeight: '800' },
 
   /* ── No-queue card ── */
   noQueueCard: {
