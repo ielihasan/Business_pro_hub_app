@@ -7,7 +7,7 @@ import { Spacing, Typography, BorderRadius } from '@/constants/theme';
 
 const APP_VERSION   = '1.0.0';
 const BUILD_NUMBER  = '2026.03.31';
-const CONTACT_EMAIL = 'support@businesshubpro.app';
+const CONTACT_EMAIL = 'support@businessprohub.me';
 
 const FEATURES = [
   { icon: 'people-outline',           label: 'Virtual Queue Management',   desc: 'Join & track queues remotely — no physical waiting' },
@@ -37,9 +37,9 @@ const TECH_STACK = [
 ];
 
 const LINKS = [
-  { icon: 'mail-outline',      label: 'Support',          value: CONTACT_EMAIL,                              url: `mailto:${CONTACT_EMAIL}` },
-  { icon: 'globe-outline',     label: 'Website',          value: 'businesshubpro.app',                       url: 'https://businesshubpro.app' },
-  { icon: 'logo-github',       label: 'GitHub',           value: 'github.com/meeru456',                      url: 'https://github.com/meeru456' },
+  { icon: 'mail-outline',  label: 'Support Email',    value: CONTACT_EMAIL,                         url: `mailto:${CONTACT_EMAIL}` },
+  { icon: 'globe-outline', label: 'App Website',      value: 'businessprohub.me',                   url: 'https://www.businessprohub.me/' },
+  { icon: 'globe-outline', label: 'Developer',        value: 'elixasoftware.tech',                  url: 'https://www.elixasoftware.tech/' },
 ];
 
 const CHANGELOG = [
@@ -180,14 +180,14 @@ export default function AboutScreen() {
         {/* ── Legal ── */}
         {sectionTitle('LEGAL')}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <TouchableOpacity style={styles.linkRow} onPress={() => router.push('/profile/terms')} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://www.businessprohub.me/legal?tab=terms').catch(() => {})} activeOpacity={0.7}>
             <View style={[styles.linkIcon, { backgroundColor: colors.secondary }]}>
               <Ionicons name="document-text-outline" size={20} color={colors.foreground} />
             </View>
             <Text style={[styles.featureLabel, { color: colors.foreground, flex: 1 }]}>
               Terms of Service & Privacy Policy
             </Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
+            <Ionicons name="open-outline" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.legalTextRow}>
@@ -206,6 +206,11 @@ export default function AboutScreen() {
           <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
             © 2026 BusinessHub Pro. All rights reserved.
           </Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://www.elixasoftware.tech/').catch(() => {})} activeOpacity={0.7}>
+            <Text style={[styles.footerSub, { color: colors.brand }]}>
+              Developed by Elixa Software Pvt Ltd.
+            </Text>
+          </TouchableOpacity>
           <Text style={[styles.footerSub, { color: colors.mutedForeground }]}>
             Built with React Native & Expo
           </Text>

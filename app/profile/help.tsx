@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { Spacing, Typography, BorderRadius } from '@/constants/theme';
 
-const CONTACT_EMAIL = 'support@businesshubpro.app';
+const CONTACT_EMAIL = 'support@businessprohub.me';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -457,7 +457,7 @@ export default function HelpCenterScreen() {
           {/* Terms & Privacy */}
           <TouchableOpacity
             style={styles.contactRow}
-            onPress={() => router.push('/profile/terms')}
+            onPress={() => Linking.openURL('https://www.businessprohub.me/legal?tab=terms').catch(() => {})}
             activeOpacity={0.7}
           >
             <View style={[styles.contactIcon, { backgroundColor: colors.secondary }]}>
@@ -469,7 +469,7 @@ export default function HelpCenterScreen() {
                 Read our terms of service and privacy policy
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
+            <Ionicons name="open-outline" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
 

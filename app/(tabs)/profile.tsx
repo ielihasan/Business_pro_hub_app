@@ -77,8 +77,8 @@ export default function ProfileScreen() {
     {
       title: t('profile.sections.support'),
       items: [
-        { id: 'help',     icon: 'help-circle-outline', label: t('profile.menu.help'),     subtitle: 'FAQs & support',      type: 'link' },
-        { id: 'feedback', icon: 'chatbubble-outline',  label: t('profile.menu.feedback'), subtitle: 'Share your thoughts', type: 'link' },
+        { id: 'help-support', icon: 'help-circle-outline',        label: 'Help & Support', subtitle: 'FAQs, feedback & contact', type: 'link' },
+        { id: 'about',        icon: 'information-circle-outline', label: 'About',          subtitle: 'App info & version',       type: 'link' },
       ],
     },
   ];
@@ -88,8 +88,8 @@ export default function ProfileScreen() {
       case 'settings':     router.push('/profile/settings'); break;
       case 'saved':        router.push('/profile/saved');    break;
       case 'payment':      router.push('/profile/payment');  break;
-      case 'feedback':     router.push('/profile/feedback'); break;
-      case 'help':         router.push('/profile/help');     break;
+      case 'help-support': router.push('/profile/support');    break;
+      case 'about':        router.push('/profile/about-menu'); break;
       case 'loyalty':
         setDialog({
           title: loyaltyBadge,

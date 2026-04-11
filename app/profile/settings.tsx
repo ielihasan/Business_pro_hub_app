@@ -32,8 +32,6 @@ export default function SettingsScreen() {
     { icon: 'notifications-outline',      label: 'Notifications',                         route: '/profile/notifications'},
     { icon: 'shield-checkmark-outline',   label: 'Privacy & Location',                    route: '/profile/privacy'      },
     { icon: 'person-circle-outline',      label: 'Account & Security',                    route: '/profile/account'      },
-    { icon: 'help-circle-outline',        label: 'Help & Support',                        route: '/profile/support'      },
-    { icon: 'information-circle-outline', label: 'About',                                 route: '/profile/about-menu'   },
   ] as const;
 
   return (

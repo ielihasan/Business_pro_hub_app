@@ -5,10 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 
 const ITEMS = [
-  { icon: 'help-circle-outline',         label: 'Help Center',     sub: 'Browse FAQs and guides',             route: '/profile/help'     },
+  { icon: 'help-circle-outline',         label: 'Help Center',     sub: 'Browse FAQs and guides',             url: 'https://www.businessprohub.me/support#help-center' },
   { icon: 'chatbubble-ellipses-outline', label: 'Send Feedback',   sub: 'Rate your experience',               route: '/profile/feedback' },
-  { icon: 'mail-outline',                label: 'Contact Support', sub: 'Email our support team',             mailto: 'support@businesshubpro.app?subject=Support' },
-  { icon: 'bug-outline',                 label: 'Report a Bug',    sub: 'Found an issue? Let us know',        mailto: 'support@businesshubpro.app?subject=Bug%20Report&body=Describe%20the%20issue...' },
+  { icon: 'mail-outline',                label: 'Contact Support', sub: 'Email our support team',             url: 'https://www.businessprohub.me/support#contact' },
+  { icon: 'bug-outline',                 label: 'Report a Bug',    sub: 'Found an issue? Let us know',        mailto: 'support@businessprohub.me?subject=Bug%20Report&body=Describe%20the%20issue...' },
   { icon: 'star-outline',                label: 'Rate the App',    sub: 'Leave a review on the store',        store: true },
 ] as const;
 
@@ -23,6 +23,7 @@ export default function SupportScreen() {
 
   const handlePress = (item: typeof ITEMS[number]) => {
     if ('route' in item && item.route) { router.push(item.route as any); return; }
+    if ('url' in item && item.url) { Linking.openURL(item.url).catch(() => {}); return; }
     if ('mailto' in item && item.mailto) { Linking.openURL(`mailto:${item.mailto}`).catch(() => {}); return; }
     if ('store' in item && item.store) {
       const url = Platform.OS === 'android'
