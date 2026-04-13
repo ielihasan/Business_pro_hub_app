@@ -12,6 +12,10 @@ export type BusinessRecord = {
   rating?: number | null;
   is_open?: boolean | null;
   address?: string | null;
+  address_line?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
   phone?: string | null;
   description?: string | null;
 };
@@ -85,6 +89,10 @@ export async function fetchBusinesses(opts: {
         wait_time:    b.wait_time    ?? b.waitTime       ?? null,
         rating:       b.rating       ?? null,
         address:      b.address      ?? b.business_address ?? null,
+        address_line: b.address_line ?? null,
+        city:         b.city         ?? null,
+        state:        b.state        ?? null,
+        country:      b.country      ?? null,
         phone:        b.phone        ?? b.business_phone   ?? null,
         description:  b.description  ?? b.business_description ?? null,
         distanceKm: (hasLocation && lat !== null && lon !== null)
@@ -106,6 +114,10 @@ export async function fetchBusinesses(opts: {
       wait_time:    null,
       rating:       null,
       address:      a.business_address     ?? null,
+      address_line: a.address_line         ?? null,
+      city:         a.city                 ?? null,
+      state:        a.state                ?? null,
+      country:      a.country              ?? null,
       phone:        a.business_phone       ?? null,
       description:  a.business_description ?? null,
       distanceKm:   null,
@@ -126,6 +138,10 @@ export async function fetchBusinesses(opts: {
       wait_time:    null,
       rating:       null,
       address:      a.business_address     ?? null,
+      address_line: a.address_line         ?? null,
+      city:         a.city                 ?? null,
+      state:        a.state                ?? null,
+      country:      a.country              ?? null,
       phone:        a.business_phone       ?? null,
       description:  a.business_description ?? null,
       distanceKm:   null, // no coordinates available
@@ -153,6 +169,8 @@ export async function fetchBusinesses(opts: {
     filtered = filtered.filter((b) =>
       b.name.toLowerCase().includes(q) ||
       (b.category ?? '').toLowerCase().includes(q) ||
+      (b.city ?? '').toLowerCase().includes(q) ||
+      (b.state ?? '').toLowerCase().includes(q) ||
       (b.address ?? '').toLowerCase().includes(q)
     );
   }
