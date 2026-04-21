@@ -22,4 +22,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     // stored between two app contexts which is unreliable on Android.
     flowType: 'implicit',
   },
+  global: {
+    // Disable built-in retries — stale-token failures shouldn't spam the console
+    fetch: (url, options) => fetch(url, options),
+  },
 });

@@ -1235,9 +1235,12 @@ export const setupAuthListener = () => {
         _setupQueueSubscription(session.user.id);
         useStore.getState().loadFavorites();
       }
-    } else if (event === 'SIGNED_OUT') {
+    } else if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESH_FAILED') {
       _teardownQueueSubscription();
       useStore.setState({ isAuthenticated: false, user: null, session: null, activeQueues: [], queueHistory: [], orders: [], notifications: [], unreadCount: 0, favoriteBusinesses: [] });
+      if (event === 'TOKEN_REFRESH_FAILED') {
+        supabase.auth.signOut();
+      }
     } else if (event === 'TOKEN_REFRESHED' && session) {
       useStore.setState({ session });
     }

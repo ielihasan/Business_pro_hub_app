@@ -336,7 +336,12 @@ export async function logoutUser(): Promise<AuthResponse> {
  */
 export async function getCurrentSession(): Promise<Session | null> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      // Stale/invalid token — wipe it so autoRefreshToken stops retrying
+      await supabase.auth.signOut();
+      return null;
+    }
     return session;
   } catch (error) {
     console.error('Get session error:', error);
