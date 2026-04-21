@@ -10,6 +10,12 @@ const PATTERNS = [
   'not fully supported in Expo Go',
   'removed from Expo Go',
   'development build',
+  // Transient network failures on startup (no internet / Supabase unreachable)
+  'Network request failed',
+  'syncQueues active error',
+  'syncQueues history error',
+  'Get profile error',
+  'users table sync on auth init failed',
 ];
 
 const matches = (msg: unknown) =>

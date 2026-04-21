@@ -57,8 +57,8 @@ export async function syncAuthUserToUsersTable(
     }
 
     return { success: true };
-  } catch (error) {
-    console.error('syncAuthUserToUsersTable error:', error);
+  } catch (error: any) {
+    console.warn('syncAuthUserToUsersTable error:', error?.message ?? error);
     return { success: false, error: 'Could not sync user profile.' };
   }
 }
@@ -374,13 +374,13 @@ export async function getUserProfile(userId: string) {
       .maybeSingle();
 
     if (error) {
-      console.error('Get profile error:', error);
+      console.warn('Get profile error:', error.message);
       return null;
     }
 
     return data;
-  } catch (error) {
-    console.error('Get profile error:', error);
+  } catch (error: any) {
+    console.warn('Get profile error:', error?.message ?? error);
     return null;
   }
 }
