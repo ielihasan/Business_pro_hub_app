@@ -71,10 +71,17 @@ export default function AuthCallbackScreen() {
           return;
         }
 
-        // Email verification links (signup or magiclink) should land user in app,
-        // not back on register screen.
         const callbackType = (params.type as string | undefined) || '';
-        if (callbackType === 'signup' || callbackType === 'magiclink') {
+
+        if (callbackType === 'signup') {
+          // Email verified — sign out so the user must log in manually before entering the app.
+          await supabase.auth.signOut();
+          router.replace('/(auth)/login');
+          return;
+        }
+
+        if (callbackType === 'magiclink') {
+          // Magic link is itself a login method — land in app directly.
           oauthState.oauthSource = null;
           await initializeAuth();
           router.replace('/(tabs)');
