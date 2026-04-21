@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { oauthState } from '@/lib/oauthState';
 import {
   loginUser,
   registerUser,
@@ -1218,6 +1219,14 @@ export const useStore = create<AppState>()(
 export const setupAuthListener = () => {
   return onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session?.user) {
+      // Email verification deep link — _layout.tsx set this flag before setSession().
+      // Sign out immediately so the user must authenticate manually.
+      if (oauthState.isSignupVerification) {
+        oauthState.isSignupVerification = false; // consume
+        await supabase.auth.signOut();
+        return;
+      }
+
       if (session.user.email_confirmed_at || session.user.confirmed_at) {
         const syncResult = await syncAuthUserToUsersTable(session.user);
         if (!syncResult.success) {

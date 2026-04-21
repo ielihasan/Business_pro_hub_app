@@ -16,6 +16,9 @@ export const oauthState = {
   pendingAlreadyRegistered: null as string | null,
   /** Set by _layout.tsx when the deep link contains type=recovery (password reset email) */
   isPasswordRecovery: false,
+  /** Set by _layout.tsx when the deep link contains type=signup (email verification).
+   *  Prevents setupAuthListener from auto-authenticating — user must log in manually. */
+  isSignupVerification: false,
   /** Set by _layout.tsx when an OAuth deep link is being processed; cleared by callback.tsx */
   oauthCallbackInProgress: false,
 };

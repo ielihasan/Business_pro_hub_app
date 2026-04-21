@@ -114,10 +114,14 @@ export default function RootLayout() {
         const refreshToken = params.get('refresh_token');
         const linkType = params.get('type');
 
-        // Mark password-recovery links BEFORE the async setSession so
-        // auth/callback.tsx can read the flag after its 400 ms wait.
+        // Mark link type BEFORE the async setSession so setupAuthListener
+        // can read the flags synchronously when SIGNED_IN fires.
         if (linkType === 'recovery') {
           oauthState.isPasswordRecovery = true;
+        }
+        if (linkType === 'signup') {
+          // Email verification — block auto-login in setupAuthListener.
+          oauthState.isSignupVerification = true;
         }
 
         if (accessToken && refreshToken) {

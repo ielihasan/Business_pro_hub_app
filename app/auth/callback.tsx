@@ -71,10 +71,17 @@ export default function AuthCallbackScreen() {
           return;
         }
 
+        // On Android, deep link tokens arrive as URL fragments which Expo Router
+        // does not parse into useLocalSearchParams(). _layout.tsx sets
+        // oauthState.isSignupVerification from the fragment before setSession(),
+        // so check both the param and the flag.
         const callbackType = (params.type as string | undefined) || '';
+        const isSignup = callbackType === 'signup' || oauthState.isSignupVerification;
 
-        if (callbackType === 'signup') {
-          // Email verified — sign out so the user must log in manually before entering the app.
+        if (isSignup) {
+          oauthState.isSignupVerification = false; // consume (in case listener didn't)
+          // Session was already signed out by setupAuthListener if flag was set,
+          // but sign out again defensively in case this path is reached with a live session.
           await supabase.auth.signOut();
           router.replace('/(auth)/login');
           return;
