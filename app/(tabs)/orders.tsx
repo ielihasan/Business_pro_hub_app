@@ -18,6 +18,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { OrderCard } from '@/components/orders';
 import { useStore } from '@/store/useStore';
 import { fetchUserQueueHistory, OrderHistoryEntry } from '@/lib/queue';
+import { useSmartPolling } from '@/hooks/useSmartPolling';
 
 type Filter = 'all' | 'active' | 'completed';
 
@@ -47,6 +48,9 @@ export default function OrdersScreen() {
     setLoading(true);
     loadOrders().finally(() => setLoading(false));
   }, [loadOrders]);
+
+  // Auto-refresh every 30 s; pauses when app goes to background
+  useSmartPolling(loadOrders, 30_000);
 
   const onRefresh = async () => {
     setRefreshing(true);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Animated,
   View,
@@ -18,6 +18,7 @@ import { ActiveQueueItem, PastQueueItem, QueueEmptyState } from '@/components/qu
 import { SkeletonQueueItem } from '@/components/ui/Skeleton';
 import { useStore } from '@/store/useStore';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
+import { useAppState } from '@/hooks/useAppState';
 
 export default function QueueScreen() {
   const { colors, isDark }    = useTheme();
@@ -43,6 +44,12 @@ export default function QueueScreen() {
       setInitialLoading(false);
     }
   }, [isAuthenticated]);
+
+  // Re-sync when the app returns to the foreground (e.g. user switched away and came back)
+  const handleForeground = useCallback(() => {
+    if (isAuthenticated) syncQueuesFromSupabase();
+  }, [isAuthenticated, syncQueuesFromSupabase]);
+  useAppState(handleForeground);
 
   const onRefresh = async () => {
     setRefreshing(true);

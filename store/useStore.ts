@@ -282,9 +282,17 @@ let _toppingUp = false;
 
 // ─── Realtime subscription for current user's queue entries ──────────────────
 let _queueRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+let _syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function _debouncedSync(ms = 400) {
+  if (_syncDebounceTimer) clearTimeout(_syncDebounceTimer);
+  _syncDebounceTimer = setTimeout(() => {
+    _syncDebounceTimer = null;
+    useStore.getState().syncQueuesFromSupabase();
+  }, ms);
+}
 
 function _setupQueueSubscription(userId: string) {
-  // Remove any existing channel before creating a new one
   _teardownQueueSubscription();
   _queueRealtimeChannel = supabase
     .channel(`user-queues:${userId}`)
@@ -292,23 +300,24 @@ function _setupQueueSubscription(userId: string) {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'queues', filter: `customer_id=eq.${userId}` },
       () => {
-        // Re-sync the full queue state whenever any of this user's rows change
-        useStore.getState().syncQueuesFromSupabase();
+        // Debounce: coalesce rapid cascading updates into a single re-sync
+        _debouncedSync();
       }
     )
     .subscribe((status, err) => {
       if (status === 'CHANNEL_ERROR' && err) {
-        // Only log real errors (err is undefined on normal connection close)
         console.warn('[Queue realtime] Channel error:', (err as any)?.message ?? err);
       } else if (status === 'TIMED_OUT') {
-        _setupQueueSubscription(userId);
+        // Back off 3 s before reconnecting to avoid rapid retry loops
+        setTimeout(() => _setupQueueSubscription(userId), 3000);
       } else if (status === 'CLOSED') {
-        useStore.getState().syncQueuesFromSupabase();
+        _debouncedSync(1000);
       }
     });
 }
 
 function _teardownQueueSubscription() {
+  if (_syncDebounceTimer) { clearTimeout(_syncDebounceTimer); _syncDebounceTimer = null; }
   if (_queueRealtimeChannel) {
     supabase.removeChannel(_queueRealtimeChannel);
     _queueRealtimeChannel = null;
@@ -866,6 +875,9 @@ export const useStore = create<AppState>()(
       syncQueuesFromSupabase: async () => {
         const user = get().user;
         if (!user) return;
+
+        const prevActive = get().activeQueues;
+
         const [activeRes, historyRes] = await Promise.all([
           fetchUserActiveQueues(user.id),
           fetchUserQueueHistory(user.id),
@@ -891,10 +903,50 @@ export const useStore = create<AppState>()(
             ? toTime(r.cancelled_at)
             : undefined,
         });
+
+        const newActive = (activeRes.data ?? []).map(mapEntry);
+
         set({
-          activeQueues: (activeRes.data ?? []).map(mapEntry),
+          activeQueues: newActive,
           queueHistory: (historyRes.data ?? []).map(mapEntry),
         });
+
+        // Fire position-change notifications for existing queues that moved
+        const { notificationsEnabled, queueNotificationsEnabled, soundEnabled, vibrationEnabled, addNotification, unreadCount } = get();
+        if (notificationsEnabled && queueNotificationsEnabled) {
+          const notifOpts = { sound: soundEnabled, vibrate: vibrationEnabled };
+          for (const newQ of newActive) {
+            const oldQ = prevActive.find(q => q.id === newQ.id);
+            if (!oldQ || newQ.position === oldQ.position) continue;
+            if (newQ.position === 1) {
+              addNotification({
+                id: `your-turn-${newQ.id}-${Date.now()}`,
+                type: 'queue_update',
+                title: "🔔 It's Your Turn!",
+                message: `Please proceed to ${newQ.businessName} now.`,
+                read: false,
+                createdAt: new Date().toISOString(),
+              });
+              if (!runningInExpoGo) {
+                notifyYourTurnNow(newQ.businessName, notifOpts);
+                setBadgeCount(unreadCount + 1);
+              }
+            } else if (newQ.position <= 3 && oldQ.position > newQ.position) {
+              addNotification({
+                id: `almost-turn-${newQ.id}-${Date.now()}`,
+                type: 'queue_update',
+                title: '⏰ Almost Your Turn!',
+                message: `You're #${newQ.position} at ${newQ.businessName}. Get ready!`,
+                read: false,
+                createdAt: new Date().toISOString(),
+              });
+              if (!runningInExpoGo) {
+                notifyAlmostYourTurn(newQ.businessName, newQ.position, notifOpts);
+                setBadgeCount(unreadCount + 1);
+              }
+            }
+          }
+        }
       },
 
       // Orders

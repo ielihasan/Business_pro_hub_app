@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Animated,
   View,
@@ -24,6 +24,7 @@ import {
   NearbyBusinesses,
 } from '@/components/home';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
+import { useAppState } from '@/hooks/useAppState';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -53,6 +54,12 @@ export default function HomeScreen() {
   const activeQueue            = activeQueues[0] ?? null;
   const syncQueuesFromSupabase = useStore((s) => s.syncQueuesFromSupabase);
 
+  // Re-sync queue + businesses when app comes back to the foreground
+  const handleForeground = useCallback(() => {
+    syncQueuesFromSupabase();
+    refreshBusinesses();
+  }, [syncQueuesFromSupabase, refreshBusinesses]);
+  useAppState(handleForeground);
 
   const onRefresh = async () => {
     setRefreshing(true);
