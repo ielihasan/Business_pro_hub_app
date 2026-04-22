@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -42,7 +42,7 @@ export default function RegisterScreen() {
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
   const [dialog, setDialog]             = useState<DialogConfig | null>(null);
 
-  const { register, initializeAuth, activateSession, isLoading, authError, clearAuthError } = useStore();
+  const { register, activateSession, isLoading, authError, clearAuthError } = useStore();
 
   const updateField = (field: string, value: string) => {
     setFormData(p => ({ ...p, [field]: value }));
@@ -89,18 +89,6 @@ export default function RegisterScreen() {
       });
     }
   }, []));
-
-  // Auto-dismiss OTP modal if user verifies via magic link in browser
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
-      if (event === 'SIGNED_IN' && showOtpModal) {
-        await initializeAuth();
-        setShowOtpModal(false);
-        router.replace('/(tabs)');
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [showOtpModal]);
 
   const handleGooglePress = async () => {
     setSocialLoading('google');
@@ -273,9 +261,11 @@ export default function RegisterScreen() {
   const handleVerifyOtp = async (code: string): Promise<string | null> => {
     const result = await verifyEmailOtp(otpEmail, code, otpType);
     if (!result.success) return result.error || 'Invalid code. Please try again.';
-    await initializeAuth();
+    // Sign out so the user goes through the login flow explicitly
+    await supabase.auth.signOut();
     setShowOtpModal(false);
-    router.replace('/(tabs)');
+    // Navigate to login with email pre-filled
+    router.replace({ pathname: '/(auth)/login', params: { prefillEmail: otpEmail } });
     return null;
   };
 
