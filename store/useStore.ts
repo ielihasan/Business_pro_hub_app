@@ -282,7 +282,35 @@ let _toppingUp = false;
 
 // ─── Realtime subscription for current user's queue entries ──────────────────
 let _queueRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+let _queueRealtimeUserId: string | null = null;
+let _queueRealtimeNonce = 0;
 let _syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+let _paymentRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+let _paymentRealtimeUserId: string | null = null;
+let _paymentRealtimeNonce = 0;
+let _paymentSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function _uniqueRealtimeTopic(prefix: string, userId: string, nonce: number) {
+  // Include time + random so hot-reload/module-reload cannot recreate the same topic.
+  const rnd = Math.random().toString(36).slice(2, 8);
+  return `${prefix}:${userId}:${Date.now()}:${nonce}:${rnd}`;
+}
+
+function _removeStaleRealtimeChannels(prefix: string, userId: string) {
+  // Defensive cleanup for channels left by a previous module instance (Fast Refresh)
+  // which can trigger "cannot add postgres_changes callbacks ... after subscribe".
+  const client: any = supabase as any;
+  const channels: any[] = typeof client.getChannels === 'function' ? client.getChannels() : [];
+  const expectedPrefix = `realtime:${prefix}:${userId}:`;
+
+  for (const ch of channels) {
+    const topic = String(ch?.topic ?? '');
+    if (topic.startsWith(expectedPrefix)) {
+      try { supabase.removeChannel(ch); } catch {}
+    }
+  }
+}
 
 function _debouncedSync(ms = 400) {
   if (_syncDebounceTimer) clearTimeout(_syncDebounceTimer);
@@ -292,10 +320,78 @@ function _debouncedSync(ms = 400) {
   }, ms);
 }
 
-function _setupQueueSubscription(userId: string) {
+function _debouncedPaymentSync(ms = 250) {
+  if (_paymentSyncDebounceTimer) clearTimeout(_paymentSyncDebounceTimer);
+  _paymentSyncDebounceTimer = setTimeout(() => {
+    _paymentSyncDebounceTimer = null;
+    void useStore.getState().loadWallet();
+  }, ms);
+}
+
+function _handleTransactionRealtime(payload: any) {
+  const current = payload?.new ?? {};
+  const previous = payload?.old ?? {};
+  const status = String(current.status ?? '').toLowerCase();
+  const oldStatus = String(previous.status ?? '').toLowerCase();
+  if (!status || status === oldStatus) return;
+
+  const state = useStore.getState();
+
+  const queueEntryId = current.queue_entry_id ?? current.queue_id ?? null;
+  if (queueEntryId) {
+    const orderId = `order-${queueEntryId}`;
+    if (status === 'verified') {
+      state.updateOrderStatus(orderId, 'completed');
+    } else if (status === 'rejected') {
+      state.updateOrderStatus(orderId, 'cancelled');
+    } else if (status === 'pending_verification') {
+      state.updateOrderStatus(orderId, 'in_progress');
+    }
+  }
+
+  if (!state.notificationsEnabled || !state.orderNotificationsEnabled) return;
+
+  const txnId = String(current.transaction_id ?? current.id ?? Date.now());
+  const title = status === 'verified'
+    ? 'Payment Verified'
+    : status === 'rejected'
+    ? 'Payment Rejected'
+    : status === 'pending_verification'
+    ? 'Payment Under Review'
+    : `Payment Update: ${status}`;
+
+  const message = status === 'verified'
+    ? `Transaction ${txnId} was verified successfully.`
+    : status === 'rejected'
+    ? `Transaction ${txnId} was rejected. Please review and retry.`
+    : status === 'pending_verification'
+    ? `Transaction ${txnId} is waiting for admin verification.`
+    : `Transaction ${txnId} status changed to ${status}.`;
+
+  state.addNotification({
+    id: `txn-${txnId}-${status}`,
+    type: 'order_ready',
+    title,
+    message,
+    read: false,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+function _setupQueueSubscription(userId: string, forceReconnect = false) {
+  // Reuse existing subscription for the same user to avoid duplicate
+  // subscribe cycles from login/init/auth-listener calling this repeatedly.
+  if (!forceReconnect && _queueRealtimeChannel && _queueRealtimeUserId === userId) {
+    return;
+  }
+
   _teardownQueueSubscription();
+  _removeStaleRealtimeChannels('user-queues', userId);
+
+  _queueRealtimeUserId = userId;
   _queueRealtimeChannel = supabase
-    .channel(`user-queues:${userId}`)
+    // Unique topic name avoids internal "already subscribed" collisions.
+    .channel(_uniqueRealtimeTopic('user-queues', userId, ++_queueRealtimeNonce))
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'queues', filter: `customer_id=eq.${userId}` },
@@ -309,7 +405,7 @@ function _setupQueueSubscription(userId: string) {
         console.warn('[Queue realtime] Channel error:', (err as any)?.message ?? err);
       } else if (status === 'TIMED_OUT') {
         // Back off 3 s before reconnecting to avoid rapid retry loops
-        setTimeout(() => _setupQueueSubscription(userId), 3000);
+        setTimeout(() => _setupQueueSubscription(userId, true), 3000);
       } else if (status === 'CLOSED') {
         _debouncedSync(1000);
       }
@@ -322,6 +418,73 @@ function _teardownQueueSubscription() {
     supabase.removeChannel(_queueRealtimeChannel);
     _queueRealtimeChannel = null;
   }
+  _queueRealtimeUserId = null;
+}
+
+function _setupPaymentSubscription(userId: string, forceReconnect = false) {
+  // Reuse existing subscription for the same user to avoid duplicate subscribe calls.
+  if (!forceReconnect && _paymentRealtimeChannel && _paymentRealtimeUserId === userId) {
+    return;
+  }
+
+  _teardownPaymentSubscription();
+  _removeStaleRealtimeChannels('user-payments', userId);
+
+  _paymentRealtimeUserId = userId;
+  _paymentRealtimeChannel = supabase
+    .channel(_uniqueRealtimeTopic('user-payments', userId, ++_paymentRealtimeNonce))
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'wallets', filter: `user_id=eq.${userId}` },
+      () => _debouncedPaymentSync()
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'payment_methods', filter: `user_id=eq.${userId}` },
+      () => _debouncedPaymentSync()
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'wallet_transactions', filter: `user_id=eq.${userId}` },
+      () => _debouncedPaymentSync()
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'Transactions', filter: `user_id=eq.${userId}` },
+      (payload) => {
+        _debouncedPaymentSync();
+        _handleTransactionRealtime(payload);
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` },
+      (payload) => {
+        _debouncedPaymentSync();
+        _handleTransactionRealtime(payload);
+      }
+    )
+    .subscribe((status, err) => {
+      if (status === 'CHANNEL_ERROR' && err) {
+        console.warn('[Payment realtime] Channel error:', (err as any)?.message ?? err);
+      } else if (status === 'TIMED_OUT') {
+        setTimeout(() => _setupPaymentSubscription(userId, true), 3000);
+      } else if (status === 'CLOSED') {
+        _debouncedPaymentSync(1000);
+      }
+    });
+}
+
+function _teardownPaymentSubscription() {
+  if (_paymentSyncDebounceTimer) {
+    clearTimeout(_paymentSyncDebounceTimer);
+    _paymentSyncDebounceTimer = null;
+  }
+  if (_paymentRealtimeChannel) {
+    supabase.removeChannel(_paymentRealtimeChannel);
+    _paymentRealtimeChannel = null;
+  }
+  _paymentRealtimeUserId = null;
 }
 
 export const useStore = create<AppState>()(
@@ -386,6 +549,7 @@ export const useStore = create<AppState>()(
 
           set({ isAuthenticated: true, user, session: result.session, isLoading: false, authError: null });
           _setupQueueSubscription(result.user.id);
+          _setupPaymentSubscription(result.user.id);
 
           // Initialize wallet (no-op if already initialized) + load payment methods + favorites + queues
           const [walletBalance, methods] = await Promise.all([
@@ -456,6 +620,7 @@ export const useStore = create<AppState>()(
       logout: async () => {
         set({ isLoading: true });
         _teardownQueueSubscription();
+        _teardownPaymentSubscription();
         await logoutUser();
         set({
           isAuthenticated: false,
@@ -485,6 +650,7 @@ export const useStore = create<AppState>()(
             const user = mapSupabaseUserToUser(session.user, profile);
             set({ isAuthenticated: true, user, session, isLoading: false });
             _setupQueueSubscription(session.user.id);
+            _setupPaymentSubscription(session.user.id);
             // Load wallet + payment methods + favorites + queues in background
             const [walletBalance, methods] = await Promise.all([
               initializeWallet(session.user.id),
@@ -515,6 +681,7 @@ export const useStore = create<AppState>()(
             const user = mapSupabaseUserToUser(session.user, profile);
             set({ isAuthenticated: true, user, session });
             _setupQueueSubscription(session.user.id);
+            _setupPaymentSubscription(session.user.id);
             get().loadFavorites();
             get().syncQueuesFromSupabase();
           }
@@ -538,6 +705,23 @@ export const useStore = create<AppState>()(
           return { success: false, error };
         }
         if (data.user) {
+          // Keep the public users table in sync so profile screens refresh from
+          // the same source of truth the app reads during auth initialization.
+          const publicProfileUpdate: Record<string, unknown> = {
+            updated_at: new Date().toISOString(),
+          };
+          if (Object.prototype.hasOwnProperty.call(updates, 'avatar_url')) {
+            publicProfileUpdate.avatar_url = updates.avatar_url ?? null;
+          }
+          if (Object.prototype.hasOwnProperty.call(updates, 'full_name')) {
+            publicProfileUpdate.full_name = updates.full_name ?? null;
+          }
+
+          await supabase
+            .from('users')
+            .update(publicProfileUpdate)
+            .eq('id', data.user.id);
+
           const profile = await getUserProfile(data.user.id);
           const updatedUser = mapSupabaseUserToUser(data.user, profile);
           set({ user: updatedUser, isLoading: false });
@@ -776,7 +960,8 @@ export const useStore = create<AppState>()(
           status: data.status,
           joinedAt: new Date(data.joined_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
         };
-        // Remove duplicate if re-joining same business
+
+        // Update UI immediately so the queue appears on screen without waiting for notifications/wallet
         set((state) => ({
           activeQueues: [
             ...state.activeQueues.filter(q => q.businessId !== businessId),
@@ -784,7 +969,7 @@ export const useStore = create<AppState>()(
           ],
         }));
 
-        // Trigger in-app + push notification
+        // Trigger in-app + push notification (fire-and-forget — don't block UI)
         const { notificationsEnabled, queueNotificationsEnabled, soundEnabled, vibrationEnabled, addNotification, unreadCount } = get();
         const notifOpts = { sound: soundEnabled, vibrate: vibrationEnabled };
         if (notificationsEnabled && queueNotificationsEnabled) {
@@ -798,8 +983,8 @@ export const useStore = create<AppState>()(
           };
           addNotification(notif);
           if (!runningInExpoGo) {
-            await notifyQueueJoined(entry.businessName, entry.position, entry.estimatedWait, notifOpts);
-            await setBadgeCount(unreadCount + 1);
+            notifyQueueJoined(entry.businessName, entry.position, entry.estimatedWait, notifOpts);
+            setBadgeCount(unreadCount + 1);
           }
         }
 
@@ -910,6 +1095,33 @@ export const useStore = create<AppState>()(
           activeQueues: newActive,
           queueHistory: (historyRes.data ?? []).map(mapEntry),
         });
+
+        // Sync queue status -> orders so order statuses update in realtime
+        for (const newQ of newActive) {
+          try {
+            const orderId = `order-${newQ.id}`;
+            const existingOrder = get().orders.find(o => o.id === orderId);
+            if (!existingOrder) continue;
+            // Map queue.status -> order.status
+            const mapStatus = (qs: QueueEntry['status']): Order['status'] => {
+              switch (qs) {
+                case 'waiting': return 'pending';
+                case 'called': return 'in_progress';
+                case 'in_progress': return 'in_progress';
+                case 'completed': return 'completed';
+                case 'cancelled': return 'cancelled';
+                default: return 'pending';
+              }
+            };
+            const desired = mapStatus(newQ.status);
+            if (existingOrder.status !== desired) {
+              get().updateOrderStatus(orderId, desired);
+            }
+          } catch (e) {
+            // non-fatal — continue syncing other entries
+            console.warn('Order sync error:', e);
+          }
+        }
 
         // Fire position-change notifications for existing queues that moved
         const { notificationsEnabled, queueNotificationsEnabled, soundEnabled, vibrationEnabled, addNotification, unreadCount } = get();
@@ -1279,6 +1491,13 @@ export const setupAuthListener = () => {
         return;
       }
 
+      // OTP modal verification from register.tsx — that handler calls signOut
+      // and navigates to login itself; skip auto-authentication here.
+      if (oauthState.isSignupOtpVerification) {
+        oauthState.isSignupOtpVerification = false; // consume
+        return;
+      }
+
       if (session.user.email_confirmed_at || session.user.confirmed_at) {
         const syncResult = await syncAuthUserToUsersTable(session.user);
         if (!syncResult.success) {
@@ -1294,10 +1513,12 @@ export const setupAuthListener = () => {
         const user = mapSupabaseUserToUser(session.user, profile);
         useStore.setState({ isAuthenticated: true, user, session });
         _setupQueueSubscription(session.user.id);
+        _setupPaymentSubscription(session.user.id);
         useStore.getState().loadFavorites();
       }
     } else if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESH_FAILED') {
       _teardownQueueSubscription();
+      _teardownPaymentSubscription();
       useStore.setState({ isAuthenticated: false, user: null, session: null, activeQueues: [], queueHistory: [], orders: [], notifications: [], unreadCount: 0, favoriteBusinesses: [] });
       if (event === 'TOKEN_REFRESH_FAILED') {
         supabase.auth.signOut();

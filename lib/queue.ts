@@ -272,50 +272,39 @@ export async function joinBusinessQueue(
     totalAmount?: number;
   }
 ): Promise<{ data: QueueEntryRecord | null; error: string | null }> {
-  // 1. Prevent duplicate active entry for same user + business
-  const { data: existing } = await supabase
-    .from('queues')
-    .select('id')
-    .eq('business_id', businessId)
-    .eq('customer_id', userId)
-    .in('status', ['waiting', 'in_progress'])
-    .maybeSingle();
+  // 1+2+3. Run duplicate check, active count, and wait-time lookup in parallel
+  const [existingRes, countRes, waitRes] = await Promise.all([
+    supabase
+      .from('queues')
+      .select('id')
+      .eq('business_id', businessId)
+      .eq('customer_id', userId)
+      .in('status', ['waiting', 'in_progress'])
+      .maybeSingle(),
+    supabase
+      .from('queues')
+      .select('id', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+      .in('status', ['waiting', 'in_progress']),
+    opts?.serviceType
+      ? supabase.from('services').select('estimated_duration').eq('id', opts.serviceType).maybeSingle()
+      : supabase.from('businesses').select('wait_time, waitTime').eq('id', businessId).maybeSingle(),
+  ]);
 
-  if (existing) {
-    return fetchQueueEntry(existing.id);
+  if (existingRes.data) {
+    return fetchQueueEntry(existingRes.data.id);
   }
 
-  // 2. Count active entries to determine next position
-  const { count: activeCount } = await supabase
-    .from('queues')
-    .select('id', { count: 'exact', head: true })
-    .eq('business_id', businessId)
-    .in('status', ['waiting', 'in_progress']);
+  const newPosition = (countRes.count ?? 0) + 1;
 
-  const newPosition = (activeCount ?? 0) + 1;
-
-  // 3. Resolve wait time from service estimated_duration if provided
-  let waitMinutes = newPosition * 5; // fallback default
+  let waitMinutes = newPosition * 5;
   if (opts?.serviceType) {
-    const { data: svc } = await supabase
-      .from('services')
-      .select('estimated_duration')
-      .eq('id', opts.serviceType)
-      .maybeSingle();
-    if (svc?.estimated_duration) {
-      waitMinutes = svc.estimated_duration * newPosition;
-    }
+    const svc = waitRes.data as any;
+    if (svc?.estimated_duration) waitMinutes = svc.estimated_duration * newPosition;
   } else {
-    // Try businesses table for wait_time string
-    const { data: biz } = await supabase
-      .from('businesses')
-      .select('*')
-      .eq('id', businessId)
-      .maybeSingle();
+    const biz = waitRes.data as any;
     const rawWait = biz?.wait_time ?? biz?.waitTime ?? null;
-    if (rawWait) {
-      waitMinutes = parseInt(String(rawWait).replace(/\D/g, '')) || waitMinutes;
-    }
+    if (rawWait) waitMinutes = parseInt(String(rawWait).replace(/\D/g, '')) || waitMinutes;
   }
 
   // 4. Insert into `queues`
@@ -350,33 +339,24 @@ export async function joinBusinessQueue(
   if (Number.isFinite(unitPrice)) pricingUpdate.unit_price = unitPrice;
   if (Number.isFinite(totalAmount)) pricingUpdate.total_price = totalAmount;
 
-  if (Object.keys(pricingUpdate).length > 0) {
-    const { error: pricingError } = await supabase
-      .from('queues')
-      .update(pricingUpdate)
-      .eq('id', entry.id);
+  // 5. Pricing update + business name resolve in parallel
+  const pricingPromise = Object.keys(pricingUpdate).length > 0
+    ? supabase.from('queues').update(pricingUpdate).eq('id', entry.id).then(({ error: pricingError }) => {
+        if (pricingError) {
+          console.warn('Queues pricing columns update failed, falling back to notes:', pricingError.message);
+          const pricingMeta = JSON.stringify({ quantity, unit_price: unitPrice, total_price: totalAmount });
+          const fallbackNotes = entry.notes
+            ? `${entry.notes}\npricing_meta:${pricingMeta}`
+            : `pricing_meta:${pricingMeta}`;
+          return supabase.from('queues').update({ notes: fallbackNotes }).eq('id', entry.id);
+        }
+        (entry as any).quantity = quantity;
+        (entry as any).unit_price = unitPrice;
+        (entry as any).total_price = totalAmount;
+      })
+    : Promise.resolve();
 
-    if (pricingError) {
-      console.warn('Queues pricing columns update failed, falling back to notes:', pricingError.message);
-
-      const pricingMeta = JSON.stringify({ quantity, unit_price: unitPrice, total_price: totalAmount });
-      const fallbackNotes = entry.notes
-        ? `${entry.notes}\npricing_meta:${pricingMeta}`
-        : `pricing_meta:${pricingMeta}`;
-
-      await supabase
-        .from('queues')
-        .update({ notes: fallbackNotes })
-        .eq('id', entry.id);
-    } else {
-      (entry as any).quantity = quantity;
-      (entry as any).unit_price = unitPrice;
-      (entry as any).total_price = totalAmount;
-    }
-  }
-
-  // 5. Resolve business name for the embedded stub
-  const { data: resolvedBiz } = await resolveBusinessById(businessId);
+  const [, { data: resolvedBiz }] = await Promise.all([pricingPromise, resolveBusinessById(businessId)]);
 
   return {
     data: {

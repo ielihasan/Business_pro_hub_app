@@ -19,6 +19,7 @@ import { SkeletonQueueItem } from '@/components/ui/Skeleton';
 import { useStore } from '@/store/useStore';
 import Dialog, { DialogConfig } from '@/components/ui/Dialog';
 import { useAppState } from '@/hooks/useAppState';
+import { useSmartPolling } from '@/hooks/useSmartPolling';
 
 export default function QueueScreen() {
   const { colors, isDark }    = useTheme();
@@ -50,6 +51,7 @@ export default function QueueScreen() {
     if (isAuthenticated) syncQueuesFromSupabase();
   }, [isAuthenticated, syncQueuesFromSupabase]);
   useAppState(handleForeground);
+  useSmartPolling(syncQueuesFromSupabase, 8000);
 
   const onRefresh = async () => {
     setRefreshing(true);
