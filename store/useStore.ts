@@ -291,6 +291,44 @@ let _paymentRealtimeUserId: string | null = null;
 let _paymentRealtimeNonce = 0;
 let _paymentSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+// ─── Realtime subscription for business-level queue changes ──────────────────
+// Fires when ANY user joins/leaves/updates in the same business queue,
+// so the current user sees totalInQueue update in real time.
+const _bizQueueChannels: Map<string, ReturnType<typeof supabase.channel>> = new Map();
+let _bizQueueNonce = 0;
+
+function _setupBusinessQueueSubscriptions(businessIds: string[]) {
+  // Tear down channels for businesses no longer in user's active queues
+  for (const [bizId, ch] of _bizQueueChannels.entries()) {
+    if (!businessIds.includes(bizId)) {
+      try { supabase.removeChannel(ch); } catch {}
+      _bizQueueChannels.delete(bizId);
+    }
+  }
+  // Set up new channels for each active business
+  for (const bizId of businessIds) {
+    if (_bizQueueChannels.has(bizId)) continue; // already subscribed
+    const rnd = Math.random().toString(36).slice(2, 8);
+    const topic = `biz-queue:${bizId}:${Date.now()}:${++_bizQueueNonce}:${rnd}`;
+    const ch = supabase
+      .channel(topic)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'queues', filter: `business_id=eq.${bizId}` },
+        () => _debouncedSync(600),
+      )
+      .subscribe();
+    _bizQueueChannels.set(bizId, ch);
+  }
+}
+
+function _teardownBusinessQueueSubscriptions() {
+  for (const ch of _bizQueueChannels.values()) {
+    try { supabase.removeChannel(ch); } catch {}
+  }
+  _bizQueueChannels.clear();
+}
+
 function _uniqueRealtimeTopic(prefix: string, userId: string, nonce: number) {
   // Include time + random so hot-reload/module-reload cannot recreate the same topic.
   const rnd = Math.random().toString(36).slice(2, 8);
@@ -621,6 +659,7 @@ export const useStore = create<AppState>()(
         set({ isLoading: true });
         _teardownQueueSubscription();
         _teardownPaymentSubscription();
+        _teardownBusinessQueueSubscriptions();
         await logoutUser();
         set({
           isAuthenticated: false,
@@ -1096,6 +1135,11 @@ export const useStore = create<AppState>()(
           queueHistory: (historyRes.data ?? []).map(mapEntry),
         });
 
+        // Subscribe to all businesses the user is currently queued at,
+        // so any other user joining/leaving fires a re-sync immediately.
+        const activeBizIds = [...new Set(newActive.map((q) => q.businessId).filter(Boolean))];
+        _setupBusinessQueueSubscriptions(activeBizIds);
+
         // Sync queue status -> orders so order statuses update in realtime
         for (const newQ of newActive) {
           try {
@@ -1519,6 +1563,7 @@ export const setupAuthListener = () => {
     } else if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESH_FAILED') {
       _teardownQueueSubscription();
       _teardownPaymentSubscription();
+      _teardownBusinessQueueSubscriptions();
       useStore.setState({ isAuthenticated: false, user: null, session: null, activeQueues: [], queueHistory: [], orders: [], notifications: [], unreadCount: 0, favoriteBusinesses: [] });
       if (event === 'TOKEN_REFRESH_FAILED') {
         supabase.auth.signOut();

@@ -487,7 +487,25 @@ export async function fetchUserActiveQueues(
     }
   }
 
-  const normalized = entries.map((e) => ({ ...e, business: bizMap[e.business_id] }));
+  // Fetch live active queue counts per business (real-time total, not static queue_length)
+  const liveCountMap: Record<string, number> = {};
+  if (bizIds.length > 0) {
+    const { data: liveRows } = await supabase
+      .from('queues')
+      .select('business_id')
+      .in('business_id', bizIds)
+      .in('status', ['waiting', 'called', 'in_progress']);
+    for (const row of liveRows ?? []) {
+      liveCountMap[row.business_id] = (liveCountMap[row.business_id] ?? 0) + 1;
+    }
+  }
+
+  const normalized = entries.map((e) => ({
+    ...e,
+    business: bizMap[e.business_id]
+      ? { ...bizMap[e.business_id], queue_length: liveCountMap[e.business_id] ?? e.position }
+      : undefined,
+  }));
   return { data: normalized, error: null };
 }
 
