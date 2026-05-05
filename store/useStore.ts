@@ -987,6 +987,7 @@ export const useStore = create<AppState>()(
           }
         }
 
+        // data.position is the real position assigned by the DB trigger
         const entry: QueueEntry = {
           id: data.id,
           businessId: data.business_id,
@@ -994,7 +995,7 @@ export const useStore = create<AppState>()(
           businessCategory: data.business?.category ?? '',
           ticketNumber: ticketLabel(data.position, data.joined_at),
           position: data.position,
-          totalInQueue: data.business?.queue_length ?? data.position,
+          totalInQueue: data.position, // will be corrected by next syncQueuesFromSupabase
           estimatedWait: formatWait(data.estimated_wait_time),
           status: data.status,
           joinedAt: new Date(data.joined_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
@@ -1110,15 +1111,20 @@ export const useStore = create<AppState>()(
         if (historyRes.error) console.warn('syncQueues history error:', historyRes.error);
         const toTime = (iso: string) =>
           new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        const mapEntry = (r: QueueEntryRecord): QueueEntry => ({
+        const mapEntry = (r: QueueEntryRecord, liveTotal?: number): QueueEntry => ({
           id: r.id,
           businessId: r.business_id,
           businessName: r.business?.name ?? '',
           businessCategory: r.business?.category ?? '',
           ticketNumber: ticketLabel(r.position, r.joined_at),
           position: r.position,
-          totalInQueue: r.business?.queue_length ?? r.position,
-          estimatedWait: formatWait(r.estimated_wait_time),
+          totalInQueue: liveTotal ?? r.business?.queue_length ?? r.position,
+          // Recalculate estimated wait from the DB position so it stays accurate as queue shrinks
+          estimatedWait: formatWait(
+            r.estimated_wait_time != null && r.position > 0
+              ? Math.ceil(r.estimated_wait_time / Math.max(r.position, 1)) * r.position
+              : r.estimated_wait_time
+          ),
           status: r.status,
           joinedAt: toTime(r.joined_at),
           completedAt: r.completed_at
@@ -1128,11 +1134,19 @@ export const useStore = create<AppState>()(
             : undefined,
         });
 
-        const newActive = (activeRes.data ?? []).map(mapEntry);
+        // Build live total count per business from the fetched active data
+        const liveTotalMap: Record<string, number> = {};
+        for (const r of activeRes.data ?? []) {
+          if (r.business?.queue_length) {
+            liveTotalMap[r.business_id] = r.business.queue_length;
+          }
+        }
+
+        const newActive = (activeRes.data ?? []).map((r) => mapEntry(r, liveTotalMap[r.business_id]));
 
         set({
           activeQueues: newActive,
-          queueHistory: (historyRes.data ?? []).map(mapEntry),
+          queueHistory: (historyRes.data ?? []).map((r) => mapEntry(r)),
         });
 
         // Subscribe to all businesses the user is currently queued at,

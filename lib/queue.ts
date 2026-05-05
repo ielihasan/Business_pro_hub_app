@@ -272,20 +272,16 @@ export async function joinBusinessQueue(
     totalAmount?: number;
   }
 ): Promise<{ data: QueueEntryRecord | null; error: string | null }> {
-  // 1+2+3. Run duplicate check, active count, and wait-time lookup in parallel
-  const [existingRes, countRes, waitRes] = await Promise.all([
+  // 1+2. Run duplicate check and wait-time lookup in parallel
+  // Position is now assigned by DB trigger (assign_queue_position) — no JS race condition
+  const [existingRes, waitRes] = await Promise.all([
     supabase
       .from('queues')
       .select('id')
       .eq('business_id', businessId)
       .eq('customer_id', userId)
-      .in('status', ['waiting', 'in_progress'])
+      .in('status', ['waiting', 'called', 'in_progress'])
       .maybeSingle(),
-    supabase
-      .from('queues')
-      .select('id', { count: 'exact', head: true })
-      .eq('business_id', businessId)
-      .in('status', ['waiting', 'in_progress']),
     opts?.serviceType
       ? supabase.from('services').select('estimated_duration').eq('id', opts.serviceType).maybeSingle()
       : supabase.from('businesses').select('wait_time, waitTime').eq('id', businessId).maybeSingle(),
@@ -295,19 +291,18 @@ export async function joinBusinessQueue(
     return fetchQueueEntry(existingRes.data.id);
   }
 
-  const newPosition = (countRes.count ?? 0) + 1;
-
-  let waitMinutes = newPosition * 5;
+  // Estimate wait time (position will be assigned by DB trigger)
+  let waitMinutes = 5; // fallback per person
   if (opts?.serviceType) {
     const svc = waitRes.data as any;
-    if (svc?.estimated_duration) waitMinutes = svc.estimated_duration * newPosition;
+    if (svc?.estimated_duration) waitMinutes = svc.estimated_duration;
   } else {
     const biz = waitRes.data as any;
     const rawWait = biz?.wait_time ?? biz?.waitTime ?? null;
     if (rawWait) waitMinutes = parseInt(String(rawWait).replace(/\D/g, '')) || waitMinutes;
   }
 
-  // 4. Insert into `queues`
+  // 3. Insert — position is set atomically by trg_assign_queue_position trigger
   const { data: entry, error: insertError } = await supabase
     .from('queues')
     .insert({
@@ -317,7 +312,7 @@ export async function joinBusinessQueue(
       customer_phone: opts?.customerPhone,
       customer_email: opts?.customerEmail,
       service_type: opts?.serviceType,
-      position: newPosition,
+      position: 0,               // placeholder — trigger overwrites this immediately
       status: 'waiting',
       estimated_wait_time: waitMinutes,
       joined_at: new Date().toISOString(),
