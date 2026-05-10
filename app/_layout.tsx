@@ -2,7 +2,7 @@ import '@/lib/suppressWarnings'; // MUST be first — patches console before nat
 import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme, View, Text, Animated, StyleSheet } from 'react-native';
+import { useColorScheme, View, Text, Animated, Image, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
 import { Colors } from '@/constants/theme';
@@ -43,15 +43,20 @@ function AppLoadingScreen({ colors }: { colors: typeof Colors.dark }) {
   animateDot(dot3, 400);
 
   return (
-    <View style={[ls.root, { backgroundColor: colors.background }]}>
-      <Animated.View style={[ls.logoBox, { backgroundColor: colors.brand, transform: [{ scale: pulse }] }]}>
-        <Text style={[ls.logoText, { color: colors.brandForeground }]}>BH</Text>
+    <View style={[ls.root, { backgroundColor: '#000000' }]}>
+      {/* Actual app icon image with pulse animation */}
+      <Animated.View style={{ transform: [{ scale: pulse }], marginBottom: 24 }}>
+        <Image
+          source={require('../assets/icon.png')}
+          style={ls.iconImage}
+          resizeMode="contain"
+        />
       </Animated.View>
-      <Text style={[ls.title, { color: colors.foreground }]}>BusinessHub Pro</Text>
-      <Text style={[ls.sub, { color: colors.mutedForeground }]}>Smart Queue Management</Text>
+      <Text style={ls.title}>BusinessHub Pro</Text>
+      <Text style={ls.sub}>Smart Queue Management</Text>
       <View style={ls.dots}>
         {[dot1, dot2, dot3].map((d, i) => (
-          <Animated.View key={i} style={[ls.dot, { backgroundColor: colors.brand, opacity: d }]} />
+          <Animated.View key={i} style={[ls.dot, { opacity: d }]} />
         ))}
       </View>
     </View>
@@ -59,13 +64,12 @@ function AppLoadingScreen({ colors }: { colors: typeof Colors.dark }) {
 }
 
 const ls = StyleSheet.create({
-  root:    { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  logoBox: { width: 96, height: 96, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  logoText:{ fontSize: 38, fontWeight: '900', letterSpacing: -1 },
-  title:   { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
-  sub:     { fontSize: 13, fontWeight: '500', marginTop: -4 },
-  dots:    { flexDirection: 'row', gap: 8, marginTop: 32 },
-  dot:     { width: 8, height: 8, borderRadius: 4 },
+  root:      { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: '#000000' },
+  iconImage: { width: 120, height: 120, borderRadius: 28 },
+  title:     { fontSize: 22, fontWeight: '900', letterSpacing: -0.5, color: '#FFFFFF' },
+  sub:       { fontSize: 13, fontWeight: '500', marginTop: -4, color: '#888888' },
+  dots:      { flexDirection: 'row', gap: 8, marginTop: 32 },
+  dot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFFFFF' },
 });
 
 export default function RootLayout() {
