@@ -2,7 +2,7 @@ import '@/lib/suppressWarnings'; // MUST be first — patches console before nat
 import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme, View, Image, StyleSheet } from 'react-native';
+import { useColorScheme, View, Image, Text, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
 import { Colors } from '@/constants/theme';
@@ -27,13 +27,17 @@ function AppLoadingScreen() {
         style={ls.icon}
         resizeMode="contain"
       />
+      <Text style={ls.appName}>BusinessHub Pro</Text>
+      <Text style={ls.tagline}>Smart Queue Management</Text>
     </View>
   );
 }
 
 const ls = StyleSheet.create({
-  root: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000000' },
-  icon: { width: 260, height: 300 },
+  root:    { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000000' },
+  icon:    { width: 240, height: 280, marginBottom: 16 },
+  appName: { fontSize: 26, fontWeight: '900', color: '#FFFFFF', letterSpacing: -0.5 },
+  tagline: { fontSize: 14, fontWeight: '400', color: '#1E8F4E', marginTop: 6 },
 });
 
 export default function RootLayout() {
