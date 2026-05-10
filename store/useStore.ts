@@ -393,25 +393,32 @@ function _handleTransactionRealtime(payload: any) {
 
   if (!state.notificationsEnabled || !state.orderNotificationsEnabled) return;
 
-  const txnId = String(current.transaction_id ?? current.id ?? Date.now());
+  // Use queue entry to get business name for a meaningful message
+  const queueEntryId = current.queue_entry_id ?? current.queue_id ?? null;
+  const relatedQueue = queueEntryId
+    ? state.activeQueues.find(q => q.id === queueEntryId) ?? state.queueHistory.find(q => q.id === queueEntryId)
+    : null;
+  const bizName = relatedQueue?.businessName ?? 'your queue';
+  const stableId = `txn-${queueEntryId ?? current.id}-${status}`;
+
   const title = status === 'verified'
-    ? 'Payment Verified'
+    ? '💰 Payment Confirmed'
     : status === 'rejected'
-    ? 'Payment Rejected'
+    ? '⚠️ Payment Rejected'
     : status === 'pending_verification'
-    ? 'Payment Under Review'
-    : `Payment Update: ${status}`;
+    ? '⏳ Payment Under Review'
+    : 'Payment Update';
 
   const message = status === 'verified'
-    ? `Transaction ${txnId} was verified successfully.`
+    ? `Your advance payment for ${bizName} has been verified. You're all set!`
     : status === 'rejected'
-    ? `Transaction ${txnId} was rejected. Please review and retry.`
+    ? `Your payment for ${bizName} was rejected. Please check your wallet and try again.`
     : status === 'pending_verification'
-    ? `Transaction ${txnId} is waiting for admin verification.`
-    : `Transaction ${txnId} status changed to ${status}.`;
+    ? `Your payment for ${bizName} is being reviewed by the admin.`
+    : `Payment status updated to ${status} for ${bizName}.`;
 
   state.addNotification({
-    id: `txn-${txnId}-${status}`,
+    id: stableId,
     type: 'order_ready',
     title,
     message,
@@ -631,30 +638,28 @@ export const useStore = create<AppState>()(
               : null,
           }));
 
-          // Request notification permissions and send welcome notification
+          // Welcome + payment-setup notifications — stable IDs prevent spam on every login
           const { notificationsEnabled, addNotification } = get();
           if (notificationsEnabled) {
             if (!runningInExpoGo) {
-              // Only request OS permissions in development builds
               const granted = await requestNotificationPermissions();
               if (granted) await notifyWelcome(user.name);
             }
-            // Always add in-app welcome notification
+            // Stable ID: dedup ensures this shows only once per account
             addNotification({
-              id: `welcome-${Date.now()}`,
+              id: `welcome-${result.user.id}`,
               type: 'promo',
               title: '👋 Welcome to BusinessHub Pro!',
               message: `Hi ${user.name}! Scan QR codes to join queues and track orders in real-time.`,
               read: false,
               createdAt: new Date().toISOString(),
             });
-            // Payment method setup reminder if none saved
             if (methods.length === 0) {
               addNotification({
-                id: `setup-payment-${Date.now()}`,
+                id: `setup-payment-${result.user.id}`,
                 type: 'promo',
                 title: '💳 Set Up Your Payment Method',
-                message: 'Add EasyPaisa, JazzCash, or a bank account. A Rs 50 commitment fee is required to join any queue.',
+                message: 'Add EasyPaisa, JazzCash, or a bank account. A commitment fee is required to join any queue.',
                 read: false,
                 createdAt: new Date().toISOString(),
               });
@@ -900,44 +905,9 @@ export const useStore = create<AppState>()(
         queueHistory: [...state.queueHistory, { ...state.activeQueues.find(q => q.id === queueId)!, status: 'cancelled' as const }].filter(Boolean) as QueueEntry[],
       })),
       updateQueuePosition: (queueId, position, estimatedWait) => {
+        // Only update local state — notifications are fired by syncQueuesFromSupabase
+        // which has access to both old and new positions, preventing duplicates.
         set((state) => ({ activeQueues: state.activeQueues.map(q => q.id === queueId ? { ...q, position, estimatedWait } : q) }));
-        // Trigger position-based notifications
-        const { notificationsEnabled, queueNotificationsEnabled, soundEnabled, vibrationEnabled, addNotification, activeQueues, unreadCount } = get();
-        const notifOpts = { sound: soundEnabled, vibrate: vibrationEnabled };
-        if (notificationsEnabled && queueNotificationsEnabled) {
-          const queue = activeQueues.find(q => q.id === queueId);
-          if (queue) {
-            if (position === 1) {
-              const notif = {
-                id: `your-turn-${queueId}-${Date.now()}`,
-                type: 'queue_update' as const,
-                title: "🔔 It's Your Turn!",
-                message: `Please proceed to ${queue.businessName} now.`,
-                read: false,
-                createdAt: new Date().toISOString(),
-              };
-              addNotification(notif);
-              if (!runningInExpoGo) {
-                notifyYourTurnNow(queue.businessName, notifOpts);
-                setBadgeCount(unreadCount + 1);
-              }
-            } else if (position <= 3) {
-              const notif = {
-                id: `almost-turn-${queueId}-${Date.now()}`,
-                type: 'queue_update' as const,
-                title: '⏰ Almost Your Turn!',
-                message: `You're #${position} at ${queue.businessName}. Get ready!`,
-                read: false,
-                createdAt: new Date().toISOString(),
-              };
-              addNotification(notif);
-              if (!runningInExpoGo) {
-                notifyAlmostYourTurn(queue.businessName, position, notifOpts);
-                setBadgeCount(unreadCount + 1);
-              }
-            }
-          }
-        }
       },
       completeQueue: (queueId) => {
         set((state) => {
@@ -945,8 +915,9 @@ export const useStore = create<AppState>()(
           if (!queue) return state;
           return { activeQueues: state.activeQueues.filter(q => q.id !== queueId), queueHistory: [...state.queueHistory, { ...queue, status: 'completed' as const }] };
         });
-        // Award completion bonus points
+        // Award completion bonus points + notify
         const user = get().user;
+        const completedQueue = get().queueHistory.find(q => q.id === queueId);
         if (user) {
           awardPoints(user.id, POINTS_QUEUE_COMPLETE, 'queue_complete', 'Queue completed — bonus points', queueId)
             .then(({ newPoints }) => {
@@ -958,6 +929,19 @@ export const useStore = create<AppState>()(
                     : null,
                 }));
                 supabase.auth.updateUser({ data: { loyalty_points: newPoints, loyalty_tier: tier.key } });
+                if (POINTS_QUEUE_COMPLETE > 0) {
+                  const { addNotification, notificationsEnabled, promoNotificationsEnabled } = get();
+                  if (notificationsEnabled && promoNotificationsEnabled) {
+                    addNotification({
+                      id: `loyalty-complete-${queueId}`,
+                      type: 'loyalty',
+                      title: '⭐ Bonus Points Earned!',
+                      message: `+${POINTS_QUEUE_COMPLETE} points for completing your visit${completedQueue ? ` at ${completedQueue.businessName}` : ''}. Total: ${newPoints} pts.`,
+                      read: false,
+                      createdAt: new Date().toISOString(),
+                    });
+                  }
+                }
               }
             });
         }
@@ -1107,6 +1091,20 @@ export const useStore = create<AppState>()(
                   : null,
               }));
               supabase.auth.updateUser({ data: { loyalty_points: newPoints, loyalty_tier: tier.key } });
+              // Loyalty notification for joining
+              if (joinPoints > 0) {
+                const { addNotification, notificationsEnabled, promoNotificationsEnabled } = get();
+                if (notificationsEnabled && promoNotificationsEnabled) {
+                  addNotification({
+                    id: `loyalty-join-${data.id}`,
+                    type: 'loyalty',
+                    title: '⭐ Points Earned!',
+                    message: `+${joinPoints} loyalty points for joining the queue at ${entry.businessName}. Total: ${newPoints} pts.`,
+                    read: false,
+                    createdAt: new Date().toISOString(),
+                  });
+                }
+              }
             }
           });
 
@@ -1215,38 +1213,89 @@ export const useStore = create<AppState>()(
           }
         }
 
-        // Fire position-change notifications for existing queues that moved
-        const { notificationsEnabled, queueNotificationsEnabled, soundEnabled, vibrationEnabled, addNotification, unreadCount } = get();
-        if (notificationsEnabled && queueNotificationsEnabled) {
-          const notifOpts = { sound: soundEnabled, vibrate: vibrationEnabled };
+        // Fire notifications for position changes and status changes
+        const { notificationsEnabled, queueNotificationsEnabled, orderNotificationsEnabled, soundEnabled, vibrationEnabled, addNotification, unreadCount } = get();
+        const notifOpts = { sound: soundEnabled, vibrate: vibrationEnabled };
+
+        if (notificationsEnabled) {
           for (const newQ of newActive) {
             const oldQ = prevActive.find(q => q.id === newQ.id);
-            if (!oldQ || newQ.position === oldQ.position) continue;
-            if (newQ.position === 1) {
-              addNotification({
-                id: `your-turn-${newQ.id}-${Date.now()}`,
-                type: 'queue_update',
-                title: "🔔 It's Your Turn!",
-                message: `Please proceed to ${newQ.businessName} now.`,
-                read: false,
-                createdAt: new Date().toISOString(),
-              });
-              if (!runningInExpoGo) {
-                notifyYourTurnNow(newQ.businessName, notifOpts);
-                setBadgeCount(unreadCount + 1);
+
+            // ── Status-change notifications (business changed your status) ────────
+            if (oldQ && newQ.status !== oldQ.status && queueNotificationsEnabled) {
+              if (newQ.status === 'called') {
+                addNotification({
+                  id: `called-${newQ.id}`,
+                  type: 'queue_update',
+                  title: "📣 You've Been Called!",
+                  message: `It's your turn at ${newQ.businessName}. Please proceed to the counter now.`,
+                  read: false,
+                  createdAt: new Date().toISOString(),
+                });
+                if (!runningInExpoGo) {
+                  notifyYourTurnNow(newQ.businessName, notifOpts);
+                  setBadgeCount(unreadCount + 1);
+                }
+              } else if (newQ.status === 'in_progress') {
+                addNotification({
+                  id: `serving-${newQ.id}`,
+                  type: 'queue_update',
+                  title: '🛎 Now Being Served',
+                  message: `You're now being served at ${newQ.businessName}.`,
+                  read: false,
+                  createdAt: new Date().toISOString(),
+                });
               }
-            } else if (newQ.position <= 3 && oldQ.position > newQ.position) {
-              addNotification({
-                id: `almost-turn-${newQ.id}-${Date.now()}`,
-                type: 'queue_update',
-                title: '⏰ Almost Your Turn!',
-                message: `You're #${newQ.position} at ${newQ.businessName}. Get ready!`,
-                read: false,
-                createdAt: new Date().toISOString(),
-              });
-              if (!runningInExpoGo) {
-                notifyAlmostYourTurn(newQ.businessName, newQ.position, notifOpts);
-                setBadgeCount(unreadCount + 1);
+            }
+
+            // ── Position-change notifications ─────────────────────────────────────
+            if (queueNotificationsEnabled && oldQ && newQ.position !== oldQ.position) {
+              if (newQ.position === 1) {
+                addNotification({
+                  id: `your-turn-${newQ.id}`,
+                  type: 'queue_update',
+                  title: "🔔 It's Your Turn!",
+                  message: `You're next at ${newQ.businessName}. Please get ready!`,
+                  read: false,
+                  createdAt: new Date().toISOString(),
+                });
+                if (!runningInExpoGo) {
+                  notifyYourTurnNow(newQ.businessName, notifOpts);
+                  setBadgeCount(unreadCount + 1);
+                }
+              } else if (newQ.position <= 3 && oldQ.position > newQ.position) {
+                addNotification({
+                  id: `almost-turn-${newQ.id}-pos${newQ.position}`,
+                  type: 'queue_update',
+                  title: '⏰ Almost Your Turn!',
+                  message: `You're #${newQ.position} in line at ${newQ.businessName}. Get ready!`,
+                  read: false,
+                  createdAt: new Date().toISOString(),
+                });
+                if (!runningInExpoGo) {
+                  notifyAlmostYourTurn(newQ.businessName, newQ.position, notifOpts);
+                  setBadgeCount(unreadCount + 1);
+                }
+              }
+            }
+          }
+
+          // ── Completed-queue notifications (entry moved from active to history) ──
+          if (queueNotificationsEnabled) {
+            for (const oldQ of prevActive) {
+              const stillActive = newActive.find(q => q.id === oldQ.id);
+              if (stillActive) continue;
+              // Entry left active list — check history for completion
+              const historyEntry = (historyRes.data ?? []).find(r => r.id === oldQ.id);
+              if (historyEntry?.status === 'completed') {
+                addNotification({
+                  id: `completed-${oldQ.id}`,
+                  type: 'queue_update',
+                  title: '✅ Service Completed!',
+                  message: `Your visit at ${oldQ.businessName} is complete. Thank you for using BusinessHub Pro!`,
+                  read: false,
+                  createdAt: new Date().toISOString(),
+                });
               }
             }
           }
@@ -1264,7 +1313,7 @@ export const useStore = create<AppState>()(
             const order = orders.find(o => o.id === orderId);
             if (order) {
               const notif = {
-                id: `order-ready-${orderId}-${Date.now()}`,
+                id: `order-ready-${orderId}`,
                 type: 'order_ready' as const,
                 title: '✅ Order Ready!',
                 message: `Order #${order.orderNumber} from ${order.businessName} is ready for pickup!`,
