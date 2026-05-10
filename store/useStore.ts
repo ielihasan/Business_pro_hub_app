@@ -394,7 +394,6 @@ function _handleTransactionRealtime(payload: any) {
   if (!state.notificationsEnabled || !state.orderNotificationsEnabled) return;
 
   // Use queue entry to get business name for a meaningful message
-  const queueEntryId = current.queue_entry_id ?? current.queue_id ?? null;
   const relatedQueue = queueEntryId
     ? state.activeQueues.find(q => q.id === queueEntryId) ?? state.queueHistory.find(q => q.id === queueEntryId)
     : null;

@@ -29,6 +29,7 @@ export default function BusinessDetailScreen() {
   const { colors, isDark } = useTheme();
 
   const [loading,    setLoading]    = useState(false);
+  const [joining,    setJoining]    = useState(false);
   const [business,   setBusiness]   = useState<any | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [dialog,     setDialog]     = useState<DialogConfig | null>(null);
@@ -111,18 +112,22 @@ export default function BusinessDetailScreen() {
   };
 
   const handleConfirmJoin = async () => {
-    if (!business || !pendingJoin) return;
+    if (!business || !pendingJoin || joining) return;
     const qty = Math.max(1, quantity);
     const totalAmount = pendingJoin.unitPrice * qty;
 
-    setShowQuantityModal(false);
-    setLoading(true);
+    // Show loading INSIDE the modal — don't close it yet so user sees feedback
+    setJoining(true);
     const result = await joinQueueInSupabase(
       business.id,
       pendingJoin.serviceType,
       { quantity: qty, unitPrice: pendingJoin.unitPrice, totalAmount }
     );
-    setLoading(false);
+    setJoining(false);
+
+    // Always close the quantity modal now that we have a result
+    setShowQuantityModal(false);
+    setPendingJoin(null);
 
     if (!result.success || !result.queueEntryId) {
       if (result.error === 'NO_PAYMENT_METHOD') {
@@ -154,11 +159,9 @@ export default function BusinessDetailScreen() {
           actions: [{ label: 'OK', variant: 'secondary', onPress: () => setDialog(null) }],
         });
       }
-      setPendingJoin(null);
       return;
     }
 
-    setPendingJoin(null);
     router.push(`/queue/${result.queueEntryId}`);
   };
 
@@ -411,7 +414,7 @@ export default function BusinessDetailScreen() {
           style={[styles.joinBtn, { backgroundColor: CTA }]}
           onPress={handleJoinQueue}
           activeOpacity={0.85}
-          disabled={loading}
+          disabled={loading || joining}
         >
           {loading ? (
             <ActivityIndicator size="small" color={CTA_FG} />
@@ -502,13 +505,21 @@ export default function BusinessDetailScreen() {
             )}
 
             <View style={styles.stepperRow}>
-              <TouchableOpacity style={[styles.stepBtn, { backgroundColor: colors.secondary }]} onPress={() => setQuantity(q => Math.max(1, q - 1))}>
+              <TouchableOpacity
+                style={[styles.stepBtn, { backgroundColor: colors.secondary, opacity: joining ? 0.4 : 1 }]}
+                onPress={() => setQuantity(q => Math.max(1, q - 1))}
+                disabled={joining}
+              >
                 <Text style={[styles.stepBtnText, { color: colors.foreground }]}>−</Text>
               </TouchableOpacity>
               <View style={[styles.qtyVal, { borderColor: colors.border, backgroundColor: colors.card }]}>
                 <Text style={[styles.qtyValText, { color: colors.foreground }]}>{quantity}</Text>
               </View>
-              <TouchableOpacity style={[styles.stepBtn, { backgroundColor: colors.secondary }]} onPress={() => setQuantity(q => Math.min(99, q + 1))}>
+              <TouchableOpacity
+                style={[styles.stepBtn, { backgroundColor: colors.secondary, opacity: joining ? 0.4 : 1 }]}
+                onPress={() => setQuantity(q => Math.min(99, q + 1))}
+                disabled={joining}
+              >
                 <Text style={[styles.stepBtnText, { color: colors.foreground }]}>+</Text>
               </TouchableOpacity>
             </View>
@@ -546,11 +557,23 @@ export default function BusinessDetailScreen() {
             })()}
 
             <View style={styles.qtyBtns}>
-              <TouchableOpacity style={[styles.qtyBtn, { backgroundColor: colors.secondary }]} onPress={() => { setShowQuantityModal(false); setPendingJoin(null); }}>
+              <TouchableOpacity
+                style={[styles.qtyBtn, { backgroundColor: colors.secondary, opacity: joining ? 0.4 : 1 }]}
+                onPress={() => { setShowQuantityModal(false); setPendingJoin(null); }}
+                disabled={joining}
+              >
                 <Text style={[styles.qtyBtnText, { color: colors.foreground }]}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.qtyBtn, { backgroundColor: colors.brand }]} onPress={handleConfirmJoin}>
-                <Text style={[styles.qtyBtnText, { color: '#fff' }]}>Join Queue</Text>
+              <TouchableOpacity
+                style={[styles.qtyBtn, { backgroundColor: colors.brand, opacity: joining ? 0.85 : 1 }]}
+                onPress={handleConfirmJoin}
+                disabled={joining}
+              >
+                {joining ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={[styles.qtyBtnText, { color: '#fff' }]}>Join Queue</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
