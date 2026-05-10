@@ -107,7 +107,10 @@ export default function WalletPaymentScreen() {
   const [cardCvv,       setCardCvv]       = useState('');
   const [topping,       setTopping]       = useState(false);
 
-  useEffect(() => { loadWallet(); }, []);
+  // Only fetch from DB if walletInfo isn't already in the store.
+  // At login/init the store is pre-populated, so navigating to this screen
+  // is instant. Pull-to-refresh always forces a fresh fetch.
+  useEffect(() => { if (!walletInfo) loadWallet(); }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -150,7 +153,6 @@ export default function WalletPaymentScreen() {
     }
 
     setTopping(true);
-    await new Promise(res => setTimeout(res, 1200)); // brief UX delay before balance update
     const defaultMethod = paymentMethods.find(m => m.isDefault) ?? paymentMethods[0];
     const result = await topUpWallet(amount, defaultMethod?.id);
     setTopping(false);

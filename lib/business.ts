@@ -190,8 +190,12 @@ export async function fetchBusinesses(opts: {
 
 export function subscribeToBusinesses(onChange: (payload: any) => void) {
   try {
+    // Unique topic per call — prevents "cannot add postgres_changes callbacks
+    // after subscribe()" when multiple components subscribe or when Fast Refresh
+    // remounts a component before the previous cleanup has run.
+    const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const channel = supabase
-      .channel('public:businesses-and-applications')
+      .channel(`public:businesses-and-applications:${nonce}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'businesses' }, onChange)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'business_applications' }, onChange)
       .subscribe();

@@ -147,6 +147,7 @@ export default function ScanScreen() {
   const [joining, setJoining] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualBusinessId, setManualBusinessId] = useState('');
+  const [manualResolving, setManualResolving] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [pendingJoin, setPendingJoin] = useState<{
@@ -179,7 +180,8 @@ export default function ScanScreen() {
     businessId: string,
     serviceType?: string,
     qrPayload?: Record<string, string>,
-    qrUnitPrice?: number
+    qrUnitPrice?: number,
+    isManual = false,
   ) => {
     // 1. Validate auth
     if (!isAuthenticated) {
@@ -207,7 +209,9 @@ export default function ScanScreen() {
     if (bizResult.error || !bizResult.data) {
       setDialog({
         title: 'Business Not Found',
-        message: 'We could not find this business. The QR code may be outdated.',
+        message: isManual
+          ? 'No business matches this ID. Please double-check the ID and try again.'
+          : 'We could not find this business. The QR code may be outdated.',
         icon: 'alert-circle-outline',
         iconVariant: 'destructive',
         actions: [{ label: 'OK', onPress: () => { setDialog(null); setScanned(false); } }],
@@ -386,7 +390,8 @@ export default function ScanScreen() {
   };
 
   const handleManualSubmit = async () => {
-    if (!manualBusinessId || manualBusinessId.trim() === '') {
+    const trimmedId = manualBusinessId.trim();
+    if (!trimmedId) {
       setDialog({
         title: 'Invalid Input',
         message: 'Please enter a valid business ID.',
@@ -396,11 +401,15 @@ export default function ScanScreen() {
       });
       return;
     }
-    
-    setShowManualModal(false);
+
+    // Show loading inside the modal, then dismiss once resolved
+    setManualResolving(true);
     setScanned(true);
-    await processBusinessId(manualBusinessId.trim());
-    setScanned(false);
+    await processBusinessId(trimmedId, undefined, undefined, undefined, true);
+    // Do NOT reset scanned here — the join flow or error dialog handles that.
+    // Reset the modal state only.
+    setManualResolving(false);
+    setShowManualModal(false);
     setManualBusinessId('');
   };
 
@@ -430,7 +439,7 @@ export default function ScanScreen() {
           visible={showManualModal}
           transparent={true}
           animationType="fade"
-          onRequestClose={() => setShowManualModal(false)}
+          onRequestClose={() => { if (!manualResolving) setShowManualModal(false); }}
         >
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
@@ -443,6 +452,7 @@ export default function ScanScreen() {
                   backgroundColor: colors.muted,
                   color: colors.foreground,
                   borderColor: colors.border,
+                  opacity: manualResolving ? 0.5 : 1,
                 }]}
                 placeholder="e.g., 3b7a50bb-b48d-4ae8..."
                 placeholderTextColor={colors.mutedForeground}
@@ -451,19 +461,26 @@ export default function ScanScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoFocus={true}
+                editable={!manualResolving}
               />
               <View style={styles.modalButtons}>
                 <TouchableOpacity
-                  style={[styles.modalButton, { backgroundColor: colors.muted }]}
-                  onPress={() => setShowManualModal(false)}
+                  style={[styles.modalButton, { backgroundColor: colors.muted, opacity: manualResolving ? 0.4 : 1 }]}
+                  onPress={() => { if (!manualResolving) { setShowManualModal(false); setScanned(false); } }}
+                  disabled={manualResolving}
                 >
                   <Text style={[styles.modalButtonText, { color: colors.foreground }]}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.modalButton, { backgroundColor: colors.primary }]}
                   onPress={handleManualSubmit}
+                  disabled={manualResolving}
                 >
-                  <Text style={[styles.modalButtonText, { color: colors.primaryForeground }]}>Join Queue</Text>
+                  {manualResolving ? (
+                    <ActivityIndicator size="small" color={colors.primaryForeground} />
+                  ) : (
+                    <Text style={[styles.modalButtonText, { color: colors.primaryForeground }]}>Join Queue</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -571,7 +588,7 @@ export default function ScanScreen() {
         visible={showManualModal}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowManualModal(false)}
+        onRequestClose={() => { if (!manualResolving) setShowManualModal(false); }}
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
@@ -583,10 +600,11 @@ export default function ScanScreen() {
             </Text>
 
             <TextInput
-              style={[styles.modalInput, { 
+              style={[styles.modalInput, {
                 backgroundColor: colors.muted,
                 color: colors.foreground,
                 borderColor: colors.border,
+                opacity: manualResolving ? 0.5 : 1,
               }]}
               placeholder="e.g., 3b7a50bb-b48d-4ae8..."
               placeholderTextColor={colors.mutedForeground}
@@ -595,25 +613,32 @@ export default function ScanScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus={true}
+              editable={!manualResolving}
             />
-            
+
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: colors.muted }]}
-                onPress={() => setShowManualModal(false)}
+                style={[styles.modalButton, { backgroundColor: colors.muted, opacity: manualResolving ? 0.4 : 1 }]}
+                onPress={() => { if (!manualResolving) { setShowManualModal(false); setScanned(false); } }}
+                disabled={manualResolving}
               >
                 <Text style={[styles.modalButtonText, { color: colors.foreground }]}>
                   Cancel
                 </Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.modalButton, { backgroundColor: colors.primary }]}
                 onPress={handleManualSubmit}
+                disabled={manualResolving}
               >
-                <Text style={[styles.modalButtonText, { color: colors.primaryForeground }]}>
-                  Join Queue
-                </Text>
+                {manualResolving ? (
+                  <ActivityIndicator size="small" color={colors.primaryForeground} />
+                ) : (
+                  <Text style={[styles.modalButtonText, { color: colors.primaryForeground }]}>
+                    Join Queue
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>

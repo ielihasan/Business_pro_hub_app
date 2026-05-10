@@ -343,8 +343,10 @@ export async function getCurrentSession(): Promise<Session | null> {
       return null;
     }
     return session;
-  } catch (error) {
-    console.error('Get session error:', error);
+  } catch (err: any) {
+    // AuthApiError: Invalid Refresh Token — clear AsyncStorage so the next
+    // launch doesn't retry the same invalid token in an infinite loop.
+    try { await supabase.auth.signOut(); } catch { /* ignore secondary error */ }
     return null;
   }
 }

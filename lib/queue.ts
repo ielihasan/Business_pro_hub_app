@@ -122,14 +122,17 @@ export interface ServiceRecord {
 export async function resolveBusinessById(
   businessId: string
 ): Promise<{ data: ResolvedBusiness | null; error: string | null }> {
-  // Fetch live queue count in parallel with business lookup
-  const [liveQueue, bizResult, adminResult] = await Promise.all([
+  // Fetch live queue count in parallel with business lookup.
+  // Query both table name variants ('businesses' and 'Business') to handle
+  // environments where the table was created with different casing.
+  const [liveQueue, bizLowerResult, bizUpperResult, adminResult] = await Promise.all([
     supabase
       .from('queues')
       .select('id', { count: 'exact', head: true })
       .eq('business_id', businessId)
       .in('status', ['waiting', 'in_progress']),
     supabase.from('businesses').select('*').eq('id', businessId).maybeSingle(),
+    supabase.from('Business').select('*').eq('id', businessId).maybeSingle(),
     supabase
       .from('admins')
       .select('id, business_name, business_type, business_address, business_phone, business_description, is_approved')
@@ -141,8 +144,8 @@ export async function resolveBusinessById(
   const liveCount = liveQueue.count ?? 0;
   const waitStr = liveCount > 0 ? `~${liveCount * 5} min` : 'No wait';
 
-  // 1. Try the businesses table first
-  const biz = bizResult.data;
+  // 1. Try the businesses table first (either casing)
+  const biz = bizLowerResult.data ?? bizUpperResult.data;
   if (biz) {
     return {
       data: {
@@ -272,9 +275,11 @@ export async function joinBusinessQueue(
     totalAmount?: number;
   }
 ): Promise<{ data: QueueEntryRecord | null; error: string | null }> {
-  // 1+2. Run duplicate check and wait-time lookup in parallel
-  // Position is now assigned by DB trigger (assign_queue_position) — no JS race condition
-  const [existingRes, waitRes] = await Promise.all([
+  // 1+2+3. Run duplicate check, wait-time lookup, and active count in parallel.
+  // We compute position ourselves (count of active entries + 1) so every user
+  // gets a unique position regardless of whether a DB trigger is present.
+  const joinedAt = new Date().toISOString();
+  const [existingRes, waitRes, countRes] = await Promise.all([
     supabase
       .from('queues')
       .select('id')
@@ -285,14 +290,19 @@ export async function joinBusinessQueue(
     opts?.serviceType
       ? supabase.from('services').select('estimated_duration').eq('id', opts.serviceType).maybeSingle()
       : supabase.from('businesses').select('wait_time, waitTime').eq('id', businessId).maybeSingle(),
+    supabase
+      .from('queues')
+      .select('id', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+      .in('status', ['waiting', 'called', 'in_progress']),
   ]);
 
   if (existingRes.data) {
     return fetchQueueEntry(existingRes.data.id);
   }
 
-  // Estimate wait time (position will be assigned by DB trigger)
-  let waitMinutes = 5; // fallback per person
+  // Per-person wait time (minutes)
+  let waitMinutes = 5; // fallback
   if (opts?.serviceType) {
     const svc = waitRes.data as any;
     if (svc?.estimated_duration) waitMinutes = svc.estimated_duration;
@@ -302,20 +312,24 @@ export async function joinBusinessQueue(
     if (rawWait) waitMinutes = parseInt(String(rawWait).replace(/\D/g, '')) || waitMinutes;
   }
 
-  // 3. Insert — position is set atomically by trg_assign_queue_position trigger
+  // Position = current active count + 1 (unique, no trigger dependency)
+  const position = (countRes.count ?? 0) + 1;
+  const estimatedWaitTime = position * waitMinutes;
+
+  // 3. Insert with the computed position and estimated wait
   const { data: entry, error: insertError } = await supabase
     .from('queues')
     .insert({
-      business_id: businessId,
-      customer_id: userId,
-      customer_name: opts?.customerName,
-      customer_phone: opts?.customerPhone,
-      customer_email: opts?.customerEmail,
-      service_type: opts?.serviceType,
-      position: 0,               // placeholder — trigger overwrites this immediately
-      status: 'waiting',
-      estimated_wait_time: waitMinutes,
-      joined_at: new Date().toISOString(),
+      business_id:          businessId,
+      customer_id:          userId,
+      customer_name:        opts?.customerName,
+      customer_phone:       opts?.customerPhone,
+      customer_email:       opts?.customerEmail,
+      service_type:         opts?.serviceType,
+      position,
+      status:               'waiting',
+      estimated_wait_time:  estimatedWaitTime,
+      joined_at:            joinedAt,
     })
     .select()
     .single();
@@ -361,7 +375,7 @@ export async function joinBusinessQueue(
         name: resolvedBiz.name,
         category: resolvedBiz.category,
         address: resolvedBiz.address,
-        queue_length: newPosition,
+        queue_length: resolvedBiz.queue_length ?? entry.position,
         wait_time: formatWait(waitMinutes),
         rating: 0,
         is_open: resolvedBiz.is_open,
@@ -430,6 +444,11 @@ export async function fetchQueueEntry(
 
 /**
  * Fetch all active queue entries for a user (separate business lookup to avoid FK-join).
+ *
+ * Live position and total-queue-size are computed server-side via the
+ * `get_queue_positions` RPC (SECURITY DEFINER), which bypasses the
+ * "Users can view their own queue entries" RLS policy so we can safely
+ * count other customers' entries without exposing their private data.
  */
 export async function fetchUserActiveQueues(
   userId: string
@@ -448,27 +467,46 @@ export async function fetchUserActiveQueues(
   if (error) return { data: [], error: error.message };
 
   const entries = (data ?? []) as QueueEntryRecord[];
+  if (entries.length === 0) return { data: [], error: null };
 
-  // Collect unique business IDs and resolve them
+  // ── 1. Call the SECURITY DEFINER RPC for live positions ──────────────────────
+  // This runs as the DB owner so it can count ALL entries at the same business,
+  // not just the current user's — bypassing RLS correctly and safely.
+  const entryIds = entries.map((e) => e.id);
+  const { data: posRows, error: posError } = await supabase
+    .rpc('get_queue_positions', { p_entry_ids: entryIds });
+
+  if (posError) {
+    console.warn('[fetchUserActiveQueues] RPC get_queue_positions error:', posError.message);
+  }
+
+  // Build a lookup: entryId → { live_position, total_in_queue }
+  const posMap: Record<string, { live_position: number; total_in_queue: number }> = {};
+  for (const row of (posRows ?? []) as Array<{ entry_id: string; live_position: number; total_in_queue: number }>) {
+    posMap[row.entry_id] = {
+      live_position: Number(row.live_position),
+      total_in_queue: Number(row.total_in_queue),
+    };
+  }
+
+  // ── 2. Resolve business metadata ─────────────────────────────────────────────
   const bizIds = [...new Set(entries.map((e) => e.business_id).filter(Boolean))];
   const bizMap: Record<string, BusinessDetail> = {};
+
   if (bizIds.length > 0) {
-    const { data: bizRows } = await supabase
-      .from('Business')
-      .select('id, name, category, queue_length, wait_time, rating, is_open')
-      .in('id', bizIds);
-    for (const b of bizRows ?? []) {
-      bizMap[b.id] = b as BusinessDetail;
+    // Query businesses (both table-name casings) + admins + business_applications in parallel
+    const [bizLower, bizUpper, adminRows, appRows] = await Promise.all([
+      supabase.from('businesses').select('id, name, category, queue_length, wait_time, rating, is_open').in('id', bizIds),
+      supabase.from('Business').select('id, name, category, queue_length, wait_time, rating, is_open').in('id', bizIds),
+      supabase.from('admins').select('id, business_name, business_type').eq('role', 'business_owner').in('id', bizIds),
+      supabase.from('business_applications').select('id, business_name, business_type').eq('is_approved', true).in('id', bizIds),
+    ]);
+
+    for (const b of [...(bizLower.data ?? []), ...(bizUpper.data ?? [])]) {
+      if (!bizMap[b.id]) bizMap[b.id] = b as BusinessDetail;
     }
-    // Fallback to admins for any not found
-    const missing = bizIds.filter((id) => !bizMap[id]);
-    if (missing.length > 0) {
-      const { data: adminRows } = await supabase
-        .from('admins')
-        .select('id, business_name, business_type')
-        .in('id', missing)
-        .eq('role', 'business_owner');
-      for (const a of adminRows ?? []) {
+    for (const a of [...(adminRows.data ?? []), ...(appRows.data ?? [])]) {
+      if (!bizMap[a.id]) {
         bizMap[a.id] = {
           id: a.id,
           name: a.business_name ?? 'Business',
@@ -482,25 +520,31 @@ export async function fetchUserActiveQueues(
     }
   }
 
-  // Fetch live active queue counts per business (real-time total, not static queue_length)
-  const liveCountMap: Record<string, number> = {};
-  if (bizIds.length > 0) {
-    const { data: liveRows } = await supabase
-      .from('queues')
-      .select('business_id')
-      .in('business_id', bizIds)
-      .in('status', ['waiting', 'called', 'in_progress']);
-    for (const row of liveRows ?? []) {
-      liveCountMap[row.business_id] = (liveCountMap[row.business_id] ?? 0) + 1;
-    }
-  }
+  // ── 3. Normalise entries with live positions from the RPC ─────────────────────
+  const normalized = entries.map((e) => {
+    const pos = posMap[e.id];
+    // If the RPC returned data use it; otherwise fall back to the stored DB position
+    const livePosition = pos?.live_position ?? e.position ?? 1;
+    const totalInQueue = pos?.total_in_queue ?? livePosition;
 
-  const normalized = entries.map((e) => ({
-    ...e,
-    business: bizMap[e.business_id]
-      ? { ...bizMap[e.business_id], queue_length: liveCountMap[e.business_id] ?? e.position }
-      : undefined,
-  }));
+    // Derive per-person wait from stored values, fall back to 5 min
+    const storedPos = e.position > 0 ? e.position : 1;
+    const perPersonMinutes =
+      e.estimated_wait_time > 0
+        ? Math.ceil(e.estimated_wait_time / storedPos)
+        : 5;
+    const liveEstimatedWait = livePosition * perPersonMinutes;
+
+    return {
+      ...e,
+      position:             livePosition,
+      estimated_wait_time:  liveEstimatedWait,
+      business: bizMap[e.business_id]
+        ? { ...bizMap[e.business_id], queue_length: totalInQueue }
+        : undefined,
+    };
+  });
+
   return { data: normalized, error: null };
 }
 
@@ -611,8 +655,13 @@ export function subscribeToQueueEntry(
   entryId: string,
   onUpdate: (entry: Partial<QueueEntryRecord>) => void
 ) {
+  // Include a nonce so every subscription call gets a unique topic.
+  // A static topic like "queue:<id>" causes "cannot add postgres_changes callbacks
+  // after subscribe()" when React remounts the component (StrictMode / Fast Refresh)
+  // because the old channel may still be registered under the same name.
+  const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   const channel = supabase
-    .channel(`queue:${entryId}`)
+    .channel(`queue:${entryId}:${nonce}`)
     .on(
       'postgres_changes',
       {

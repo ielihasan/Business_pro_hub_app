@@ -291,6 +291,10 @@ let _paymentRealtimeUserId: string | null = null;
 let _paymentRealtimeNonce = 0;
 let _paymentSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+let _queueRetryCount = 0;
+let _paymentRetryCount = 0;
+const _MAX_REALTIME_RETRIES = 5;
+
 // ─── Realtime subscription for business-level queue changes ──────────────────
 // Fires when ANY user joins/leaves/updates in the same business queue,
 // so the current user sees totalInQueue update in real time.
@@ -439,10 +443,17 @@ function _setupQueueSubscription(userId: string, forceReconnect = false) {
       }
     )
     .subscribe((status, err) => {
-      if (status === 'CHANNEL_ERROR' && err) {
-        console.warn('[Queue realtime] Channel error:', (err as any)?.message ?? err);
+      if (status === 'SUBSCRIBED') {
+        _queueRetryCount = 0;
+      } else if (status === 'CHANNEL_ERROR') {
+        if (_queueRetryCount < _MAX_REALTIME_RETRIES) {
+          const delay = Math.min(1000 * 2 ** _queueRetryCount, 30000);
+          _queueRetryCount++;
+          setTimeout(() => _setupQueueSubscription(userId, true), delay);
+        } else {
+          console.warn('[Queue realtime] Channel error after max retries:', (err as any)?.message ?? err);
+        }
       } else if (status === 'TIMED_OUT') {
-        // Back off 3 s before reconnecting to avoid rapid retry loops
         setTimeout(() => _setupQueueSubscription(userId, true), 3000);
       } else if (status === 'CLOSED') {
         _debouncedSync(1000);
@@ -457,6 +468,7 @@ function _teardownQueueSubscription() {
     _queueRealtimeChannel = null;
   }
   _queueRealtimeUserId = null;
+  _queueRetryCount = 0;
 }
 
 function _setupPaymentSubscription(userId: string, forceReconnect = false) {
@@ -503,8 +515,16 @@ function _setupPaymentSubscription(userId: string, forceReconnect = false) {
       }
     )
     .subscribe((status, err) => {
-      if (status === 'CHANNEL_ERROR' && err) {
-        console.warn('[Payment realtime] Channel error:', (err as any)?.message ?? err);
+      if (status === 'SUBSCRIBED') {
+        _paymentRetryCount = 0;
+      } else if (status === 'CHANNEL_ERROR') {
+        if (_paymentRetryCount < _MAX_REALTIME_RETRIES) {
+          const delay = Math.min(1000 * 2 ** _paymentRetryCount, 30000);
+          _paymentRetryCount++;
+          setTimeout(() => _setupPaymentSubscription(userId, true), delay);
+        } else {
+          console.warn('[Payment realtime] Channel error after max retries:', (err as any)?.message ?? err);
+        }
       } else if (status === 'TIMED_OUT') {
         setTimeout(() => _setupPaymentSubscription(userId, true), 3000);
       } else if (status === 'CLOSED') {
@@ -523,6 +543,7 @@ function _teardownPaymentSubscription() {
     _paymentRealtimeChannel = null;
   }
   _paymentRealtimeUserId = null;
+  _paymentRetryCount = 0;
 }
 
 export const useStore = create<AppState>()(
@@ -589,16 +610,25 @@ export const useStore = create<AppState>()(
           _setupQueueSubscription(result.user.id);
           _setupPaymentSubscription(result.user.id);
 
-          // Initialize wallet (no-op if already initialized) + load payment methods + favorites + queues
-          const [walletBalance, methods] = await Promise.all([
-            initializeWallet(result.user.id),
+          // Load full wallet info + methods + favorites + queues in parallel.
+          // Using getWalletInfo (1 query) avoids the slow multi-step initializeWallet
+          // path for returning users. If no wallet exists yet, fall back to init.
+          const [walletInfo, methods] = await Promise.all([
+            getWalletInfo(result.user.id).then(async (info) => {
+              if (info) return info;
+              await initializeWallet(result.user.id);
+              return getWalletInfo(result.user.id);
+            }),
             getSavedPaymentMethods(result.user.id),
             get().loadFavorites(),
             get().syncQueuesFromSupabase(),
           ]);
           set((state) => ({
             paymentMethods: methods,
-            user: state.user ? { ...state.user, walletBalance } : null,
+            walletInfo,
+            user: state.user
+              ? { ...state.user, walletBalance: walletInfo?.balance ?? state.user.walletBalance }
+              : null,
           }));
 
           // Request notification permissions and send welcome notification
@@ -690,16 +720,23 @@ export const useStore = create<AppState>()(
             set({ isAuthenticated: true, user, session, isLoading: false });
             _setupQueueSubscription(session.user.id);
             _setupPaymentSubscription(session.user.id);
-            // Load wallet + payment methods + favorites + queues in background
-            const [walletBalance, methods] = await Promise.all([
-              initializeWallet(session.user.id),
+            // Load full wallet info + methods + favorites + queues in parallel.
+            const [walletInfo, methods] = await Promise.all([
+              getWalletInfo(session.user.id).then(async (info) => {
+                if (info) return info;
+                await initializeWallet(session.user.id);
+                return getWalletInfo(session.user.id);
+              }),
               getSavedPaymentMethods(session.user.id),
               get().loadFavorites(),
               get().syncQueuesFromSupabase(),
             ]);
             set((state) => ({
               paymentMethods: methods,
-              user: state.user ? { ...state.user, walletBalance } : null,
+              walletInfo,
+              user: state.user
+                ? { ...state.user, walletBalance: walletInfo?.balance ?? state.user.walletBalance }
+                : null,
             }));
           } else {
             set({ isAuthenticated: false, user: null, session: null, isLoading: false });
@@ -987,7 +1024,7 @@ export const useStore = create<AppState>()(
           }
         }
 
-        // data.position is the real position assigned by the DB trigger
+        // data.position is computed by joinBusinessQueue (count+1), so it's correct.
         const entry: QueueEntry = {
           id: data.id,
           businessId: data.business_id,
@@ -995,7 +1032,7 @@ export const useStore = create<AppState>()(
           businessCategory: data.business?.category ?? '',
           ticketNumber: ticketLabel(data.position, data.joined_at),
           position: data.position,
-          totalInQueue: data.position, // will be corrected by next syncQueuesFromSupabase
+          totalInQueue: data.business?.queue_length ?? data.position,
           estimatedWait: formatWait(data.estimated_wait_time),
           status: data.status,
           joinedAt: new Date(data.joined_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
@@ -1119,12 +1156,9 @@ export const useStore = create<AppState>()(
           ticketNumber: ticketLabel(r.position, r.joined_at),
           position: r.position,
           totalInQueue: liveTotal ?? r.business?.queue_length ?? r.position,
-          // Recalculate estimated wait from the DB position so it stays accurate as queue shrinks
-          estimatedWait: formatWait(
-            r.estimated_wait_time != null && r.position > 0
-              ? Math.ceil(r.estimated_wait_time / Math.max(r.position, 1)) * r.position
-              : r.estimated_wait_time
-          ),
+          // estimated_wait_time is already live-computed in fetchUserActiveQueues
+          // (livePosition × perPersonMinutes), so use it directly.
+          estimatedWait: formatWait(r.estimated_wait_time ?? 0),
           status: r.status,
           joinedAt: toTime(r.joined_at),
           completedAt: r.completed_at
@@ -1275,8 +1309,8 @@ export const useStore = create<AppState>()(
           const { newBalance, balanceBefore, error } = await topUpWalletBalance(user.id, amount);
           if (error || newBalance === null) return { success: false, error: error ?? 'Top-up failed' };
 
-          // Record credit transaction
-          await recordWalletTransaction({
+          // Record credit transaction (fire-and-forget — don't block balance update)
+          recordWalletTransaction({
             userId:          user.id,
             paymentMethodId,
             amount,
@@ -1286,14 +1320,20 @@ export const useStore = create<AppState>()(
             balanceAfter:    newBalance,
           });
 
-          // Reload full wallet info from DB
-          const freshInfo = await getWalletInfo(user.id);
+          // Update state optimistically — no extra DB round-trip needed
           set((state) => ({
-            walletInfo: freshInfo,
+            walletInfo: state.walletInfo
+              ? {
+                  ...state.walletInfo,
+                  balance:       newBalance,
+                  totalCredited: state.walletInfo.totalCredited + amount,
+                  updatedAt:     new Date().toISOString(),
+                }
+              : null,
             user: state.user ? { ...state.user, walletBalance: newBalance } : null,
           }));
 
-          return { success: true, newBalance, walletInfo: freshInfo ?? undefined };
+          return { success: true, newBalance };
         } finally {
           _toppingUp = false;
         }
@@ -1304,26 +1344,46 @@ export const useStore = create<AppState>()(
         if (!user) return { success: false, error: 'Not authenticated' };
         const { id, error } = await addPaymentMethod({ userId: user.id, ...params });
         if (error) return { success: false, error };
-        // Reload methods + wallet info (is_active may have flipped)
-        const [methods, freshInfo] = await Promise.all([
-          getSavedPaymentMethods(user.id),
-          getWalletInfo(user.id),
-        ]);
-        set({ paymentMethods: methods, walletInfo: freshInfo });
+        // Optimistically update state — no extra DB round-trips
+        const existingMethods = get().paymentMethods;
+        const isDefault = params.makeDefault || existingMethods.length === 0;
+        const newMethod: SavedPaymentMethod = {
+          id: id!,
+          userId: user.id,
+          type: params.type,
+          accountTitle: params.accountTitle,
+          accountNumber: params.accountNumber,
+          bankName: params.bankName,
+          isDefault,
+          createdAt: new Date().toISOString(),
+        };
+        set((state) => ({
+          paymentMethods: isDefault
+            ? [newMethod, ...state.paymentMethods.map((m) => ({ ...m, isDefault: false }))]
+            : [newMethod, ...state.paymentMethods],
+          // Wallet becomes active now that a method exists
+          walletInfo: state.walletInfo ? { ...state.walletInfo, isActive: true } : null,
+        }));
         return { success: true };
       },
 
       removeWalletPaymentMethod: async (id) => {
         const user = get().user;
         if (!user) return { success: false, error: 'Not authenticated' };
-        // Pass userId so deletePaymentMethod can sync wallets.is_active
         const { error } = await deletePaymentMethod(id, user.id);
         if (error) return { success: false, error };
-        const [methods, freshInfo] = await Promise.all([
-          getSavedPaymentMethods(user.id),
-          getWalletInfo(user.id),
-        ]);
-        set({ paymentMethods: methods, walletInfo: freshInfo });
+        // Optimistically remove from state — no extra DB round-trips
+        const remaining = get().paymentMethods.filter((m) => m.id !== id);
+        const removedWasDefault = get().paymentMethods.find((m) => m.id === id)?.isDefault ?? false;
+        const withDefault = removedWasDefault && remaining.length > 0
+          ? remaining.map((m, i) => ({ ...m, isDefault: i === 0 }))
+          : remaining;
+        set((state) => ({
+          paymentMethods: withDefault,
+          walletInfo: state.walletInfo
+            ? { ...state.walletInfo, isActive: remaining.length > 0 }
+            : null,
+        }));
         return { success: true };
       },
 
