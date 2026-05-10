@@ -21,8 +21,9 @@ SplashScreen.preventAutoHideAsync();
 function AppLoadingScreen() {
   return (
     <View style={ls.root}>
+      {/* adaptive-icon has transparent background — looks clean on black */}
       <Image
-        source={require('../assets/icon.png')}
+        source={require('../assets/adaptive-icon.png')}
         style={ls.icon}
         resizeMode="contain"
       />
@@ -32,7 +33,7 @@ function AppLoadingScreen() {
 
 const ls = StyleSheet.create({
   root: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000000' },
-  icon: { width: 160, height: 160, borderRadius: 36 },
+  icon: { width: 260, height: 300 },
 });
 
 export default function RootLayout() {
