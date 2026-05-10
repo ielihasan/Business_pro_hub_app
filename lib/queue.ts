@@ -126,11 +126,8 @@ export async function resolveBusinessById(
   // Query both table name variants ('businesses' and 'Business') to handle
   // environments where the table was created with different casing.
   const [liveQueue, bizLowerResult, bizUpperResult, adminResult] = await Promise.all([
-    supabase
-      .from('queues')
-      .select('id', { count: 'exact', head: true })
-      .eq('business_id', businessId)
-      .in('status', ['waiting', 'in_progress']),
+    // SECURITY DEFINER RPC bypasses RLS — counts all real customers, not just the caller's own rows.
+    supabase.rpc('count_business_queue_active', { p_business_id: businessId }),
     supabase.from('businesses').select('*').eq('id', businessId).maybeSingle(),
     supabase.from('Business').select('*').eq('id', businessId).maybeSingle(),
     supabase
@@ -141,7 +138,7 @@ export async function resolveBusinessById(
       .maybeSingle(),
   ]);
 
-  const liveCount = liveQueue.count ?? 0;
+  const liveCount = Number(liveQueue.data ?? 0);
   const waitStr = liveCount > 0 ? `~${liveCount * 5} min` : 'No wait';
 
   // 1. Try the businesses table first (either casing)
@@ -276,8 +273,8 @@ export async function joinBusinessQueue(
   }
 ): Promise<{ data: QueueEntryRecord | null; error: string | null }> {
   // 1+2+3. Run duplicate check, wait-time lookup, and active count in parallel.
-  // We compute position ourselves (count of active entries + 1) so every user
-  // gets a unique position regardless of whether a DB trigger is present.
+  // count_business_queue_active is SECURITY DEFINER — it bypasses RLS so we
+  // see ALL customers' entries, not just the current user's own row.
   const joinedAt = new Date().toISOString();
   const [existingRes, waitRes, countRes] = await Promise.all([
     supabase
@@ -290,11 +287,8 @@ export async function joinBusinessQueue(
     opts?.serviceType
       ? supabase.from('services').select('estimated_duration').eq('id', opts.serviceType).maybeSingle()
       : supabase.from('businesses').select('wait_time, waitTime').eq('id', businessId).maybeSingle(),
-    supabase
-      .from('queues')
-      .select('id', { count: 'exact', head: true })
-      .eq('business_id', businessId)
-      .in('status', ['waiting', 'called', 'in_progress']),
+    // Use SECURITY DEFINER RPC so RLS does not hide other customers' entries.
+    supabase.rpc('count_business_queue_active', { p_business_id: businessId }),
   ]);
 
   if (existingRes.data) {
@@ -312,8 +306,9 @@ export async function joinBusinessQueue(
     if (rawWait) waitMinutes = parseInt(String(rawWait).replace(/\D/g, '')) || waitMinutes;
   }
 
-  // Position = current active count + 1 (unique, no trigger dependency)
-  const position = (countRes.count ?? 0) + 1;
+  // Position = current active real-customer count + 1
+  const activeCount = Number(countRes.data ?? 0);
+  const position = activeCount + 1;
   const estimatedWaitTime = position * waitMinutes;
 
   // 3. Insert with the computed position and estimated wait
@@ -375,7 +370,8 @@ export async function joinBusinessQueue(
         name: resolvedBiz.name,
         category: resolvedBiz.category,
         address: resolvedBiz.address,
-        queue_length: resolvedBiz.queue_length ?? entry.position,
+        // queue_length after insert = previous active count + 1 (this user)
+        queue_length: activeCount + 1,
         wait_time: formatWait(waitMinutes),
         rating: 0,
         is_open: resolvedBiz.is_open,
@@ -527,12 +523,16 @@ export async function fetchUserActiveQueues(
     const livePosition = pos?.live_position ?? e.position ?? 1;
     const totalInQueue = pos?.total_in_queue ?? livePosition;
 
-    // Derive per-person wait from stored values, fall back to 5 min
-    const storedPos = e.position > 0 ? e.position : 1;
+    // Per-person wait: use the original stored time divided by the ORIGINAL stored
+    // position (not live), so it represents one person's service duration.
+    // If both stored values are valid we get an accurate per-person figure;
+    // otherwise fall back to 5 min.
+    const storedPos = (e.position ?? 0) > 1 ? e.position : 1;
     const perPersonMinutes =
-      e.estimated_wait_time > 0
-        ? Math.ceil(e.estimated_wait_time / storedPos)
+      e.estimated_wait_time > 0 && storedPos > 0
+        ? Math.round(e.estimated_wait_time / storedPos)
         : 5;
+    // Live wait = how many people are ahead × per-person time
     const liveEstimatedWait = livePosition * perPersonMinutes;
 
     return {

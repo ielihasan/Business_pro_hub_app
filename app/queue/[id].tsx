@@ -88,6 +88,8 @@ export default function QueueDetailScreen() {
   const [dialog, setDialog] = useState<DialogConfig | null>(null);
   const [serviceName, setServiceName] = useState<string | null>(null);
   const leaveQueueInSupabase = useStore((s) => s.leaveQueueInSupabase);
+  // Live position/wait/total from the store (updated by the business-queue realtime subscription + RPC)
+  const storeEntry = useStore((s) => s.activeQueues.find((q) => q.id === id));
 
   useEffect(() => {
     if (!id) return;
@@ -113,10 +115,16 @@ export default function QueueDetailScreen() {
     return unsubscribe;
   }, [id]);
 
-  const queueLen    = queue?.business?.queue_length ?? queue?.position ?? 1;
-  const progressPct = queue ? Math.max(0, Math.min(100,
-    ((queueLen - queue.position + 1) / queueLen) * 100
-  )) : 0;
+  // Prefer live values from the store (RPC-backed, updates when others join/complete).
+  // Fall back to the locally fetched queue if the store entry is not yet available.
+  const livePosition = storeEntry?.position ?? queue?.position ?? 1;
+  const liveTotal    = storeEntry?.totalInQueue ?? queue?.business?.queue_length ?? livePosition;
+  const liveWait     = storeEntry?.estimatedWait ?? formatWait(queue?.estimated_wait_time ?? 0);
+
+  const queueLen    = liveTotal;
+  const progressPct = Math.max(0, Math.min(100,
+    ((queueLen - livePosition + 1) / Math.max(queueLen, 1)) * 100
+  ));
 
   const handleLeaveQueue = () => {
     if (!queue) return;
@@ -238,9 +246,9 @@ export default function QueueDetailScreen() {
         <View style={[styles.statsRow, { borderBottomColor: colors.border }]}>
           <View style={styles.statBox}>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>POSITION</Text>
-            <Text style={[styles.statValue, { color: colors.foreground }]}>#{queue.position}</Text>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>#{livePosition}</Text>
             <Text style={[styles.statSub, { color: colors.mutedForeground }]}>
-              of {queueLen} in queue
+              of {liveTotal} in queue
             </Text>
           </View>
 
@@ -249,11 +257,11 @@ export default function QueueDetailScreen() {
           <View style={styles.statBox}>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>EST. WAIT</Text>
             <Text style={[styles.statValue, { color: colors.foreground }]}>
-              {formatWait(queue.estimated_wait_time)}
+              {liveWait}
             </Text>
             <Text style={[styles.statSub, { color: colors.mutedForeground }]}>
-              {readyAtTime(queue.estimated_wait_time)
-                ? `Ready ~${readyAtTime(queue.estimated_wait_time)}`
+              {readyAtTime(queue?.estimated_wait_time ?? 0)
+                ? `Ready ~${readyAtTime(queue?.estimated_wait_time ?? 0)}`
                 : 'Updated just now'}
             </Text>
           </View>
