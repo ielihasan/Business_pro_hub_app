@@ -2,7 +2,7 @@ import '@/lib/suppressWarnings'; // MUST be first — patches console before nat
 import { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme, View, Text, Animated, Image, StyleSheet } from 'react-native';
+import { useColorScheme, View, Image, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Linking from 'expo-linking';
 import { Colors } from '@/constants/theme';
@@ -12,64 +12,27 @@ import { oauthState } from '@/lib/oauthState';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import '@/lib/i18n';
 
-// Keep the splash screen visible while we fetch resources
+// Minimum time (ms) the splash screen stays visible — even if auth finishes faster
+const SPLASH_DURATION_MS = 3000;
+
+// Keep the native splash screen visible while JS loads
 SplashScreen.preventAutoHideAsync();
 
-function AppLoadingScreen({ colors }: { colors: typeof Colors.dark }) {
-  const pulse = new Animated.Value(1);
-  const dot1  = new Animated.Value(0.3);
-  const dot2  = new Animated.Value(0.3);
-  const dot3  = new Animated.Value(0.3);
-
-  Animated.loop(
-    Animated.sequence([
-      Animated.timing(pulse, { toValue: 1.08, duration: 800, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 1,    duration: 800, useNativeDriver: true }),
-    ])
-  ).start();
-
-  const animateDot = (dot: Animated.Value, delay: number) =>
-    Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(dot, { toValue: 1,   duration: 300, useNativeDriver: true }),
-        Animated.timing(dot, { toValue: 0.3, duration: 300, useNativeDriver: true }),
-        Animated.delay(600 - delay),
-      ])
-    ).start();
-
-  animateDot(dot1, 0);
-  animateDot(dot2, 200);
-  animateDot(dot3, 400);
-
+function AppLoadingScreen() {
   return (
-    <View style={[ls.root, { backgroundColor: '#000000' }]}>
-      {/* Actual app icon image with pulse animation */}
-      <Animated.View style={{ transform: [{ scale: pulse }], marginBottom: 24 }}>
-        <Image
-          source={require('../assets/icon.png')}
-          style={ls.iconImage}
-          resizeMode="contain"
-        />
-      </Animated.View>
-      <Text style={ls.title}>BusinessHub Pro</Text>
-      <Text style={ls.sub}>Smart Queue Management</Text>
-      <View style={ls.dots}>
-        {[dot1, dot2, dot3].map((d, i) => (
-          <Animated.View key={i} style={[ls.dot, { opacity: d }]} />
-        ))}
-      </View>
+    <View style={ls.root}>
+      <Image
+        source={require('../assets/icon.png')}
+        style={ls.icon}
+        resizeMode="contain"
+      />
     </View>
   );
 }
 
 const ls = StyleSheet.create({
-  root:      { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: '#000000' },
-  iconImage: { width: 120, height: 120, borderRadius: 28 },
-  title:     { fontSize: 22, fontWeight: '900', letterSpacing: -0.5, color: '#FFFFFF' },
-  sub:       { fontSize: 13, fontWeight: '500', marginTop: -4, color: '#888888' },
-  dots:      { flexDirection: 'row', gap: 8, marginTop: 32 },
-  dot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFFFFF' },
+  root: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000000' },
+  icon: { width: 160, height: 160, borderRadius: 36 },
 });
 
 export default function RootLayout() {
@@ -86,11 +49,15 @@ export default function RootLayout() {
   const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
-    // Initialize authentication on app start
+    // Wait for BOTH auth to finish AND the minimum splash duration.
+    // This ensures the icon screen is always visible for at least SPLASH_DURATION_MS,
+    // even on fast devices where auth completes in under a second.
     const initAuth = async () => {
-      await initializeAuth();
+      await Promise.all([
+        initializeAuth(),
+        new Promise<void>((resolve) => setTimeout(resolve, SPLASH_DURATION_MS)),
+      ]);
       setAppReady(true);
-      // Hide splash screen after auth is initialized
       SplashScreen.hideAsync();
     };
 
@@ -161,7 +128,7 @@ export default function RootLayout() {
 
   // Show loading indicator while initializing auth for the first time
   if (!appReady) {
-    return <AppLoadingScreen colors={colors} />;
+    return <AppLoadingScreen />;
   }
 
   return (
