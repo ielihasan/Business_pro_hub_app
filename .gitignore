@@ -30,7 +30,6 @@ yarn-error.*
 
 # local env files
 .env*.local
-.env
 
 # typescript
 *.tsbuildinfo
@@ -40,7 +39,6 @@ coverage/
 
 # IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 
@@ -49,3 +47,7 @@ coverage/
 
 expo-env.d.ts
 # @end expo-cli
+temp_auto_push.bat
+temp_interactive_push.bat
+branch_structure.json
+config.bat
