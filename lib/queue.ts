@@ -276,6 +276,10 @@ export async function joinBusinessQueue(
   // count_business_queue_active is SECURITY DEFINER — it bypasses RLS so we
   // see ALL customers' entries, not just the current user's own row.
   const joinedAt = new Date().toISOString();
+  // Scope duplicate check to today only — stale "waiting" entries from previous
+  // days must not block a fresh join (dashboard only shows today's entries).
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
   const [existingRes, waitRes, countRes] = await Promise.all([
     supabase
       .from('queues')
@@ -283,6 +287,7 @@ export async function joinBusinessQueue(
       .eq('business_id', businessId)
       .eq('customer_id', userId)
       .in('status', ['waiting', 'called', 'in_progress'])
+      .gte('joined_at', todayStart.toISOString())
       .maybeSingle(),
     opts?.serviceType
       ? supabase.from('services').select('estimated_duration').eq('id', opts.serviceType).maybeSingle()
@@ -306,61 +311,35 @@ export async function joinBusinessQueue(
     if (rawWait) waitMinutes = parseInt(String(rawWait).replace(/\D/g, '')) || waitMinutes;
   }
 
-  // Position = current active real-customer count + 1
+  // Active count for wait-time estimate (position is assigned atomically below).
   const activeCount = Number(countRes.data ?? 0);
-  const position = activeCount + 1;
-  const estimatedWaitTime = position * waitMinutes;
+  const estimatedWaitTime = (activeCount + 1) * waitMinutes;
 
-  // 3. Insert with the computed position and estimated wait
-  const { data: entry, error: insertError } = await supabase
-    .from('queues')
-    .insert({
-      business_id:          businessId,
-      customer_id:          userId,
-      customer_name:        opts?.customerName,
-      customer_phone:       opts?.customerPhone,
-      customer_email:       opts?.customerEmail,
-      service_type:         opts?.serviceType,
-      position,
-      status:               'waiting',
-      estimated_wait_time:  estimatedWaitTime,
-      joined_at:            joinedAt,
-    })
-    .select()
-    .single();
+  // 3. Atomic insert: the DB function acquires a per-business advisory lock,
+  //    computes MAX(position)+1 for today, and inserts — all in one transaction.
+  //    This eliminates the race condition where two concurrent joins both read
+  //    the same count and end up with the same position number.
+  const { data: rpcRows, error: insertError } = await supabase
+    .rpc('join_queue_atomic', {
+      p_business_id:    businessId,
+      p_customer_id:    userId,
+      p_customer_name:  opts?.customerName ?? '',
+      p_customer_phone: opts?.customerPhone ?? null,
+      p_customer_email: opts?.customerEmail ?? null,
+      p_service_type:   opts?.serviceType   ?? null,
+      p_estimated_wait: estimatedWaitTime,
+      p_quantity:       opts?.quantity  ?? 1,
+      p_unit_price:     opts?.unitPrice ?? 0,
+      p_total_price:    opts?.totalAmount ?? 0,
+      p_joined_at:      joinedAt,
+    });
 
   if (insertError) return { data: null, error: insertError.message };
+  const entry = Array.isArray(rpcRows) ? rpcRows[0] : rpcRows;
+  if (!entry) return { data: null, error: 'Insert returned no data' };
 
-  // 4b. Best-effort pricing persistence into queues table.
-  // If these columns are not present in some environments, we gracefully
-  // fallback to storing pricing metadata in `notes`.
-  const quantity = opts?.quantity ?? 1;
-  const unitPrice = opts?.unitPrice ?? 0;
-  const totalAmount = opts?.totalAmount ?? unitPrice * quantity;
-
-  const pricingUpdate: Record<string, any> = {};
-  if (Number.isFinite(quantity)) pricingUpdate.quantity = quantity;
-  if (Number.isFinite(unitPrice)) pricingUpdate.unit_price = unitPrice;
-  if (Number.isFinite(totalAmount)) pricingUpdate.total_price = totalAmount;
-
-  // 5. Pricing update + business name resolve in parallel
-  const pricingPromise = Object.keys(pricingUpdate).length > 0
-    ? supabase.from('queues').update(pricingUpdate).eq('id', entry.id).then(({ error: pricingError }) => {
-        if (pricingError) {
-          console.warn('Queues pricing columns update failed, falling back to notes:', pricingError.message);
-          const pricingMeta = JSON.stringify({ quantity, unit_price: unitPrice, total_price: totalAmount });
-          const fallbackNotes = entry.notes
-            ? `${entry.notes}\npricing_meta:${pricingMeta}`
-            : `pricing_meta:${pricingMeta}`;
-          return supabase.from('queues').update({ notes: fallbackNotes }).eq('id', entry.id);
-        }
-        (entry as any).quantity = quantity;
-        (entry as any).unit_price = unitPrice;
-        (entry as any).total_price = totalAmount;
-      })
-    : Promise.resolve();
-
-  const [, { data: resolvedBiz }] = await Promise.all([pricingPromise, resolveBusinessById(businessId)]);
+  // 4. Resolve business name in parallel (pricing is already set by the atomic insert).
+  const { data: resolvedBiz } = await resolveBusinessById(businessId);
 
   return {
     data: {
@@ -370,7 +349,6 @@ export async function joinBusinessQueue(
         name: resolvedBiz.name,
         category: resolvedBiz.category,
         address: resolvedBiz.address,
-        // queue_length after insert = previous active count + 1 (this user)
         queue_length: activeCount + 1,
         wait_time: formatWait(waitMinutes),
         rating: 0,
